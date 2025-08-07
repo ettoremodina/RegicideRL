@@ -1,0 +1,22 @@
+{
+  "experiment_name": "quick_test_run",
+  "timestamp": "2025-08-06T18:54:01.779676",
+  "config": {
+    "num_episodes": 100,
+    "learning_rate": 0.001,
+    "hidden_size": 64,
+    "gamma": 0.99,
+    "description": "Quick demonstration run"
+  },
+  "final_stats": {
+    "total_episodes": 100,
+    "final_win_rate": 0.0,
+    "avg_bosses_killed": 0.92,
+    "max_bosses_killed": 4
+  },
+  "files": {
+    "final_model": "C:\\Users\\modin\\Desktop\\Ettore\\programming\\Regicide\\outputs\\quick_test_run\\models\\final_model.pth",
+    "training_plot": "C:\\Users\\modin\\Desktop\\Ettore\\programming\\Regicide\\outputs\\quick_test_run\\plots\\training_progress.png",
+    "logs": "C:\\Users\\modin\\Desktop\\Ettore\\programming\\Regicide\\outputs\\quick_test_run\\logs\\training.log"
+  }
+}

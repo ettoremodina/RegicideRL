@@ -1,0 +1,24 @@
+{
+  "experiment_name": "regicide_training_20250807_022732",
+  "timestamp": "2025-08-07T02:46:21.677806",
+  "config": {
+    "learning_rate": 0.005,
+    "gamma": 0.99,
+    "policy_type": "card_aware",
+    "num_players": 4,
+    "max_hand_size": 6,
+    "card_embed_dim": 64,
+    "hidden_dim": 128
+  },
+  "final_stats": {
+    "total_episodes": 35000,
+    "final_win_rate": 0.44,
+    "avg_bosses_killed": 0.5501714285714285,
+    "max_bosses_killed": 4
+  },
+  "files": {
+    "final_model": "C:\\Users\\modin\\Desktop\\Ettore\\programming\\Regicide\\outputs\\regicide_training_20250807_022732\\models\\final_model.pth",
+    "training_plot": "C:\\Users\\modin\\Desktop\\Ettore\\programming\\Regicide\\outputs\\regicide_training_20250807_022732\\plots\\training_progress.png",
+    "logs": "C:\\Users\\modin\\Desktop\\Ettore\\programming\\Regicide\\outputs\\regicide_training_20250807_022732\\logs\\training.log"
+  }
+}

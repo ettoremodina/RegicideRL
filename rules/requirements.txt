@@ -1,0 +1,15 @@
+# Core ML libraries
+torch>=1.12.0
+numpy>=1.21.0
+
+# Gymnasium and RL libraries
+gymnasium>=0.26.0
+stable-baselines3>=2.0.0
+
+# Optional but recommended
+tensorboard>=2.10.0
+matplotlib>=3.5.0
+
+# For better performance (optional)
+# gymnasium[box2d]  # If you need Box2D environments
+# gym[atari]        # If you need Atari environments
