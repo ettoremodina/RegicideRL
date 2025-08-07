@@ -1,0 +1,37 @@
+REGICIDE POLICY ANALYSIS REPORT
+==================================================
+
+Analysis Date: 2025-08-07T14:53:24.659230
+Total Games Analyzed: 50
+Total Decisions Recorded: 743
+
+ACTION DISTRIBUTION ANALYSIS
+------------------------------
+Unique Actions Used: 12
+Most Common Action: 0 (27.2% of decisions)
+ No action collapse detected - good action diversity
+
+DECISION QUALITY ANALYSIS
+------------------------------
+Average Decision Entropy: 0.458 ± 0.679
+Action Consistency: 0.328
+Entropy Assessment: very_decisive
+Consistency Assessment: highly_varied
+
+PERFORMANCE ANALYSIS
+------------------------------
+Average Bosses Killed: 2.18
+Maximum Bosses Killed: 5
+Win Rate: 0.0%
+Average Episode Length: 14.9 steps
+Average Episode Reward: 41.96
+Performance Assessment: fair
+
+STRATEGIC ANALYSIS
+------------------------------
+Yield Rate: 8.9%
+
+ RECOMMENDATIONS
+------------------------------
+• Policy is very decisive - might be overfitting
+• Low win rate - policy needs significant improvement

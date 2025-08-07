@@ -26,8 +26,8 @@ class CardAwareRegicideTrainer:
     def __init__(self, 
                  env: RegicideGymEnv,
                  learning_rate: float = 0.001,
-                 card_embed_dim: int = 64,
-                 hidden_dim: int = 128,
+                 card_embed_dim: int = 16,
+                 hidden_dim: int = 64,
                  gamma: float = 0.99,
                  experiment_name: str = None):
         
@@ -49,13 +49,27 @@ class CardAwareRegicideTrainer:
             hidden_dim=hidden_dim
         )
     
-        # Optimizer
-        self.optimizer = optim.Adam(self.policy.parameters(), lr=learning_rate)
+        # Optimizer - AdamW with weight decay for better generalization
+        self.optimizer = optim.AdamW(
+            self.policy.parameters(), 
+            lr=learning_rate,
+            weight_decay=1e-4,
+            eps=1e-8
+        )
+        
+        # Learning rate scheduler for adaptive learning
+        self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+            self.optimizer, 
+            mode='max',  # We want to maximize rewards
+            factor=0.8,  # Reduce LR by 20% when plateau
+            patience=1000,  # Wait 1000 episodes before reducing
+            min_lr=1e-5
+        )
         
         # Create evaluator (will need to be updated for card-aware policy)
         # self.evaluator = TrainingEvaluator(env, self.policy)
     
-    def collect_episode(self, render: bool = False) -> Tuple[List, List, List, float, int, int]:
+    def collect_episode(self, render: bool = False) -> Tuple[List, List, List, List, float, int, int]:
         """Collect one episode of experience with card-aware observations"""
         observations = []
         actions = []
@@ -83,7 +97,7 @@ class CardAwareRegicideTrainer:
             observations.append(obs)
             actions.append(action)
             log_probs.append(log_prob)
-            rewards.append(reward)
+            rewards.append(reward)  # Store step reward
             
             episode_reward += reward
             episode_length += 1
@@ -100,7 +114,7 @@ class CardAwareRegicideTrainer:
             obs = next_obs
             info = next_info
         
-        return observations, actions, log_probs, episode_reward, episode_length, next_info.get('bosses_killed', 0)
+        return observations, actions, log_probs, rewards, episode_reward, episode_length, next_info.get('bosses_killed', 0)
     
     def _render_step(self, action: int, episode_length: int, info: dict, obs: Dict):
         """Render a single step during episode with enhanced information"""
@@ -140,7 +154,7 @@ class CardAwareRegicideTrainer:
             print(f"\n💀 DEFEAT! Episode length: {episode_length}, Bosses killed: {bosses_killed}")
     
     def compute_returns(self, rewards: List[float]) -> List[float]:
-        """Compute discounted returns"""
+        """Compute discounted returns properly"""
         returns = []
         G = 0
         
@@ -151,35 +165,43 @@ class CardAwareRegicideTrainer:
         return returns
     
     def train_episode(self, render: bool = False) -> Dict:
-        """Train on one episode using REINFORCE with enhanced rewards"""
-        # Collect episode
-        observations, actions, log_probs, episode_reward, episode_length, bosses_killed = self.collect_episode(render)
+        """Train on one episode using REINFORCE with proper returns"""
+        # Collect episode - now also collect step rewards
+        observations, actions, log_probs, rewards, episode_reward, episode_length, bosses_killed = self.collect_episode(render)
         
-        # Compute returns
-        returns = self.compute_returns([0.0] * (len(observations) - 1) + [episode_reward])
+        # Compute proper discounted returns from step rewards
+        returns = self.compute_returns(rewards)
         
         # Convert to tensors
         log_probs = torch.stack(log_probs)
         returns = torch.FloatTensor(returns)
         
-        # Normalize returns for training stability
+        # Use baseline for variance reduction
         if len(returns) > 1:
-            returns = (returns - returns.mean()) / (returns.std() + 1e-8)
+            baseline = returns.mean()
+            advantages = returns - baseline
+        else:
+            advantages = returns
         
         # Compute policy loss
-        policy_loss = -(log_probs * returns).mean()
+        policy_loss = -(log_probs * advantages).mean()
         
         # Update policy
         self.optimizer.zero_grad()
         policy_loss.backward()
         
         # Gradient clipping for stability
-        torch.nn.utils.clip_grad_norm_(self.policy.parameters(), max_norm=1.0)
+        torch.nn.utils.clip_grad_norm_(self.policy.parameters(), max_norm=0.5)
         
         self.optimizer.step()
         
         # Update statistics
         self.stats.update(episode_reward, episode_length, bosses_killed)
+        
+        # Step learning rate scheduler based on recent performance
+        if hasattr(self, 'scheduler') and len(self.stats.episode_rewards) % 100 == 0:
+            recent_reward = np.mean(self.stats.episode_rewards[-100:])
+            self.scheduler.step(recent_reward)
         
         # Return episode results
         return {
@@ -291,6 +313,7 @@ class CardAwareRegicideTrainer:
         torch.save({
             'policy_state_dict': self.policy.state_dict(),
             'optimizer_state_dict': self.optimizer.state_dict(),
+            'scheduler_state_dict': self.scheduler.state_dict() if hasattr(self, 'scheduler') else None,
             'training_stats': stats_dict,
             'model_config': model_config
         }, filepath)
@@ -304,6 +327,11 @@ class CardAwareRegicideTrainer:
         # Load model
         self.policy.load_state_dict(checkpoint['policy_state_dict'])
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        
+        # Load scheduler if available
+        if 'scheduler_state_dict' in checkpoint and checkpoint['scheduler_state_dict'] is not None:
+            if hasattr(self, 'scheduler'):
+                self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
         
         # Load training statistics if available
         if 'training_stats' in checkpoint:
@@ -353,14 +381,14 @@ def main():
     CONFIG = {
         'num_players': 4,
         'max_hand_size': 5,
-        'learning_rate': 0.005,  # Slightly lower for stability
-        'card_embed_dim': 64,
-        'hidden_dim': 128,
-        'gamma': 0.99,
-        'num_episodes': 35000,  # Start with fewer episodes to test
-        'render_every': 200,
-        'log_every': 50,
-        'save_every': 1000,
+        'learning_rate': 0.0015,  # Slightly higher for AdamW
+        'card_embed_dim': 12,
+        'hidden_dim': 32,
+        'gamma': 0.95,  # Slightly lower discount for faster learning
+        'num_episodes': 50000,
+        'render_every': 5000,
+        'log_every': 200,
+        'save_every': 10000,
         'eval_episodes': 30,
     }
     

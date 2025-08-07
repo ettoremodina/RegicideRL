@@ -71,6 +71,7 @@ class RegicideGymEnv(gym.Env):
             'hand_size': spaces.Box(0, self.max_hand_size, (), dtype=np.int32),
             'enemy_card': spaces.Box(0, self.card_vocab_size-1, (), dtype=np.int32),
             'game_state': spaces.Box(0, 1, (12,), dtype=np.float32),
+            'discard_pile_cards': spaces.Box(0, 1, (self.card_vocab_size,), dtype=np.bool_),
             'action_mask': spaces.Box(0, 1, (self.max_actions,), dtype=np.bool_)
         })
     
@@ -79,9 +80,10 @@ class RegicideGymEnv(gym.Env):
         # Hand: one-hot encoding (max_hand_size * card_vocab_size)
         # Enemy: card one-hot + stats (card_vocab_size + 6)
         # Game state: 12 values
+        # Discard pile: bit tensor (card_vocab_size)
         # Action info: max_actions mask
         obs_size = (self.max_hand_size * self.card_vocab_size + 
-                   self.card_vocab_size + 6 + 12 + self.max_actions)
+                   self.card_vocab_size + 6 + 12 + self.card_vocab_size + self.max_actions)
         self.observation_space = spaces.Box(0, 1, (obs_size,), dtype=np.float32)
     
     def reset(self, seed: Optional[int] = None, options: Optional[Dict] = None) -> Tuple[Union[Dict, torch.Tensor], Dict]:
@@ -232,7 +234,7 @@ class RegicideGymEnv(gym.Env):
             (self.game.current_enemy.health - self.game.current_enemy.damage_taken) / 40.0,  # Current health
             self.game.current_enemy.spade_protection / 20.0,  # Spade protection
             len(self.game.castle_deck) / 12.0,  # Enemies remaining
-            len(self.game.tavern_deck) / 100.0,  # Tavern deck size
+            len(self.game.tavern_deck) / 53.0,  # Tavern deck size
             len(current_hand) / self.max_hand_size,  # Hand fullness
             1.0 if self.current_phase == "attack" else 0.0,  # Phase
             1.0 if self.game.can_yield() else 0.0,  # Can yield
@@ -245,6 +247,9 @@ class RegicideGymEnv(gym.Env):
         # Action mask
         action_mask = torch.zeros(self.max_actions, dtype=torch.bool)
         action_mask[:len(self.valid_actions)] = True
+        
+        # Discard pile bit tensor
+        discard_pile_bits = self._get_discard_pile_bit_tensor().float()
         
         # Get action card indices for each valid action
         action_card_indices = []
@@ -262,6 +267,7 @@ class RegicideGymEnv(gym.Env):
             'hand_size': torch.tensor(len(current_hand), dtype=torch.long),
             'enemy_card': torch.tensor(self._card_to_index(self.game.current_enemy.card), dtype=torch.long),
             'game_state': game_state,
+            'discard_pile_cards': discard_pile_bits,
             'action_mask': action_mask,
             'num_valid_actions': torch.tensor(len(self.valid_actions), dtype=torch.long),
             'action_card_indices': action_card_indices
@@ -310,8 +316,11 @@ class RegicideGymEnv(gym.Env):
         action_mask = torch.zeros(self.max_actions)
         action_mask[:len(self.valid_actions)] = 1.0
         
+        # Discard pile bit tensor
+        discard_pile_bits = self._get_discard_pile_bit_tensor().float()
+        
         # Concatenate all parts
-        observation = torch.cat([hand_encoding, enemy_encoding, game_state, action_mask])
+        observation = torch.cat([hand_encoding, enemy_encoding, game_state, discard_pile_bits, action_mask])
         return observation
     
     def _get_terminal_observation(self) -> Union[Dict, torch.Tensor]:
@@ -322,13 +331,14 @@ class RegicideGymEnv(gym.Env):
                 'hand_size': torch.tensor(0, dtype=torch.long),
                 'enemy_card': torch.tensor(0, dtype=torch.long),
                 'game_state': torch.zeros(12, dtype=torch.float32),
+                'discard_pile_cards': torch.zeros(self.card_vocab_size, dtype=torch.bool),
                 'action_mask': torch.zeros(self.max_actions, dtype=torch.bool),
                 'num_valid_actions': torch.tensor(0, dtype=torch.long),
                 'action_card_indices': []
             }
         else:
             obs_size = (self.max_hand_size * self.card_vocab_size + 
-                       self.card_vocab_size + 6 + 12 + self.max_actions)
+                       self.card_vocab_size + 6 + 12 + self.card_vocab_size + self.max_actions)
             return torch.zeros(obs_size, dtype=torch.float32)
     
     def _update_valid_actions(self):
@@ -366,36 +376,94 @@ class RegicideGymEnv(gym.Env):
         suit_idx = list(Suit).index(card.suit)
         return suit_idx * 13 + (card.value - 1) + 1  # +1 to reserve 0 for padding
     
+    def _get_discard_pile_bit_tensor(self) -> torch.Tensor:
+        """Create bit tensor representing which cards are in the discard pile"""
+        discard_bits = torch.zeros(self.card_vocab_size, dtype=torch.bool)
+        
+        if hasattr(self.game, 'discard_pile') and self.game.discard_pile:
+            for card in self.game.discard_pile:
+                card_idx = self._card_to_index(card)
+                discard_bits[card_idx] = True
+        
+        return discard_bits
+    
     def _calculate_reward(self, success: bool, enemies_before: int, enemy_health_before: int) -> float:
-        """Calculate comprehensive reward signal"""
+        """Calculate enhanced reward signal focused on boss progression"""
         if self.game.game_over:
             if self.game.victory:
-                return 20.0  # Victory bonus
+                return 50.0  # Higher victory bonus
             else:
-                return -15.0  # Defeat penalty
+                # Progressive death penalty based on how far we got
+                bosses_killed = 12 - len(self.game.castle_deck)
+                death_penalty = max(-20.0, -10.0 - (5 - bosses_killed) * 2.0)  # Less harsh for progress
+                return death_penalty
         
         reward = 0.0
         
-        # Boss kill reward
+        # Boss progression rewards (ENHANCED)
         enemies_after = len(self.game.castle_deck)
-        if enemies_before > enemies_after:
-            reward += 8.0
+        bosses_killed_this_step = enemies_before - enemies_after
         
-        # Damage reward
+        if bosses_killed_this_step > 0:
+            # Progressive boss kill rewards (later bosses worth more)
+            total_bosses_killed = 12 - enemies_after
+            if total_bosses_killed <= 4:  # Jacks (easiest)
+                reward += 10.0
+            elif total_bosses_killed <= 8:  # Queens (medium)
+                reward += 15.0
+            elif total_bosses_killed <= 12:  # Kings (hardest)
+                reward += 25.0
+            
+            # Bonus for reaching milestones
+            if total_bosses_killed == 4:  # All Jacks defeated
+                reward += 5.0
+            elif total_bosses_killed == 8:  # All Queens defeated
+                reward += 10.0
+            elif total_bosses_killed == 12:  # All Kings defeated (victory)
+                reward += 20.0
+        
+        # Enhanced damage rewards
         if self.last_damage_dealt > 0:
             enemy_health_after = (self.game.current_enemy.health - 
                                 self.game.current_enemy.damage_taken)
             progress_ratio = self.last_damage_dealt / max(enemy_health_before, 1)
-            reward += min(progress_ratio * 3.0, 2.0)  # Cap at 2.0
+            
+            # Scale damage reward by boss difficulty
+            total_bosses_killed = 12 - len(self.game.castle_deck)
+            difficulty_multiplier = 1.0 + (total_bosses_killed // 4) * 0.5  # 1.0, 1.5, 2.0
+            
+            base_damage_reward = min(progress_ratio * 2.0, 1.5)  # Reduced base
+            reward += base_damage_reward * difficulty_multiplier
+            
+            # Bonus for significant damage (>= 50% of enemy health)
+            if progress_ratio >= 0.5:
+                reward += 1.0 * difficulty_multiplier
         
-        # Success/failure
+        # Progress maintenance reward (staying alive longer)
+        total_bosses_killed = 12 - len(self.game.castle_deck)
+        if total_bosses_killed > 0:
+            reward += 0.1 * total_bosses_killed  # Small reward for maintaining progress
+        
+        # Efficiency rewards
         if success:
-            reward += 0.2
+            reward += 0.3  # Slightly higher success reward
         else:
-            reward -= 1.0
+            # More forgiving failure penalty early in the game
+            if total_bosses_killed == 0:
+                reward -= 0.5  # Lighter penalty when just starting
+            else:
+                reward -= 1.0  # Normal penalty when making progress
         
-        # Small step penalty to encourage efficiency
-        reward -= 0.05
+        # Adaptive step penalty (less harsh early game)
+        if total_bosses_killed == 0:
+            reward -= 0.02  # Very light step penalty early
+        else:
+            reward -= 0.05  # Normal step penalty when progressing
+        
+        # Card efficiency bonus (reward for not hoarding cards)
+        hand_size = len(self.game.players[self.game.current_player])
+        if hand_size <= 3 and success:  # Playing with few cards successfully
+            reward += 0.2
         
         return reward
     
