@@ -6,8 +6,16 @@ Runs N games with a uniform random policy and generates histograms of performanc
 
 import numpy as np
 import torch
+import os
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing import List, Dict, Tuple
 from collections import defaultdict
+from math import ceil
+try:
+    # For PyTorch-heavy environments, avoid thread oversubscription across processes
+    torch.set_num_threads(1)
+except Exception:
+    pass
 
 # Import our modules
 from regicide_gym_env import make_regicide_env
@@ -43,13 +51,96 @@ class RandomPolicy:
             return 0, torch.tensor(0.0)
 
 
+def _run_single_game_worker(args: Tuple[int, int, int, int]) -> Dict:
+    """Top-level worker to run a single game. Safe for Windows process spawning.
+
+    Args tuple: (num_players, max_hand_size, max_steps, seed)
+    Returns a dict with the same keys used by the evaluator aggregation.
+    """
+    num_players, max_hand_size, max_steps, seed = args
+
+    # Local imports already resolved at module import; ensure independent RNG
+    try:
+        rng = np.random.default_rng(seed if seed is not None else None)
+        try:
+            torch.set_num_threads(1)
+        except Exception:
+            pass
+
+        env = make_regicide_env(
+            num_players=num_players,
+            max_hand_size=max_hand_size,
+            observation_mode="card_aware",
+            render_mode=None,
+        )
+
+        obs, info = env.reset()
+        episode_reward = 0.0
+        episode_length = 0
+        terminated = False
+        truncated = False
+        next_info = {}
+
+        # Fast random policy inline to avoid extra pickling
+        while episode_length < max_steps:
+            num_valid_actions = int(obs['num_valid_actions'].item())
+            action = int(rng.integers(0, num_valid_actions)) if num_valid_actions > 0 else 0
+            next_obs, reward, terminated, truncated, next_info = env.step(action)
+            episode_reward += reward
+            episode_length += 1
+            if terminated or truncated:
+                break
+            obs = next_obs
+            info = next_info
+
+        game = env.game
+        bosses_killed = next_info.get('bosses_killed', 0)
+        victory = next_info.get('victory', False)
+
+        # Determine defeat reason
+        defeat_reason = "max_steps"
+        if terminated:
+            if victory:
+                defeat_reason = "victory"
+            elif getattr(game, 'game_over', False):
+                if hasattr(game, 'current_enemy') and getattr(game, 'current_enemy'):
+                    try:
+                        defeat_reason = f"defeated_by_{game.current_enemy.card.value}"
+                    except Exception:
+                        defeat_reason = "game_over"
+                else:
+                    defeat_reason = "game_over"
+
+        # Final enemy type
+        final_enemy_type = "none"
+        if hasattr(game, 'current_enemy') and getattr(game, 'current_enemy'):
+            try:
+                final_enemy_type = f"{game.current_enemy.card.value}_{game.current_enemy.card.suit.name}"
+            except Exception:
+                final_enemy_type = "unknown"
+
+        return {
+            'reward': float(episode_reward),
+            'length': int(episode_length),
+            'bosses_killed': int(bosses_killed),
+            'victory': bool(victory),
+            'defeat_reason': defeat_reason,
+            'final_enemy_type': final_enemy_type,
+        }
+    except Exception as e:
+        # Bubble up a minimal error object; the caller may handle/raise
+        return {'__error__': str(e)}
+
+
 class RandomPolicyEvaluator:
     """Evaluates random policy performance across multiple games"""
     
-    def __init__(self, num_players: int = 2, max_hand_size: int = 7, max_steps: int = 200):
+    def __init__(self, num_players: int = 2, max_hand_size: int = 7, max_steps: int = 200, num_workers: int | None = None):
         self.num_players = num_players
         self.max_hand_size = max_hand_size
         self.max_steps = max_steps
+        # Default to physical cores if unspecified
+        self.num_workers = max(1, int(num_workers)) if num_workers else max(1, os.cpu_count() or 1)
         
         # Create environment
         self.env = make_regicide_env(
@@ -76,25 +167,37 @@ class RandomPolicyEvaluator:
         }
     
     def run_evaluation(self, num_games: int) -> Dict:
-        """Run N games with random policy"""
+        """Run N games with random policy (parallelized across processes when possible)."""
         print(f"🎮 Running {num_games} games with random policy...")
         print(f"Configuration: {self.num_players} players, max {self.max_hand_size} cards, max {self.max_steps} steps")
+        print(f"Workers: {self.num_workers}")
         print("=" * 60)
 
-        for game_idx in tqdm(range(num_games)):
-        
-            
-            # Run single game
-            game_result = self._run_single_game(game_idx)
-            
-            # Store results
-            self.results['episode_rewards'].append(game_result['reward'])
-            self.results['episode_lengths'].append(game_result['length'])
-            self.results['bosses_killed'].append(game_result['bosses_killed'])
-            self.results['victories'].append(game_result['victory'])
-            self.results['defeat_reasons'].append(game_result['defeat_reason'])
-            self.results['final_enemy_types'].append(game_result['final_enemy_type'])
-        
+        if self.num_workers <= 1:
+            # Sequential fallback (original behavior)
+            for game_idx in tqdm(range(num_games)):
+                game_result = self._run_single_game(game_idx)
+                self._accumulate_result(game_result)
+        else:
+            # Parallel execution
+            # Derive deterministic-ish seeds per game to avoid RNG collisions
+            base_seed = np.random.SeedSequence().entropy
+            seeds = [int((base_seed + i) % (2**32 - 1)) for i in range(num_games)]
+
+            args_iter = (
+                (self.num_players, self.max_hand_size, self.max_steps, seeds[i])
+                for i in range(num_games)
+            )
+
+            # Choose a reasonable chunksize to reduce IPC overhead
+            chunksize = max(1, num_games // (self.num_workers * 8))
+
+            with ProcessPoolExecutor(max_workers=self.num_workers) as executor:
+                for game_result in tqdm(executor.map(_run_single_game_worker, args_iter, chunksize=chunksize), total=num_games):
+                    if isinstance(game_result, dict) and '__error__' in game_result:
+                        raise RuntimeError(f"Worker error: {game_result['__error__']}")
+                    self._accumulate_result(game_result)
+
         # Generate summary statistics
         summary = self._generate_summary()
         self._print_summary(summary)
@@ -104,6 +207,15 @@ class RandomPolicyEvaluator:
             self._generate_plots()
         
         return summary
+
+    def _accumulate_result(self, game_result: Dict):
+        """Append a single game's results into the aggregation lists."""
+        self.results['episode_rewards'].append(game_result['reward'])
+        self.results['episode_lengths'].append(game_result['length'])
+        self.results['bosses_killed'].append(game_result['bosses_killed'])
+        self.results['victories'].append(game_result['victory'])
+        self.results['defeat_reasons'].append(game_result['defeat_reason'])
+        self.results['final_enemy_types'].append(game_result['final_enemy_type'])
     
     def _run_single_game(self, game_idx: int) -> Dict:
         """Run a single game and return results"""
@@ -407,7 +519,7 @@ def main():
     print("=" * 50)
     
     # Configuration
-    NUM_GAMES = 50000  # Number of games to run
+    NUM_GAMES = 1000000  # Number of games to run
     NUM_PLAYERS = 2
     MAX_HAND_SIZE = 7
     MAX_STEPS = 500  # Maximum steps per game

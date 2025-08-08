@@ -1,17 +1,17 @@
 Random Policy Evaluation Summary
 ========================================
 
-total_games: 50000
+total_games: 1000000
 victories: 0
 victory_rate: 0.0
-avg_reward: 7.527932078012193
-std_reward: 17.859109877602002
-avg_length: 9.40998
-std_length: 5.637997552287514
-avg_bosses_killed: 1.04212
-std_bosses_killed: 1.0185803383140675
-max_bosses_killed: 6
+avg_reward: 13.08830645855062
+std_reward: 26.571512354947107
+avg_length: 9.427919
+std_length: 5.6391824167550215
+avg_bosses_killed: 1.041379
+std_bosses_killed: 1.0189665246508348
+max_bosses_killed: 7
 min_bosses_killed: 0
-boss_kill_distribution: {'distribution': {np.int64(0): np.int64(17478), np.int64(1): np.int64(18815), np.int64(2): np.int64(9296), np.int64(3): np.int64(3051), np.int64(4): np.int64(1256), np.int64(5): np.int64(102), np.int64(6): np.int64(2)}, 'percentiles': {'25th': np.float64(0.0), '50th': np.float64(1.0), '75th': np.float64(2.0), '90th': np.float64(2.0)}}
-length_distribution: {'distribution': {np.int64(2): np.int64(7207), np.int64(3): np.int64(276), np.int64(4): np.int64(5142), np.int64(5): np.int64(1311), np.int64(6): np.int64(3107), np.int64(7): np.int64(3656), np.int64(8): np.int64(1822), np.int64(9): np.int64(4204), np.int64(10): np.int64(2681), np.int64(11): np.int64(5337), np.int64(12): np.int64(2365), np.int64(13): np.int64(2577), np.int64(14): np.int64(1893), np.int64(15): np.int64(1482), np.int64(16): np.int64(1559), np.int64(17): np.int64(943), np.int64(18): np.int64(1029), np.int64(19): np.int64(671), np.int64(20): np.int64(615), np.int64(21): np.int64(451), np.int64(22): np.int64(410), np.int64(23): np.int64(313), np.int64(24): np.int64(251), np.int64(25): np.int64(178), np.int64(26): np.int64(162), np.int64(27): np.int64(98), np.int64(28): np.int64(89), np.int64(29): np.int64(48), np.int64(30): np.int64(49), np.int64(31): np.int64(26), np.int64(32): np.int64(19), np.int64(33): np.int64(8), np.int64(34): np.int64(6), np.int64(35): np.int64(7), np.int64(36): np.int64(2), np.int64(37): np.int64(1), np.int64(38): np.int64(1), np.int64(40): np.int64(2), np.int64(41): np.int64(2)}, 'percentiles': {'25th': np.float64(4.0), '50th': np.float64(9.0), '75th': np.float64(13.0), '90th': np.float64(17.0)}}
-defeat_reasons: {'counts': {'defeated_by_11': 48640, 'defeated_by_12': 1360}, 'percentages': {'defeated_by_11': 97.28, 'defeated_by_12': 2.7199999999999998}}
+boss_kill_distribution: {'distribution': {np.int64(0): np.int64(350526), np.int64(1): np.int64(375568), np.int64(2): np.int64(184551), np.int64(3): np.int64(62770), np.int64(4): np.int64(24608), np.int64(5): np.int64(1898), np.int64(6): np.int64(76), np.int64(7): np.int64(3)}, 'percentiles': {'25th': np.float64(0.0), '50th': np.float64(1.0), '75th': np.float64(2.0), '90th': np.float64(2.0)}}
+length_distribution: {'distribution': {np.int64(2): np.int64(141336), np.int64(3): np.int64(5864), np.int64(4): np.int64(103732), np.int64(5): np.int64(26417), np.int64(6): np.int64(62098), np.int64(7): np.int64(74082), np.int64(8): np.int64(37262), np.int64(9): np.int64(82598), np.int64(10): np.int64(54949), np.int64(11): np.int64(106938), np.int64(12): np.int64(46346), np.int64(13): np.int64(50616), np.int64(14): np.int64(38302), np.int64(15): np.int64(30598), np.int64(16): np.int64(30338), np.int64(17): np.int64(18977), np.int64(18): np.int64(20040), np.int64(19): np.int64(13834), np.int64(20): np.int64(12868), np.int64(21): np.int64(9688), np.int64(22): np.int64(7873), np.int64(23): np.int64(6211), np.int64(24): np.int64(4979), np.int64(25): np.int64(3667), np.int64(26): np.int64(3113), np.int64(27): np.int64(1912), np.int64(28): np.int64(1829), np.int64(29): np.int64(1039), np.int64(30): np.int64(917), np.int64(31): np.int64(491), np.int64(32): np.int64(401), np.int64(33): np.int64(223), np.int64(34): np.int64(182), np.int64(35): np.int64(119), np.int64(36): np.int64(65), np.int64(37): np.int64(39), np.int64(38): np.int64(22), np.int64(39): np.int64(11), np.int64(40): np.int64(8), np.int64(41): np.int64(8), np.int64(42): np.int64(5), np.int64(43): np.int64(3)}, 'percentiles': {'25th': np.float64(4.0), '50th': np.float64(9.0), '75th': np.float64(13.0), '90th': np.float64(17.0)}}
+defeat_reasons: {'counts': {'defeated_by_11': 973415, 'defeated_by_12': 26585}, 'percentages': {'defeated_by_11': 97.3415, 'defeated_by_12': 2.6585}}

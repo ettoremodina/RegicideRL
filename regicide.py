@@ -281,6 +281,7 @@ class Game:
         
         # Check if enemy defeated
         if self.current_enemy.is_defeated():
+            self._reset_yield_tracking()
             self._defeat_enemy()
             if not self.castle_deck:
                 self.victory = True
