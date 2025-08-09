@@ -1,0 +1,23 @@
+{
+  "experiment_name": "fixed_enhanced_regicide",
+  "timestamp": "2025-08-09T12:07:50.072787",
+  "config": {
+    "num_episodes": 50000,
+    "learning_rate": 0.001,
+    "gamma": 0.99,
+    "policy_type": "fixed_actor_critic",
+    "entropy_coefficient": 0.02,
+    "value_loss_coefficient": 0.5
+  },
+  "final_stats": {
+    "total_episodes": 50000,
+    "final_win_rate": 1.0,
+    "avg_bosses_killed": 1.88174,
+    "max_bosses_killed": 7
+  },
+  "files": {
+    "final_model": "C:\\Users\\modin\\Desktop\\Ettore\\programming\\Regicide\\outputs\\fixed_enhanced_regicide\\models\\final_model.pth",
+    "training_plot": "C:\\Users\\modin\\Desktop\\Ettore\\programming\\Regicide\\outputs\\fixed_enhanced_regicide\\plots\\training_progress.png",
+    "logs": "C:\\Users\\modin\\Desktop\\Ettore\\programming\\Regicide\\outputs\\fixed_enhanced_regicide\\logs\\training.log"
+  }
+}

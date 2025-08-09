@@ -1,0 +1,15 @@
+Training log started
+==================================================
+EXPERIMENT CONFIGURATION
+==================================================
+num_episodes: 50000
+learning_rate: 0.001
+gamma: 0.99
+policy_type: fixed_actor_critic
+num_players: 2
+max_hand_size: 7
+card_embed_dim: 16
+hidden_dim: 64
+entropy_coefficient: 0.02
+value_loss_coefficient: 0.5
+==================================================

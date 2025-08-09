@@ -1,0 +1,59 @@
+{
+  "analysis_timestamp": "2025-08-08T19:45:21.703549",
+  "total_decisions": 798,
+  "total_games": 50,
+  "unique_actions_used": 11,
+  "most_common_action": [
+    0,
+    209
+  ],
+  "action_distribution": {
+    "4": 95,
+    "0": 209,
+    "1": 148,
+    "5": 136,
+    "8": 5,
+    "2": 89,
+    "3": 89,
+    "6": 16,
+    "7": 5,
+    "11": 2,
+    "9": 4
+  },
+  "mean_entropy": 0.5199399670158483,
+  "entropy_std": 0.6337233464823873,
+  "mean_bosses_killed": 2.04,
+  "max_bosses_killed": 4,
+  "win_rate": 0.0,
+  "mean_episode_length": 15.96,
+  "mean_episode_reward": 40.76299996434594,
+  "mean_action_consistency": 0.31472961172788677,
+  "mean_probability_variance": 0.09828096628189087,
+  "yield_rate": 0.09461235216819974,
+  "potential_action_collapse": {
+    "collapsed": false,
+    "dominant_action": 0,
+    "dominant_action_percentage": 0.2619047619047619,
+    "threshold_used": 0.8,
+    "unique_actions_used": 11,
+    "action_distribution": {
+      "0": 209,
+      "1": 148,
+      "5": 136,
+      "4": 95,
+      "2": 89,
+      "3": 89,
+      "6": 16,
+      "8": 5,
+      "7": 5,
+      "9": 4,
+      "11": 2
+    }
+  },
+  "decision_quality_assessment": {
+    "entropy_based": "decisive",
+    "consistency_based": "highly_varied",
+    "performance_based": "fair",
+    "overall": "unknown"
+  }
+}

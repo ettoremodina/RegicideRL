@@ -45,8 +45,12 @@ class CardButton(ttk.Frame):
             font=("Merriweather", 14, "bold"),
                 command=on_click,
                 padx=8, pady=6,
+                takefocus=0,
             )
-        self.btn.pack()
+        self.btn.pack(fill="both", expand=True)
+        # Make whole frame clickable too
+        self.bind("<Button-1>", lambda e: on_click())
+        self.btn.bind("<Button-1>", lambda e: on_click())
         self._tooltip = None
         if tooltip:
             self._tooltip = ToolTip(self.btn, tooltip)
@@ -77,12 +81,24 @@ class LogBox(ttk.Frame):
 
 # Simple tooltip helper
 class ToolTip:
-    def __init__(self, widget, text: str):
+    def __init__(self, widget, text: str, delay_ms: int = 300):
         self.widget = widget
         self.text = text
         self.tipwindow = None
-        widget.bind("<Enter>", self.show)
+        self._after_id = None
+        self.delay_ms = delay_ms
+        widget.bind("<Enter>", self._schedule)
         widget.bind("<Leave>", self.hide)
+        widget.bind("<Button-1>", self.hide)
+
+    def _schedule(self, _=None):
+        self._cancel()
+        self._after_id = self.widget.after(self.delay_ms, self.show)
+
+    def _cancel(self):
+        if self._after_id is not None:
+            self.widget.after_cancel(self._after_id)
+            self._after_id = None
 
     def show(self, _=None):
         if self.tipwindow or not self.text:
@@ -100,6 +116,7 @@ class ToolTip:
         label.pack(ipadx=6, ipady=4)
 
     def hide(self, _=None):
+        self._cancel()
         if self.tipwindow:
             self.tipwindow.destroy()
             self.tipwindow = None
