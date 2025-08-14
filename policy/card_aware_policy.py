@@ -16,15 +16,17 @@ class CardAwarePolicy(nn.Module):
     """
     
     def __init__(self, max_hand_size: int = 8, max_actions: int = 20, 
-                 card_embed_dim: int = 12, hidden_dim: int = 128):
+                 card_embed_dim: int = 12, hidden_dim: int = 128, 
+                 game_state_dim: int = 11):  # Updated default to 11
         super(CardAwarePolicy, self).__init__()
         
         self.max_hand_size = max_hand_size
         self.max_actions = max_actions
         self.card_embed_dim = card_embed_dim
         self.hidden_dim = hidden_dim
-        game_state_dim = 12  # Simplified game state dimension
+        self.game_state_dim = game_state_dim  # Store as instance variable
         hidden_dim_2 = 64
+        self.game_state_embedding_dim = 24 
 
 
         # Card embeddings (53 cards: 52 regular + 1 jester + 1 padding)
@@ -39,25 +41,26 @@ class CardAwarePolicy(nn.Module):
             dropout=0.1
         )
         
-        # Game state encoder (simplified)
+        # Game state encoder (backward compatible with dynamic input size)
         self.game_state_encoder = nn.Sequential(
-            nn.Linear(12, hidden_dim_2),  # Game state has 12 features
+            nn.Linear(self.game_state_dim, hidden_dim_2),  # Dynamic game state features
             nn.ReLU(),
             nn.Dropout(0.1),
-            nn.Linear(hidden_dim_2, game_state_dim//2)  # Output dimension for game state
+            nn.Linear(hidden_dim_2, self.game_state_embedding_dim//2)  # Output dimension for game state
         )
         # Discard pile encoder (simplified)
         self.discard_pile_encoder = nn.Sequential(
             nn.Linear(54, hidden_dim_2),  # Discard pile has 54 features
             nn.ReLU(),
             nn.Dropout(0.1),
-            nn.Linear(hidden_dim_2, game_state_dim//2)  # Output dimension for game state
+            nn.Linear(hidden_dim_2, self.game_state_embedding_dim//2)  # Output dimension for game state
         )
         
-        # Combined context encoder (simplified)
-        # Input: card_embed_dim (64) + 32 (game state) + card_embed_dim (64 for enemy) = 160
+        # Combined context encoder (dynamic sizing)
+        # Input: card_embed_dim + game_state_dim + card_embed_dim (for enemy)
+        combined_input_dim = card_embed_dim * 2 + self.game_state_embedding_dim
         self.context_encoder = nn.Sequential(
-            nn.Linear(card_embed_dim * 2 + game_state_dim, hidden_dim),  # 160 -> 128
+            nn.Linear(combined_input_dim, hidden_dim),
             nn.ReLU(),
             nn.Dropout(0.1),
             nn.Linear(hidden_dim, hidden_dim)

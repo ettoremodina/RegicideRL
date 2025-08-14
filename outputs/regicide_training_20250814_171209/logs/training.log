@@ -1,0 +1,64 @@
+Training log started
+==================================================
+EXPERIMENT CONFIGURATION
+==================================================
+num_episodes: 10000
+learning_rate: 0.05
+gamma: 0.95
+policy_type: card_aware
+num_players: 3
+max_hand_size: 6
+card_embed_dim: 12
+hidden_dim: 64
+==================================================
+Episode 200: Reward=109.20, Length=19, Bosses=3, 
+Episode 400: Reward=8.30, Length=8, Bosses=0, 
+Episode 600: Reward=114.20, Length=19, Bosses=3, 
+Episode 800: Reward=33.20, Length=9, Bosses=1, 
+Episode 1000: Reward=56.70, Length=19, Bosses=1, 
+Episode 1200: Reward=38.00, Length=11, Bosses=1, 
+Episode 1400: Reward=109.40, Length=22, Bosses=2, 
+Episode 1600: Reward=44.80, Length=13, Bosses=1, 
+Episode 1800: Reward=83.00, Length=16, Bosses=2, 
+Episode 2000: Reward=84.00, Length=16, Bosses=2, 
+Episode 2200: Reward=85.90, Length=17, Bosses=2, 
+Episode 2400: Reward=72.90, Length=12, Bosses=2, 
+Episode 2600: Reward=185.20, Length=29, Bosses=4, 
+Episode 2800: Reward=62.60, Length=10, Bosses=2, 
+Episode 3000: Reward=127.60, Length=20, Bosses=3, 
+Episode 3200: Reward=82.80, Length=18, Bosses=2, 
+Episode 3400: Reward=145.50, Length=26, Bosses=3, 
+Episode 3600: Reward=61.30, Length=13, Bosses=1, 
+Episode 3800: Reward=91.50, Length=16, Bosses=2, 
+Episode 4000: Reward=89.30, Length=18, Bosses=2, 
+Episode 4200: Reward=140.50, Length=26, Bosses=3, 
+Episode 4400: Reward=70.20, Length=14, Bosses=2, 
+Episode 4600: Reward=68.40, Length=12, Bosses=2, 
+Episode 4800: Reward=122.80, Length=18, Bosses=3, 
+Episode 5000: Reward=3.60, Length=15, Bosses=0, 
+Episode 5200: Reward=53.50, Length=16, Bosses=1, 
+Episode 5400: Reward=31.20, Length=9, Bosses=1, 
+Episode 5600: Reward=37.30, Length=13, Bosses=1, 
+Episode 5800: Reward=10.60, Length=15, Bosses=0, 
+Episode 6000: Reward=156.30, Length=23, Bosses=4, 
+Episode 6200: Reward=55.40, Length=17, Bosses=1, 
+Episode 6400: Reward=85.60, Length=15, Bosses=2, 
+Episode 6600: Reward=90.00, Length=16, Bosses=2, 
+Episode 6800: Reward=91.10, Length=20, Bosses=2, 
+Episode 7000: Reward=82.10, Length=20, Bosses=2, 
+Episode 7200: Reward=125.40, Length=32, Bosses=3, 
+Episode 7400: Reward=41.60, Length=15, Bosses=1, 
+Episode 7600: Reward=66.80, Length=18, Bosses=2, 
+Episode 7800: Reward=151.70, Length=29, Bosses=4, 
+Episode 8000: Reward=39.30, Length=13, Bosses=1, 
+Episode 8200: Reward=41.50, Length=11, Bosses=1, 
+Episode 8400: Reward=114.40, Length=22, Bosses=3, 
+Episode 8600: Reward=79.10, Length=15, Bosses=2, 
+Episode 8800: Reward=41.50, Length=11, Bosses=1, 
+Episode 9000: Reward=76.20, Length=19, Bosses=2, 
+Episode 9200: Reward=-0.20, Length=8, Bosses=0, 
+Episode 9400: Reward=172.00, Length=31, Bosses=4, 
+Episode 9600: Reward=48.00, Length=11, Bosses=1, 
+Episode 9800: Reward=38.00, Length=11, Bosses=1, 
+Episode 10000: Reward=39.00, Length=11, Bosses=1, 
+Training log ended

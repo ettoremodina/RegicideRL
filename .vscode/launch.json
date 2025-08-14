@@ -9,7 +9,7 @@
             "name": "TRAIN",
             "type": "debugpy",
             "request": "launch",
-            "program": "streamlined_training.py",
+            "module": "train.streamlined_training",
             "console": "integratedTerminal",
         },
         {

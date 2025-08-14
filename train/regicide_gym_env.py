@@ -65,7 +65,7 @@ class RegicideGymEnv(gym.Env):
             'hand_cards': spaces.Box(0, self.card_vocab_size-1, (self.max_hand_size,), dtype=np.int32),
             'hand_size': spaces.Box(0, self.max_hand_size, (), dtype=np.int32),
             'enemy_card': spaces.Box(0, self.card_vocab_size-1, (), dtype=np.int32),
-            'game_state': spaces.Box(0, 1, (12,), dtype=np.float32),
+            'game_state': spaces.Box(0, 1, (20,), dtype=np.float32),  # Updated to 20 features
             'discard_pile_cards': spaces.Box(0, 1, (self.card_vocab_size,), dtype=np.bool_),
             'action_mask': spaces.Box(0, 1, (self.max_actions,), dtype=np.bool_)
         })
@@ -212,20 +212,44 @@ class RegicideGymEnv(gym.Env):
         hand_indices += [0] * (self.max_hand_size - len(hand_indices))  # Pad with 0
         hand_indices = hand_indices[:self.max_hand_size]  # Truncate if needed
         
-        # Game state features (normalized)
+        # Explicit game state features (normalized) - 20 features total
+        # Enemy features (0-7)
+        enemy_max_health = self.game.current_enemy.health
+        enemy_current_health = enemy_max_health - self.game.current_enemy.damage_taken
+        enemy_damage_ratio = self.game.current_enemy.damage_taken / enemy_max_health
+        enemy_effective_attack = self.game.current_enemy.get_effective_attack()
+        
+        # Deck features (8-11)
+        tavern_deck_size = len(self.game.tavern_deck)
+        tavern_deck_size = tavern_deck_size / 53.0
+        enemies_remaining = len(self.game.castle_deck) / 12.0
+        
+        # Hand features (12-16)
+        hand_size = len(current_hand)
+        hand_fullness = hand_size / self.max_hand_size
+        discard_pile_size = len(self.game.discard_pile) / 54.0
+        
+        # Game context features (17-19)
+        is_attack_phase = 1.0 if self.current_phase == "attack" else 0.0
+        can_yield = 1.0 if self.game.can_yield() else 0.0
+        
         game_state = torch.tensor([
-            self.game.current_enemy.health / 40.0,  # Enemy max health
-            (self.game.current_enemy.health - self.game.current_enemy.damage_taken) / 40.0,  # Current health
-            self.game.current_enemy.spade_protection / 20.0,  # Spade protection
-            len(self.game.castle_deck) / 12.0,  # Enemies remaining
-            len(self.game.tavern_deck) / 53.0,  # Tavern deck size
-            len(current_hand) / self.max_hand_size,  # Hand fullness
-            1.0 if self.current_phase == "attack" else 0.0,  # Phase
-            1.0 if self.game.can_yield() else 0.0,  # Can yield
-            self.game.current_player / self.num_players,  # Current player
-            1.0 if self.game.jester_immunity_cancelled else 0.0,  # Jester immunity
-            len(self.game.discard_pile) / 54.0,  # Discard pile size
-            self.episode_length / 50.0  # Episode progress
+            # Enemy features (0-4)
+            enemy_max_health / 40.0,
+            enemy_current_health / 40.0,  
+            enemy_damage_ratio,
+            enemy_effective_attack / 20.0,  # Max enemy attack
+            # Deck features (5-7)
+            tavern_deck_size,
+            enemies_remaining,
+            discard_pile_size,
+            # Hand features (8)
+            hand_fullness,
+            # Context features (9-10)
+            is_attack_phase,
+            can_yield,
+            # Player context (11)
+            self.game.current_player / self.num_players,
         ], dtype=torch.float32)
         
         # Action mask
@@ -265,7 +289,7 @@ class RegicideGymEnv(gym.Env):
             'hand_cards': torch.zeros(self.max_hand_size, dtype=torch.long),
             'hand_size': torch.tensor(0, dtype=torch.long),
             'enemy_card': torch.tensor(0, dtype=torch.long),
-            'game_state': torch.zeros(12, dtype=torch.float32),
+            'game_state': torch.zeros(20, dtype=torch.float32),  # Updated to 20 features
             'discard_pile_cards': torch.zeros(self.card_vocab_size, dtype=torch.bool),
             'action_mask': torch.zeros(self.max_actions, dtype=torch.bool),
             'num_valid_actions': torch.tensor(0, dtype=torch.long),

@@ -13,6 +13,7 @@ from typing import List, Dict, Tuple, Optional
 # from card_aware_env import CardAwareRegicideEnv
 from .regicide_gym_env import RegicideGymEnv
 from policy.card_aware_policy import CardAwarePolicy
+from policy.rule_based_policy import RuleBasedPolicy
 from .training_utils import TrainingVisualizer, TrainingEvaluator, TrainingLogger, TrainingStatistics
 from config import PathManager
 
@@ -41,13 +42,18 @@ class CardAwareRegicideTrainer:
         self.visualizer = TrainingVisualizer(self.path_manager)
     
         # Use new card-aware policy
-        self.policy = CardAwarePolicy(
+        # self.policy = CardAwarePolicy(
+        #     max_hand_size=env.max_hand_size,
+        #     max_actions=env.max_actions,
+        #     card_embed_dim=card_embed_dim,
+        #     hidden_dim=hidden_dim
+        # )
+        self.policy = RuleBasedPolicy(
             max_hand_size=env.max_hand_size,
             max_actions=env.max_actions,
-            card_embed_dim=card_embed_dim,
-            hidden_dim=hidden_dim
+            game_state_dim=11
         )
-    
+
         # Optimizer - AdamW with weight decay for better generalization
         self.optimizer = optim.AdamW(
             self.policy.parameters(), 
@@ -401,8 +407,8 @@ def main():
         'num_episodes': 10000,
         'render_every': 2000,
         'log_every': 200,
-        'save_every': 5000,
-        'eval_episodes': 30,
+        'save_every': 10000,
+        'eval_episodes': 200,
     }
     
     # Create card-aware environment
