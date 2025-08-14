@@ -60,76 +60,78 @@ def _run_single_game_worker(args: Tuple[int, int, int, int]) -> Dict:
     num_players, max_hand_size, max_steps, seed = args
 
     # Local imports already resolved at module import; ensure independent RNG
+    rng = np.random.default_rng(seed if seed is not None else None)
     try:
-        rng = np.random.default_rng(seed if seed is not None else None)
-        try:
-            torch.set_num_threads(1)
-        except Exception:
-            pass
+        torch.set_num_threads(1)
+    except Exception:
+        pass
 
-        env = make_regicide_env(
-            num_players=num_players,
-            max_hand_size=max_hand_size,
-            observation_mode="card_aware",
-            render_mode=None,
-        )
+    env = make_regicide_env(
+        num_players=num_players,
+        max_hand_size=max_hand_size,
+        observation_mode="card_aware",
+        render_mode=None,
+    )
 
-        obs, info = env.reset()
-        episode_reward = 0.0
-        episode_length = 0
-        terminated = False
-        truncated = False
-        next_info = {}
+    obs, info = env.reset()
+    episode_reward = 0.0
+    episode_length = 0
+    terminated = False
+    truncated = False
+    next_info = {}
 
-        # Fast random policy inline to avoid extra pickling
-        while episode_length < max_steps:
-            num_valid_actions = int(obs['num_valid_actions'].item())
-            action = int(rng.integers(0, num_valid_actions)) if num_valid_actions > 0 else 0
-            next_obs, reward, terminated, truncated, next_info = env.step(action)
+    # Fast random policy inline to avoid extra pickling
+    while episode_length < max_steps:
+        num_valid_actions = int(obs['num_valid_actions'].item())
+        action = int(rng.integers(0, num_valid_actions)) if num_valid_actions > 0 else 0
+        next_obs, reward, terminated, truncated, next_info = env.step(action)
+        # Ensure reward is not None
+        if reward is not None:
             episode_reward += reward
-            episode_length += 1
-            if terminated or truncated:
-                break
-            obs = next_obs
-            info = next_info
+        episode_length += 1
+        if terminated or truncated:
+            break
+        obs = next_obs
+        info = next_info
 
-        game = env.game
-        bosses_killed = next_info.get('bosses_killed', 0)
-        victory = next_info.get('victory', False)
+    game = env.game
+    bosses_killed = next_info.get('bosses_killed', 0) if next_info else 0
+    victory = next_info.get('victory', False) if next_info else False
 
-        # Determine defeat reason
-        defeat_reason = "max_steps"
-        if terminated:
-            if victory:
-                defeat_reason = "victory"
-            elif getattr(game, 'game_over', False):
-                if hasattr(game, 'current_enemy') and getattr(game, 'current_enemy'):
-                    try:
-                        defeat_reason = f"defeated_by_{game.current_enemy.card.value}"
-                    except Exception:
-                        defeat_reason = "game_over"
-                else:
+    # Ensure bosses_killed is not None
+    if bosses_killed is None:
+        bosses_killed = 0
+
+    # Determine defeat reason
+    defeat_reason = "max_steps"
+    if terminated:
+        if victory:
+            defeat_reason = "victory"
+        elif getattr(game, 'game_over', False):
+            if hasattr(game, 'current_enemy') and getattr(game, 'current_enemy'):
+                try:
+                    defeat_reason = f"defeated_by_{game.current_enemy.card.value}"
+                except Exception:
                     defeat_reason = "game_over"
+            else:
+                defeat_reason = "game_over"
 
-        # Final enemy type
-        final_enemy_type = "none"
-        if hasattr(game, 'current_enemy') and getattr(game, 'current_enemy'):
-            try:
-                final_enemy_type = f"{game.current_enemy.card.value}_{game.current_enemy.card.suit.name}"
-            except Exception:
-                final_enemy_type = "unknown"
+    # Final enemy type
+    final_enemy_type = "none"
+    if hasattr(game, 'current_enemy') and getattr(game, 'current_enemy'):
+        try:
+            final_enemy_type = f"{game.current_enemy.card.value}_{game.current_enemy.card.suit.name}"
+        except Exception:
+            final_enemy_type = "unknown"
 
-        return {
-            'reward': float(episode_reward),
-            'length': int(episode_length),
-            'bosses_killed': int(bosses_killed),
-            'victory': bool(victory),
-            'defeat_reason': defeat_reason,
-            'final_enemy_type': final_enemy_type,
-        }
-    except Exception as e:
-        # Bubble up a minimal error object; the caller may handle/raise
-        return {'__error__': str(e)}
+    return {
+        'reward': float(episode_reward),
+        'length': int(episode_length),
+        'bosses_killed': int(bosses_killed),
+        'victory': bool(victory),
+        'defeat_reason': defeat_reason,
+        'final_enemy_type': final_enemy_type,
+    }
 
 
 class RandomPolicyEvaluator:
@@ -231,7 +233,9 @@ class RandomPolicyEvaluator:
             # Take step
             next_obs, reward, terminated, truncated, next_info = self.env.step(action)
             
-            episode_reward += reward
+            # Ensure reward is not None
+            if reward is not None:
+                episode_reward += reward
             episode_length += 1
             
             if terminated or truncated:
@@ -242,8 +246,12 @@ class RandomPolicyEvaluator:
         
         # Extract final game state
         game = self.env.game
-        bosses_killed = next_info.get('bosses_killed', 0)
-        victory = next_info.get('victory', False)
+        bosses_killed = next_info.get('bosses_killed', 0) if next_info else 0
+        victory = next_info.get('victory', False) if next_info else False
+        
+        # Ensure bosses_killed is not None
+        if bosses_killed is None:
+            bosses_killed = 0
         
         # Determine defeat reason
         defeat_reason = "max_steps"

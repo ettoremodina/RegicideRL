@@ -49,7 +49,7 @@ class RegicideGymEnv(gym.Env):
         self.last_damage_dealt = 0
         
         # Action space - fixed size with masking
-        self.max_actions = 60  # Sufficient for most scenarios
+        self.max_actions = 30  # Sufficient for most scenarios
         self.action_space = spaces.Discrete(self.max_actions)
         
 
@@ -282,7 +282,6 @@ class RegicideGymEnv(gym.Env):
         game_state = {
             'allow_yield': self.game.can_yield(),
             'enemy_attack':  self.game.current_enemy.get_effective_attack(),
-            'current_shields': self.game.current_enemy.spade_protection
         }
         if self.current_phase == "attack":
             self.valid_actions = self.action_handler.get_all_possible_actions(
@@ -292,10 +291,7 @@ class RegicideGymEnv(gym.Env):
             self.valid_actions = self.action_handler.get_all_possible_actions(
                 current_hand, "defense", game_state
             )
-        
-        # Intelligent action limitation with prioritization
-        if len(self.valid_actions) > self.max_actions:
-            self.valid_actions = self._prioritize_actions(self.valid_actions)
+
     
     def _card_to_index(self, card: Card) -> int:
         """Convert card to index for embedding lookup"""
@@ -317,62 +313,6 @@ class RegicideGymEnv(gym.Env):
         
         return discard_bits
     
-    def _prioritize_actions(self, actions: List[np.ndarray]) -> List[np.ndarray]:
-        """Prioritize actions to keep the most meaningful ones when truncating"""
-        if len(actions) <= self.max_actions:
-            return actions
-        
-        # Score actions by potential impact
-        scored_actions = []
-        for action_mask in actions:
-            score = self._score_action(action_mask)
-            scored_actions.append((score, action_mask))
-        
-        # Sort by score (higher is better) and take top max_actions
-        scored_actions.sort(key=lambda x: x[0], reverse=True)
-        return [action for _, action in scored_actions[:self.max_actions]]
-    
-    def _score_action(self, action_mask: np.ndarray) -> float:
-        """Score an action based on strategic value"""
-        score = 0.0
-        
-        # Get card indices for this action
-        current_hand = self.game.get_current_player_hand()
-        card_indices = self.action_handler.mask_to_card_indices(action_mask, len(current_hand))
-        
-        if not card_indices:  # Yield action
-            return 1.0  # Low but positive score for yield
-        
-        cards = [current_hand[i] for i in card_indices]
-        
-        # Prefer actions that can deal damage to enemies
-        total_attack = sum(card.get_attack_value() for card in cards)
-        if self.game.current_enemy:
-            remaining_health = self.game.current_enemy.health - self.game.current_enemy.damage_taken
-            if total_attack >= remaining_health:
-                score += 100.0  # High score for killing enemy
-            else:
-                score += total_attack * 2.0  # Score proportional to damage
-        
-        # Prefer suit powers
-        suits = {card.suit for card in cards}
-        if Suit.HEARTS in suits:
-            score += 5.0  # Hearts healing
-        if Suit.DIAMONDS in suits:
-            score += 3.0  # Diamonds draw
-        if Suit.SPADES in suits:
-            score += 4.0  # Spades protection
-        if Suit.CLUBS in suits:
-            score += 6.0  # Clubs doubling
-        
-        # Prefer single high-value cards over complex combos when resources are tight
-        if len(cards) == 1 and cards[0].get_attack_value() >= 10:
-            score += 2.0
-        
-        # Slightly prefer smaller combos for efficiency
-        score -= len(cards) * 0.1
-        
-        return score
     
     def _calculate_reward(self, success: bool, enemies_before: int, enemy_health_before: int) -> float:
         """Enhanced reward function with suit power incentives"""
@@ -394,21 +334,6 @@ class RegicideGymEnv(gym.Env):
         # Damage reward
         if self.last_damage_dealt > 0:
             reward += self.last_damage_dealt * 0.5  # Simple damage scaling
-        
-        # Suit power rewards (strategic incentives)
-        # Hearts healing - reward for deck sustainability
-        if hasattr(self.game, 'last_hearts_healed') and self.game.last_hearts_healed > 0:
-            reward += self.game.last_hearts_healed * 0.3  # Reward healing
-        
-        # Diamonds drawing - reward for resource acquisition  
-        if hasattr(self.game, 'last_diamonds_drawn') and self.game.last_diamonds_drawn > 0:
-            reward += self.game.last_diamonds_drawn * 0.2  # Reward card draw
-        
-        # Spades protection - reward for defensive planning (diminishing returns)
-        if hasattr(self.game, 'last_spade_protection_added') and self.game.last_spade_protection_added > 0:
-            # Diminishing returns to prevent excessive stacking
-            protection_bonus = min(self.game.last_spade_protection_added * 0.1, 2.0)
-            reward += protection_bonus
         
         # Basic step penalty to encourage efficiency
         reward -= 0.1

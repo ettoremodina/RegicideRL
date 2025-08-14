@@ -286,7 +286,7 @@ class Game:
         total_attack = sum(card.get_attack_value() for card in cards_to_play)
         
         # Apply suit powers
-        self._apply_suit_powers(cards_to_play, total_attack)
+        total_attack = self._apply_suit_powers(cards_to_play, total_attack)
         
         # Deal damage
         initial_damage = self.current_enemy.damage_taken
@@ -393,40 +393,36 @@ class Game:
           - Immunity: cards matching enemy suit (unless Jester cancelled) skip suit effects.
         """
         if not cards or not self.current_enemy:
-            return
+            return total_attack
 
         effective = [c for c in cards if not self._is_immune(c)]
         if not effective:
-            return
+            return total_attack
 
-        is_ace_pairing = any(c.value == 1 for c in cards) and len(cards) <= 2
+        suits = {c.suit for c in effective} 
 
-        if is_ace_pairing:
-            suits = {c.suit for c in effective}
-            hearts_count = 1 if Suit.HEARTS in suits else 0
-            diamonds_count = 1 if Suit.DIAMONDS in suits else 0
-            spades_count = 1 if Suit.SPADES in suits else 0
-            any_clubs = Suit.CLUBS in suits
-        else:
-            hearts_count = sum(1 for c in effective if c.suit == Suit.HEARTS)
-            diamonds_count = sum(1 for c in effective if c.suit == Suit.DIAMONDS)
-            spades_count = sum(1 for c in effective if c.suit == Suit.SPADES)
-            any_clubs = any(c.suit == Suit.CLUBS for c in effective)
+        hearts_count = Suit.HEARTS in suits 
+        diamonds_count = Suit.DIAMONDS in suits 
+        spades_count =Suit.SPADES in suits 
+        any_clubs = Suit.CLUBS in suits
+
 
         # Hearts first
-        for _ in range(hearts_count):
+        if hearts_count:
             self._hearts_power(total_attack)
         # Diamonds next
-        for _ in range(diamonds_count):
+        if diamonds_count:
             self._diamonds_power(total_attack)
         # Spades protection stacks
-        for _ in range(spades_count):
+        if spades_count:
             self.current_enemy.spade_protection += total_attack
             self.last_spade_protection_added += total_attack
         # Clubs: single doubling
         if any_clubs:
-            self.current_enemy.damage_taken += total_attack
-    
+            total_attack *= 2
+
+        return total_attack
+
     def _is_immune(self, card: Card) -> bool:
         if self.jester_immunity_cancelled:
             return False

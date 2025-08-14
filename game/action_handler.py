@@ -4,7 +4,7 @@ Generates all possible valid actions for attack and defense phases
 """
 
 from typing import List, Dict, Tuple, Optional
-from game.regicide import Card, Game, Enemy
+from game.regicide import Card, Game, Enemy, Suit
 import itertools
 
 
@@ -215,7 +215,7 @@ class ActionHandler:
         
         Args:
             hand: Player's current hand
-            game_state: Dict containing 'enemy_attack' and 'current_shields'
+            game_state: Dict containing 'enemy_attack'
             
         Returns:
             List of action masks for minimal valid defense combinations
@@ -224,9 +224,7 @@ class ActionHandler:
             # If no game state provided, return all possible combinations
             return self._get_all_combinations(hand)
         
-        enemy_attack = game_state.get('enemy_attack', 0)
-        current_shields = game_state.get('current_shields', 0)
-        required_defense = max(0, enemy_attack - current_shields)
+        required_defense = game_state.get('enemy_attack', 0)
     
         hand_size = len(hand)
         
@@ -370,17 +368,13 @@ def main():
     """
     Example usage and testing
     """
-    from regicide import Card, Suit
-    
     # Create test hand
     test_hand = [
-        Card(2, Suit.HEARTS),
-        Card(2, Suit.DIAMONDS),
-        Card(3, Suit.HEARTS),
-        Card(3, Suit.DIAMONDS),
-        Card(4, Suit.DIAMONDS),
         Card(5, Suit.CLUBS),
-        Card(7, Suit.SPADES),
+        Card(6, Suit.DIAMONDS),
+        Card(8, Suit.CLUBS),
+        Card(9, Suit.CLUBS),
+        Card(10, Suit.CLUBS)
     ]
     
     # Create action handler
@@ -398,8 +392,8 @@ def main():
     
     print("\n=== Testing Defense Actions ===")
     game_state = {
-        'enemy_attack': 15,
-        'current_shields': 0
+        'enemy_attack': 10,
+        'current_shields': 8
     }
     defense_actions = handler.get_all_possible_actions(test_hand, "defense", game_state)
     print(f"Number of valid defense combinations: {len(defense_actions)}")

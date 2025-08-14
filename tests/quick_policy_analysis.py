@@ -5,7 +5,7 @@ Easy-to-use script for analyzing trained Regicide models
 
 import os
 import glob
-from tests.policy_analysis import PolicyAnalyzer
+from .policy_analysis import PolicyAnalyzer
 
 def find_latest_model(base_dir="outputs"):
     """Find the most recent trained model"""

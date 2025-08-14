@@ -14,7 +14,7 @@ from collections import deque
 import os
 from datetime import datetime
 
-from train.regicide_gym_env import RegicideGymEnv
+from .regicide_gym_env import RegicideGymEnv
 from policy.card_aware_policy import CardAwarePolicy
 from config import PathManager
 

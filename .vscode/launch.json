@@ -25,6 +25,13 @@
             "request": "launch",
             "program": "test_new_flow.py",
             "console": "integratedTerminal",
+        },
+        {
+            "name": "random",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "tests.random_policy_evaluation",
+            "console": "integratedTerminal",
         }
     ]
 }

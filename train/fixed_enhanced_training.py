@@ -16,8 +16,9 @@ import random
 from typing import Dict, Tuple, List, Optional
 
 from policy.card_aware_policy import CardAwarePolicy
-from streamlined_training import CardAwareRegicideTrainer
-from training_utils import TrainingVisualizer, TrainingLogger, TrainingStatistics
+from .streamlined_training import CardAwareRegicideTrainer
+from .training_utils import TrainingVisualizer, TrainingLogger, TrainingStatistics
+from .regicide_gym_env import RegicideGymEnv
 from config import PathManager
 
 
@@ -493,7 +494,7 @@ def main_fixed():
     print("=" * 50)
     
     # Import environment
-    from regicide_gym_env import RegicideGymEnv
+    
     
     # Training configuration
     CONFIG = {

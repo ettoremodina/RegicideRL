@@ -1,0 +1,114 @@
+Training log started
+==================================================
+EXPERIMENT CONFIGURATION
+==================================================
+num_episodes: 10000
+learning_rate: 0.0015
+gamma: 0.95
+policy_type: card_aware
+num_players: 2
+max_hand_size: 7
+card_embed_dim: 12
+hidden_dim: 32
+==================================================
+Episode 100: Reward=201.30, Length=29, Bosses=5, WinRate=100.00%
+Episode 200: Reward=51.30, Length=17, Bosses=1, WinRate=100.00%
+Episode 300: Reward=94.70, Length=15, Bosses=2, WinRate=100.00%
+Episode 400: Reward=287.40, Length=37, Bosses=5, WinRate=100.00%
+Episode 500: Reward=74.30, Length=18, Bosses=1, WinRate=99.00%
+Episode 600: Reward=68.40, Length=11, Bosses=1, WinRate=100.00%
+Episode 700: Reward=41.10, Length=13, Bosses=1, WinRate=100.00%
+Episode 800: Reward=77.40, Length=11, Bosses=2, WinRate=100.00%
+Episode 900: Reward=28.80, Length=7, Bosses=1, WinRate=100.00%
+Episode 1000: Reward=95.70, Length=16, Bosses=2, WinRate=100.00%
+Episode 1100: Reward=84.60, Length=16, Bosses=2, WinRate=100.00%
+Episode 1200: Reward=89.40, Length=17, Bosses=2, WinRate=100.00%
+Episode 1300: Reward=28.80, Length=10, Bosses=1, WinRate=100.00%
+Episode 1400: Reward=67.50, Length=9, Bosses=2, WinRate=100.00%
+Episode 1500: Reward=62.80, Length=15, Bosses=1, WinRate=98.00%
+Episode 1600: Reward=53.60, Length=9, Bosses=1, WinRate=100.00%
+Episode 1700: Reward=41.80, Length=11, Bosses=1, WinRate=100.00%
+Episode 1800: Reward=130.10, Length=18, Bosses=3, WinRate=100.00%
+Episode 1900: Reward=39.40, Length=11, Bosses=1, WinRate=99.00%
+Episode 2000: Reward=151.50, Length=25, Bosses=3, WinRate=100.00%
+Episode 2100: Reward=44.50, Length=9, Bosses=1, WinRate=100.00%
+Episode 2200: Reward=123.60, Length=17, Bosses=3, WinRate=100.00%
+Episode 2300: Reward=159.10, Length=18, Bosses=4, WinRate=99.00%
+Episode 2400: Reward=89.20, Length=18, Bosses=2, WinRate=99.00%
+Episode 2500: Reward=117.00, Length=19, Bosses=3, WinRate=99.00%
+Episode 2600: Reward=52.70, Length=12, Bosses=1, WinRate=100.00%
+Episode 2700: Reward=50.30, Length=15, Bosses=1, WinRate=100.00%
+Episode 2800: Reward=43.80, Length=11, Bosses=1, WinRate=100.00%
+Episode 2900: Reward=158.80, Length=26, Bosses=4, WinRate=98.00%
+Episode 3000: Reward=115.90, Length=15, Bosses=3, WinRate=99.00%
+Episode 3100: Reward=45.60, Length=11, Bosses=1, WinRate=100.00%
+Episode 3200: Reward=115.00, Length=13, Bosses=3, WinRate=100.00%
+Episode 3300: Reward=131.20, Length=17, Bosses=3, WinRate=99.00%
+Episode 3400: Reward=52.20, Length=11, Bosses=1, WinRate=100.00%
+Episode 3500: Reward=37.40, Length=13, Bosses=1, WinRate=100.00%
+Episode 3600: Reward=92.90, Length=15, Bosses=2, WinRate=100.00%
+Episode 3700: Reward=103.40, Length=20, Bosses=2, WinRate=100.00%
+Episode 3800: Reward=89.20, Length=18, Bosses=2, WinRate=100.00%
+Episode 3900: Reward=202.20, Length=29, Bosses=4, WinRate=100.00%
+Episode 4000: Reward=238.00, Length=32, Bosses=5, WinRate=100.00%
+Episode 4100: Reward=57.40, Length=9, Bosses=1, WinRate=100.00%
+Episode 4200: Reward=56.90, Length=7, Bosses=2, WinRate=98.00%
+Episode 4300: Reward=195.70, Length=38, Bosses=4, WinRate=100.00%
+Episode 4400: Reward=157.50, Length=18, Bosses=4, WinRate=100.00%
+Episode 4500: Reward=50.90, Length=11, Bosses=1, WinRate=100.00%
+Episode 4600: Reward=41.50, Length=8, Bosses=1, WinRate=100.00%
+Episode 4700: Reward=32.50, Length=9, Bosses=1, WinRate=100.00%
+Episode 4800: Reward=33.40, Length=7, Bosses=1, WinRate=100.00%
+Episode 4900: Reward=202.30, Length=27, Bosses=4, WinRate=100.00%
+Episode 5000: Reward=112.50, Length=20, Bosses=2, WinRate=100.00%
+Episode 5100: Reward=137.00, Length=22, Bosses=3, WinRate=100.00%
+Episode 5200: Reward=83.60, Length=18, Bosses=2, WinRate=100.00%
+Episode 5300: Reward=86.30, Length=12, Bosses=2, WinRate=100.00%
+Episode 5400: Reward=149.10, Length=19, Bosses=4, WinRate=100.00%
+Episode 5500: Reward=166.30, Length=22, Bosses=4, WinRate=100.00%
+Episode 5600: Reward=45.30, Length=11, Bosses=1, WinRate=99.00%
+Episode 5700: Reward=117.60, Length=19, Bosses=3, WinRate=99.00%
+Episode 5800: Reward=79.90, Length=14, Bosses=2, WinRate=99.00%
+Episode 5900: Reward=12.10, Length=10, Bosses=0, WinRate=100.00%
+Episode 6000: Reward=52.50, Length=11, Bosses=1, WinRate=100.00%
+Episode 6100: Reward=157.20, Length=22, Bosses=4, WinRate=100.00%
+Episode 6200: Reward=71.20, Length=12, Bosses=2, WinRate=100.00%
+Episode 6300: Reward=106.20, Length=12, Bosses=2, WinRate=100.00%
+Episode 6400: Reward=45.80, Length=13, Bosses=1, WinRate=100.00%
+Episode 6500: Reward=168.60, Length=26, Bosses=4, WinRate=100.00%
+Episode 6600: Reward=128.10, Length=22, Bosses=3, WinRate=100.00%
+Episode 6700: Reward=92.70, Length=14, Bosses=2, WinRate=100.00%
+Episode 6800: Reward=68.10, Length=14, Bosses=2, WinRate=100.00%
+Episode 6900: Reward=86.50, Length=14, Bosses=2, WinRate=100.00%
+Episode 7000: Reward=41.90, Length=11, Bosses=1, WinRate=100.00%
+Episode 7100: Reward=103.50, Length=24, Bosses=2, WinRate=100.00%
+Episode 7200: Reward=111.10, Length=17, Bosses=3, WinRate=100.00%
+Episode 7300: Reward=169.50, Length=20, Bosses=4, WinRate=100.00%
+Episode 7400: Reward=38.50, Length=10, Bosses=1, WinRate=100.00%
+Episode 7500: Reward=32.30, Length=8, Bosses=1, WinRate=99.00%
+Episode 7600: Reward=199.80, Length=25, Bosses=5, WinRate=100.00%
+Episode 7700: Reward=133.40, Length=18, Bosses=3, WinRate=100.00%
+Episode 7800: Reward=71.00, Length=14, Bosses=2, WinRate=100.00%
+Episode 7900: Reward=27.80, Length=3, Bosses=1, WinRate=100.00%
+Episode 8000: Reward=63.60, Length=11, Bosses=1, WinRate=100.00%
+Episode 8100: Reward=130.30, Length=21, Bosses=3, WinRate=100.00%
+Episode 8200: Reward=93.20, Length=15, Bosses=2, WinRate=99.00%
+Episode 8300: Reward=86.90, Length=16, Bosses=2, WinRate=100.00%
+Episode 8400: Reward=79.70, Length=14, Bosses=2, WinRate=100.00%
+Episode 8500: Reward=149.00, Length=29, Bosses=3, WinRate=100.00%
+Episode 8600: Reward=50.00, Length=9, Bosses=1, WinRate=100.00%
+Episode 8700: Reward=56.30, Length=14, Bosses=1, WinRate=100.00%
+Episode 8800: Reward=10.30, Length=6, Bosses=0, WinRate=100.00%
+Episode 8900: Reward=0.50, Length=10, Bosses=0, WinRate=100.00%
+Episode 9000: Reward=137.20, Length=24, Bosses=3, WinRate=99.00%
+Episode 9100: Reward=158.90, Length=23, Bosses=3, WinRate=100.00%
+Episode 9200: Reward=46.50, Length=13, Bosses=1, WinRate=99.00%
+Episode 9300: Reward=169.00, Length=22, Bosses=4, WinRate=100.00%
+Episode 9400: Reward=106.80, Length=14, Bosses=3, WinRate=100.00%
+Episode 9500: Reward=125.30, Length=17, Bosses=3, WinRate=100.00%
+Episode 9600: Reward=124.80, Length=19, Bosses=3, WinRate=100.00%
+Episode 9700: Reward=78.90, Length=15, Bosses=2, WinRate=99.00%
+Episode 9800: Reward=187.40, Length=23, Bosses=4, WinRate=100.00%
+Episode 9900: Reward=29.10, Length=8, Bosses=1, WinRate=100.00%
+Episode 10000: Reward=224.80, Length=33, Bosses=5, WinRate=99.00%
+Training log ended

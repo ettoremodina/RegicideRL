@@ -4,7 +4,7 @@ Test script for the updated Regicide game flow with proper yielding mechanics.
 This demonstrates the corrected game flow based on the flow diagram.
 """
 
-from game.regicide import Game
+from .regicide import Game
 import random
 
 class NewGameInterface():

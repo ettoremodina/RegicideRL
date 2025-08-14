@@ -3,13 +3,11 @@ Training utilities for Regicide - Plotting, evaluation, and helper functions
 Extracted from custom_training.py to keep the main training script focused
 """
 
+import torch
 import numpy as np
 from typing import List, Dict, Tuple, Optional
 from collections import deque
 import matplotlib.pyplot as plt
-
-
-
 from config import PathManager
 
 
@@ -25,7 +23,7 @@ class TrainingVisualizer:
                              episode_rewards: List[float],
                              episode_lengths: List[float], 
                              bosses_killed_history: List[int],
-                             win_rate_history: List[float],
+                             win_rate_history: List[float] = None,
                              filename: str = "training_progress.png") -> Optional[str]:
         """
         Plot comprehensive training progress
@@ -34,7 +32,6 @@ class TrainingVisualizer:
             episode_rewards: List of episode rewards
             episode_lengths: List of episode lengths
             bosses_killed_history: List of bosses killed per episode
-            win_rate_history: List of rolling win rates
             filename: Name of the plot file (without path)
         
         Returns:
@@ -92,15 +89,7 @@ class TrainingVisualizer:
                     axes[0, 2].plot(range(window-1, len(bosses_killed_history)), moving_avg, 
                                   color='red', linewidth=2, label=f'{window}-episode average')
                     axes[0, 2].legend()
-            
-            # Win rate
-            if win_rate_history:
-                axes[1, 0].plot(win_rate_history, color='purple', linewidth=2)
-                axes[1, 0].set_title('Win Rate (Rolling Average)')
-                axes[1, 0].set_xlabel('Episode')
-                axes[1, 0].set_ylabel('Win Rate')
-                axes[1, 0].set_ylim(0, 1)
-                axes[1, 0].grid(True, alpha=0.3)
+
             
             # Reward distribution
             if episode_rewards:
@@ -156,12 +145,6 @@ class TrainingVisualizer:
             experiment_names = list(experiments_data.keys())
             colors = plt.cm.Set1(np.linspace(0, 1, len(experiment_names)))
             
-            # Win rates comparison
-            win_rates = [data.get('final_win_rate', 0) for data in experiments_data.values()]
-            axes[0, 0].bar(experiment_names, win_rates, color=colors)
-            axes[0, 0].set_title('Final Win Rates')
-            axes[0, 0].set_ylabel('Win Rate')
-            axes[0, 0].tick_params(axis='x', rotation=45)
             
             # Average bosses killed
             avg_bosses = [data.get('avg_bosses_killed', 0) for data in experiments_data.values()]
@@ -234,7 +217,7 @@ class TrainingEvaluator:
             total_lengths.append(episode_length)
             total_boss_kills.append(bosses_killed)
             
-            if episode_reward > 0:
+            if total_boss_kills == 12:
                 wins += 1
             
             if (episode + 1) % 20 == 0:
@@ -245,7 +228,6 @@ class TrainingEvaluator:
             'avg_length': np.mean(total_lengths),
             'avg_bosses_killed': np.mean(total_boss_kills),
             'max_bosses_killed': max(total_boss_kills) if total_boss_kills else 0,
-            'win_rate': wins / num_episodes,
             'total_episodes': num_episodes
         }
         
@@ -313,7 +295,6 @@ class TrainingEvaluator:
         print(f"Average Length: {results['avg_length']:.1f}")
         print(f"Average Bosses Killed: {results['avg_bosses_killed']:.2f}")
         print(f"Max Bosses Killed: {results['max_bosses_killed']}")
-        print(f"Win Rate: {results['win_rate']:.2%}")
 
 
 class TrainingLogger:
@@ -352,7 +333,7 @@ class TrainingLogger:
                   f"Reward={results['episode_reward']:.2f}, "
                   f"Length={results['episode_length']}, "
                   f"Bosses={results['bosses_killed']}, "
-                  f"WinRate={results['win_rate']:.2%}")
+                  )
         self.log(message)
     
     def log_experiment_config(self, config: Dict):
@@ -382,7 +363,6 @@ class TrainingStatistics:
         self.episode_lengths = []
         self.bosses_killed_history = []
         self.max_bosses_killed = 0
-        self.win_rate_history = []
         
         # For tracking recent performance
         self.recent_episodes = deque(maxlen=100)
@@ -403,13 +383,7 @@ class TrainingStatistics:
         won = episode_reward > 0
         self.recent_episodes.append(won)
         self.recent_boss_kills.append(bosses_killed)
-        
-        # Calculate win rate
-        if len(self.recent_episodes) >= 10:
-            recent_win_rate = sum(self.recent_episodes) / len(self.recent_episodes)
-            self.win_rate_history.append(recent_win_rate)
-        else:
-            self.win_rate_history.append(0.0)
+    
     
     def get_summary(self) -> Dict:
         """Get summary of all training statistics"""
@@ -418,8 +392,6 @@ class TrainingStatistics:
             'episode_lengths': self.episode_lengths,
             'bosses_killed_history': self.bosses_killed_history,
             'max_bosses_killed': self.max_bosses_killed,
-            'win_rate_history': self.win_rate_history,
-            'final_win_rate': self.win_rate_history[-1] if self.win_rate_history else 0.0,
             'avg_bosses_killed': np.mean(self.bosses_killed_history) if self.bosses_killed_history else 0.0,
             'total_episodes': len(self.episode_rewards)
         }
@@ -434,20 +406,12 @@ class TrainingStatistics:
                 'avg_reward': 0.0,
                 'avg_length': 0.0,
                 'avg_bosses': 0.0,
-                'win_rate': 0.0
             }
         
         return {
             'avg_reward': np.mean(self.episode_rewards[-window:]),
             'avg_length': np.mean(self.episode_lengths[-window:]),
             'avg_bosses': np.mean(self.bosses_killed_history[-window:]),
-            'win_rate': self.win_rate_history[-1] if self.win_rate_history else 0.0
         }
 
 
-# Import torch only if needed for evaluation
-try:
-    import torch
-    TORCH_AVAILABLE = True
-except ImportError:
-    TORCH_AVAILABLE = False

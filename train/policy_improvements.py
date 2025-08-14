@@ -9,8 +9,8 @@ import numpy as np
 from typing import Dict, Tuple, Optional
 
 from policy.enhanced_policy import EnhancedCardAwarePolicy, AdaptiveLearningRate, CurriculumLearning
-from fixed_enhanced_training import FixedEnhancedCardAwareTrainer
-
+from train.fixed_enhanced_training import FixedEnhancedCardAwareTrainer
+from train.regicide_gym_env import RegicideGymEnv
 
 class SuperiorActorCriticPolicy(EnhancedCardAwarePolicy):
     """Enhanced Actor-Critic with the improved card-aware features"""
@@ -148,7 +148,7 @@ class UltimateRegicideTrainer(FixedEnhancedCardAwareTrainer):
 
 def create_ultimate_trainer(num_players=2, max_hand_size=7):
     """Factory function to create the ultimate trainer"""
-    from regicide_gym_env import RegicideGymEnv
+    
     
     # Advanced configuration
     CONFIG = {
@@ -184,85 +184,12 @@ def create_ultimate_trainer(num_players=2, max_hand_size=7):
     
     return trainer, CONFIG
 
-
-# Performance analysis and suggestions
-PERFORMANCE_IMPROVEMENTS = {
-    "Current Results Analysis": {
-        "Strengths": [
-            "100% win rate shows excellent learning",
-            "Average 1.88 bosses killed is solid",
-            "Max 7 bosses indicates capability for full game completion",
-            "Stable learning curve in plots"
-        ],
-        "Areas for Enhancement": [
-            "Could push average bosses killed higher (aim for 2.5+)",
-            "Reduce episode length variance",
-            "More consistent high-performance episodes",
-            "Better handling of complex multi-player scenarios"
-        ]
-    },
-    
-    "Recommended Improvements": {
-        "1. Enhanced Card Representation": [
-            "Separate value/suit embeddings for better understanding",
-            "Card type awareness (number/face cards)",
-            "Relationship modeling between cards"
-        ],
-        
-        "2. Strategic Reasoning": [
-            "Rule-aware combo evaluation",
-            "Long-term planning with value estimation",
-            "Opponent modeling for multi-player games"
-        ],
-        
-        "3. Advanced Attention": [
-            "Multi-head attention for different card aspects",
-            "Cross-attention between hand and enemy",
-            "Temporal attention for action sequences"
-        ],
-        
-        "4. Curriculum Learning": [
-            "Progressive difficulty (2→3→4 players)",
-            "Different enemy configurations",
-            "Varying game lengths"
-        ],
-        
-        "5. Auxiliary Tasks": [
-            "Enemy health prediction",
-            "Bosses remaining estimation",
-            "Optimal card order prediction"
-        ]
-    },
-    
-    "Implementation Priority": [
-        "High: Enhanced card embeddings (immediate improvement)",
-        "High: Rule-aware combo features (strategic understanding)",
-        "Medium: Multi-head attention (representation quality)",
-        "Medium: Curriculum learning (generalization)",
-        "Low: Auxiliary tasks (representation learning)"
-    ]
-}
-
-
 if __name__ == "__main__":
-    print("🚀 Ultimate Regicide Policy Improvements")
-    print("=" * 60)
-    
-    # Print current analysis
-    for category, items in PERFORMANCE_IMPROVEMENTS.items():
-        print(f"\n📊 {category}:")
-        if isinstance(items, dict):
-            for subcategory, details in items.items():
-                print(f"  {subcategory}:")
-                for detail in details:
-                    print(f"    • {detail}")
-        else:
-            for item in items:
-                print(f"  • {item}")
-    
-    print(f"\n🎯 Next Steps:")
-    print(f"1. Integrate enhanced card embeddings")
-    print(f"2. Add rule-aware features")
-    print(f"3. Test with curriculum learning")
-    print(f"4. Monitor for >2.5 average bosses killed")
-    print(f"5. Evaluate on 4-player games")
+    trainer, config = create_ultimate_trainer(num_players=2, max_hand_size=7)
+    # Start training
+    trainer.train(
+        num_episodes= 1000,
+        render_every=100,
+        save_every=500,
+        log_every=50
+    )

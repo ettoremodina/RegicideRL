@@ -11,9 +11,9 @@ import random
 from typing import List, Dict, Tuple, Optional
 
 # from card_aware_env import CardAwareRegicideEnv
-from train.regicide_gym_env import RegicideGymEnv
+from .regicide_gym_env import RegicideGymEnv
 from policy.card_aware_policy import CardAwarePolicy
-from train.training_utils import TrainingVisualizer, TrainingEvaluator, TrainingLogger, TrainingStatistics
+from .training_utils import TrainingVisualizer, TrainingEvaluator, TrainingLogger, TrainingStatistics
 from config import PathManager
 
 
@@ -61,7 +61,7 @@ class CardAwareRegicideTrainer:
             self.optimizer, 
             mode='max',  # We want to maximize rewards
             factor=0.8,  # Reduce LR by 20% when plateau
-            patience=1000,  # Wait 1000 episodes before reducing
+            patience=100,  # Wait 1000 episodes before reducing
             min_lr=1e-5
         )
         
@@ -224,7 +224,6 @@ class CardAwareRegicideTrainer:
             'episode_reward': episode_reward,
             'episode_length': episode_length,
             'bosses_killed': bosses_killed,
-            'win_rate': self.stats.win_rate_history[-1] if self.stats.win_rate_history else 0.0,
             'policy_loss': policy_loss.item()
         }
     
@@ -288,7 +287,6 @@ class CardAwareRegicideTrainer:
               f"Reward: {recent_stats['avg_reward']:6.2f}, "
               f"Length: {recent_stats['avg_length']:5.1f}, "
               f"Bosses: {recent_stats['avg_bosses']:4.1f}, "
-              f"Win Rate: {recent_stats['win_rate']:.2%}, "
               f"Loss: {results['policy_loss']:.4f}")
     
     def _print_render_stats(self, episode: int, results: Dict):
@@ -365,7 +363,6 @@ class CardAwareRegicideTrainer:
             episode_rewards=stats_dict['episode_rewards'],
             episode_lengths=stats_dict['episode_lengths'],
             bosses_killed_history=stats_dict['bosses_killed_history'],
-            win_rate_history=stats_dict['win_rate_history'],
             filename=filename
         )
     
@@ -395,16 +392,16 @@ def main():
     
     # Training configuration
     CONFIG = {
-        'num_players': 4,
-        'max_hand_size': 5,
-        'learning_rate': 0.0015,  # Slightly higher for AdamW
+        'num_players': 3,
+        'max_hand_size': 6,
+        'learning_rate': 0.05,  # Slightly higher for AdamW
         'card_embed_dim': 12,
         'hidden_dim': 32,
         'gamma': 0.95,  # Slightly lower discount for faster learning
-        'num_episodes': 50000,
-        'render_every': 5000,
+        'num_episodes': 10000,
+        'render_every': 2000,
         'log_every': 200,
-        'save_every': 10000,
+        'save_every': 5000,
         'eval_episodes': 30,
     }
     
@@ -448,7 +445,6 @@ def main():
     print(f"\n🏆 TRAINING COMPLETE!")
     print(f"Experiment: {trainer.path_manager.experiment_name}")
     print(f"Episodes: {stats['total_episodes']}")
-    print(f"Final win rate: {stats['final_win_rate']:.2%}")
     print(f"Max bosses killed: {stats['max_bosses_killed']}")
     print(f"Policy type:  Card-Aware")
     print(f"Files saved to: {trainer.path_manager.experiment_dir}")

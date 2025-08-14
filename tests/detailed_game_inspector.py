@@ -115,22 +115,15 @@ class DetailedGameInspector:
         print(f"📊 Episode length: {info['episode_length']}")
         
         # Enemy status
-        print(f"\n🐉 ENEMY STATUS:")
+        print(f"🐉 ENEMY STATUS:")
         print(f"  Card: {game.current_enemy}")
-        print(f"  Health: {game.current_enemy.health - game.current_enemy.damage_taken}/{game.current_enemy.health}")
-        print(f"  Damage taken: {game.current_enemy.damage_taken}")
-        print(f"  Attack power: {game.current_enemy.get_effective_attack()}")
-        print(f"  Spade protection: {game.current_enemy.spade_protection}")
-        print(f"  Is defeated: {game.current_enemy.is_defeated()}")
+
         
         # Deck status
-        print(f"\n📚 DECK STATUS:")
-        print(f"  Enemies remaining: {len(game.castle_deck)}")
-        print(f"  Tavern deck: {len(game.tavern_deck)} cards")
-        print(f"  Discard pile: {len(game.discard_pile)} cards")
+        print(f"📚 DECK: Enemies:{len(game.castle_deck)} | Tavern:{len(game.tavern_deck)} | Discard:{len(game.discard_pile)}")
         
         # Player status
-        print(f"\n👥 ALL PLAYERS:")
+        print(f"👥 ALL PLAYERS:")
         for i, hand in enumerate(game.players):
             is_current = (i == current_player)
             has_yielded = game.players_yielded_this_round[i]
@@ -143,20 +136,18 @@ class DetailedGameInspector:
             print(f"{prefix}Player {i+1}{suffix}: {hand_str} ({len(hand)} cards)")
         
         # Yield status
-        print(f"\n⚡ YIELD STATUS:")
-        print(f"  Last active player: {game.last_active_player + 1 if game.last_active_player is not None else 'None'}")
-        print(f"  Players yielded this round: {[i+1 for i, yielded in enumerate(game.players_yielded_this_round) if yielded]}")
-        print(f"  Current player can yield: {'✅ YES' if game.can_yield() else '❌ NO'}")
+        last_player = game.last_active_player + 1 if game.last_active_player is not None else 'None'
+        yielded_list = [i+1 for i, yielded in enumerate(game.players_yielded_this_round) if yielded]
+        can_yield_status = '✅ YES' if game.can_yield() else '❌ NO'
+        print(f"\n⚡ YIELD: Last:{last_player} | Yielded:{yielded_list} | Can yield:{can_yield_status}")
         
         if not game.can_yield():
             all_others_yielded = all(game.players_yielded_this_round[i] for i in range(game.num_players) if i != current_player)
-            print(f"  Reason: {'All other players have yielded' if all_others_yielded else 'Cannot yield in current state'}")
+            reason = 'All others yielded' if all_others_yielded else 'Cannot yield now'
+            print(f"    Reason: {reason}")
         
         # Game flags
-        print(f"\n🏁 GAME FLAGS:")
-        print(f"  Jester immunity cancelled: {game.jester_immunity_cancelled}")
-        print(f"  Game over: {game.game_over}")
-        print(f"  Victory: {getattr(game, 'victory', False)}")
+        print(f"\n🏁 FLAGS: Jester immunity:{game.jester_immunity_cancelled} | Game over:{game.game_over} | Victory:{getattr(game, 'victory', False)}")
         
         # Action information
         print(f"\n🎮 ACTION INFO:")
@@ -167,28 +158,25 @@ class DetailedGameInspector:
         if info['valid_actions'] > 0:
             meanings = self.env.get_action_meanings()
             print(f"  Available actions:")
-            for i, meaning in enumerate(meanings):  # Show all actions
-                print(f"    {i}: {meaning}")
+            for i in range(min(info['valid_actions'], len(meanings))):  # Only show valid actions
+                print(f"    {i}: {meanings[i]}")
                 
         
         # Observation tensor info
         print(f"\n🧠 OBSERVATION INFO:")
-        print(f"  Hand cards tensor: {obs['hand_cards']}")
-        print(f"  Hand size: {obs['hand_size'].item()}")
-        print(f"  Enemy card index: {obs['enemy_card'].item()}")
-        print(f"  Game state tensor: {obs['game_state']}")
-        print(f"  Number of valid actions: {obs['num_valid_actions'].item()}")
+        # print(f"  Hand cards tensor: {obs['hand_cards']}")
+        # print(f"  Hand size: {obs['hand_size'].item()}")
+        # print(f"  Enemy card index: {obs['enemy_card'].item()}")
+        # print(f"  Game state tensor: {obs['game_state']}")
+        # print(f"  Number of valid actions: {obs['num_valid_actions'].item()}")
     
     def _get_manual_action(self, info: Dict) -> int:
         """Get manual action input for testing"""
         valid_actions = info['valid_actions']
         if valid_actions == 0:
             return 0
-        
-        meanings = self.env.get_action_meanings()
+    
         print(f"\nChoose action (0-{valid_actions-1}):")
-        for i in range(min(valid_actions, 10)):
-            print(f"  {i}: {meanings[i]}")
         
         while True:
             try:
@@ -338,7 +326,7 @@ def main():
     NUM_PLAYERS = 2
     MAX_HAND_SIZE = 7
     NUM_EPISODES = 2
-    MAX_STEPS = 30
+    MAX_STEPS = 300
     
     inspector = DetailedGameInspector(
         num_players=NUM_PLAYERS,
