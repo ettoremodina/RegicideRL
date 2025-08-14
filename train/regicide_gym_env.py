@@ -343,9 +343,9 @@ class RegicideGymEnv(gym.Env):
         # Terminal rewards
         if self.game.game_over:
             if self.game.victory:
-                return 100.0  # Victory reward
+                return 1000.0  # Victory reward
             else:
-                return -10.0  # Death penalty
+                return -100.0  # Death penalty
         
         reward = 0.0
         
@@ -353,14 +353,14 @@ class RegicideGymEnv(gym.Env):
         enemies_after = len(self.game.castle_deck)
         bosses_killed_this_step = enemies_before - enemies_after
         if bosses_killed_this_step > 0:
-            reward += 20.0  # Fixed reward for killing any boss
+            reward += 30.0  # Fixed reward for killing any boss
         
         # Damage reward
         if self.last_damage_dealt > 0:
             reward += self.last_damage_dealt * 0.5  # Simple damage scaling
         
         # Basic step penalty to encourage efficiency
-        reward -= 0.1
+        reward -= 10
         
         return reward
     

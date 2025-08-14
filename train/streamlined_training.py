@@ -29,6 +29,8 @@ class CardAwareRegicideTrainer:
                  card_embed_dim: int = 16,
                  hidden_dim: int = 64,
                  gamma: float = 0.99,
+                 temperature_decay: float = 0.999995,
+                 min_temperature: float = 0.1,
                  experiment_name: str = None):
         
         self.env = env
@@ -51,8 +53,14 @@ class CardAwareRegicideTrainer:
         self.policy = RuleBasedPolicy(
             max_hand_size=env.max_hand_size,
             max_actions=env.max_actions,
-            game_state_dim=11
+            game_state_dim=11,
+            temperature=2.0  # Higher temperature for more exploration during training
         )
+
+        # Temperature decay parameters
+        self.initial_temperature = 2.0
+        self.temperature_decay = temperature_decay
+        self.min_temperature = min_temperature
 
         # Optimizer - AdamW with weight decay for better generalization
         self.optimizer = optim.AdamW(
@@ -62,13 +70,13 @@ class CardAwareRegicideTrainer:
             eps=1e-8
         )
         
-        # Learning rate scheduler for adaptive learning
+        # Learning rate scheduler for adaptive learning (optimized for long training)
         self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(
             self.optimizer, 
             mode='max',  # We want to maximize rewards
-            factor=0.8,  # Reduce LR by 20% when plateau
-            patience=100,  # Wait 1000 episodes before reducing
-            min_lr=1e-5
+            factor=0.5,  # More aggressive reduction for long training
+            patience=5000,  # Wait longer before reducing for stability
+            min_lr=1e-6,
         )
         
         # Create evaluator (will need to be updated for card-aware policy)
@@ -220,9 +228,9 @@ class CardAwareRegicideTrainer:
         # Update statistics
         self.stats.update(episode_reward, episode_length, bosses_killed)
         
-        # Step learning rate scheduler based on recent performance
-        if hasattr(self, 'scheduler') and len(self.stats.episode_rewards) % 100 == 0:
-            recent_reward = np.mean(self.stats.episode_rewards[-100:])
+        # Step learning rate scheduler based on recent performance (less frequent for stability)
+        if hasattr(self, 'scheduler') and len(self.stats.episode_rewards) % 1000 == 0:
+            recent_reward = np.mean(self.stats.episode_rewards[-1000:])
             self.scheduler.step(recent_reward)
         
         # Return episode results
@@ -262,6 +270,14 @@ class CardAwareRegicideTrainer:
         self.logger.log_experiment_config(config)
         
         for episode in range(num_episodes):
+            # Update temperature (decay exploration over time)
+            if episode > 0:
+                current_temp = max(
+                    self.min_temperature,
+                    self.policy.temperature * self.temperature_decay
+                )
+                self.policy.temperature = current_temp
+            
             # Train one episode
             render = render_every > 0 and (episode + 1) % render_every == 0
             results = self.train_episode(render)
@@ -270,7 +286,7 @@ class CardAwareRegicideTrainer:
             if (episode + 1) % log_every == 0:
                 self.logger.log_progress(episode + 1, results)
             
-            # Print progress
+            # Print progress with temperature info
             if (episode + 1) % log_every == 0:
                 self._print_progress(episode + 1, results)
             
@@ -281,6 +297,15 @@ class CardAwareRegicideTrainer:
             # Save model periodically
             if save_every > 0 and (episode + 1) % save_every == 0:
                 self._save_checkpoint(episode + 1)
+            
+            # Check for convergence (optional early stopping)
+            if (episode + 1) % 10000 == 0 and episode > 100000:
+                recent_bosses = self.stats.recent_boss_kills[-1000:] if len(self.stats.recent_boss_kills) >= 1000 else []
+                if recent_bosses and np.mean(recent_bosses) >= 11.5:  # Very close to perfect (12 bosses)
+                    print(f"\n🎯 CONVERGENCE DETECTED at episode {episode + 1}!")
+                    print(f"   Recent average bosses killed: {np.mean(recent_bosses):.2f}")
+                    print("   Continuing training but consider early stopping if performance plateaus.")
+                    self._save_checkpoint(episode + 1, "convergence")
         
         print("\n🏁 Training completed!")
         self.logger.close()
@@ -289,11 +314,12 @@ class CardAwareRegicideTrainer:
     def _print_progress(self, episode: int, results: Dict):
         """Print training progress"""
         recent_stats = self.stats.get_recent_averages()
-        print(f"Episode {episode:4d}: "
+        print(f"Episode {episode:7d}: "
               f"Reward: {recent_stats['avg_reward']:6.2f}, "
               f"Length: {recent_stats['avg_length']:5.1f}, "
               f"Bosses: {recent_stats['avg_bosses']:4.1f}, "
-              f"Loss: {results['policy_loss']:.4f}")
+              f"Loss: {results['policy_loss']:.4f}, "
+              f"Temp: {self.policy.temperature:.3f}")
     
     def _print_render_stats(self, episode: int, results: Dict):
         """Print detailed stats for render episodes"""
@@ -305,15 +331,19 @@ class CardAwareRegicideTrainer:
         print(f"  Recent avg bosses/episode: {np.mean(self.stats.recent_boss_kills) if self.stats.recent_boss_kills else 0:.2f}")
         print("=" * 60)
     
-    def _save_checkpoint(self, episode: int):
+    def _save_checkpoint(self, episode: int, suffix: str = ""):
         """Save model checkpoint"""
-        filename = f"regicide_policy_episode_{episode}.pth"
+        checkpoint_name = f"regicide_policy_episode_{episode}"
+        if suffix:
+            checkpoint_name += f"_{suffix}"
+        filename = f"{checkpoint_name}.pth"
         save_path = self.save_model(filename, is_checkpoint=True)
         print(f"💾 Checkpoint saved: {save_path}")
         print(f"   Current max bosses killed: {self.stats.max_bosses_killed}")
+        print(f"   Current temperature: {self.policy.temperature:.3f}")
         
-        # Clean up old checkpoints
-        self.path_manager.cleanup_old_checkpoints(keep_last_n=3)
+        # Clean up old checkpoints (keep more for long training)
+        self.path_manager.cleanup_old_checkpoints(keep_last_n=5)
     
     def save_model(self, filename: str, is_checkpoint: bool = False) -> str:
         """Save model with training statistics"""
@@ -396,19 +426,27 @@ def main():
     print("🎮 REGICIDE TRAINING - CARD-AWARE VERSION")
     print("=" * 50)
     
-    # Training configuration
+    # Training configuration - Optimized for long training (1M episodes)
+    num_episodes = 100000
+    save_every = num_episodes//2
+    log_every = num_episodes//100
+    render_every = num_episodes//20
+
     CONFIG = {
         'num_players': 3,
         'max_hand_size': 6,
-        'learning_rate': 0.05,  # Slightly higher for AdamW
-        'card_embed_dim': 12,
-        'hidden_dim': 32,
-        'gamma': 0.95,  # Slightly lower discount for faster learning
-        'num_episodes': 10000,
-        'render_every': 2000,
-        'log_every': 200,
-        'save_every': 10000,
-        'eval_episodes': 200,
+        'learning_rate': 0.001,  # Much lower for stable long-term learning
+        'card_embed_dim': 16,    # Slightly larger for better representation
+        'hidden_dim': 64,        # Larger network for million-episode learning
+        'gamma': 0.99,           # Higher discount for better long-term planning
+        'temperature': 1.5,      # More balanced exploration
+        'num_episodes': num_episodes, #
+        'render_every': render_every,   # Less frequent rendering for speed
+        'log_every': log_every,       # 
+        'save_every': save_every,     #
+        'eval_episodes': 100,    # Evaluation episodes
+        'temperature_decay': 0.9995,  # Gradual temperature decay
+        'min_temperature': 0.1,  # Minimum exploration temperature
     }
     
     # Create card-aware environment
@@ -429,6 +467,8 @@ def main():
         card_embed_dim=CONFIG['card_embed_dim'],
         hidden_dim=CONFIG['hidden_dim'],
         gamma=CONFIG['gamma'],
+        temperature_decay=CONFIG['temperature_decay'],
+        min_temperature=CONFIG['min_temperature']
     )
     
     print(f"Model parameters: {sum(p.numel() for p in trainer.policy.parameters())}")

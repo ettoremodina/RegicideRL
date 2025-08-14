@@ -1,0 +1,14 @@
+Training log started
+==================================================
+EXPERIMENT CONFIGURATION
+==================================================
+num_episodes: 100000
+learning_rate: 0.001
+gamma: 0.99
+policy_type: card_aware
+num_players: 3
+max_hand_size: 6
+card_embed_dim: 12
+hidden_dim: 64
+==================================================
+Episode 1000: Reward=74.00, Length=11, Bosses=2, 

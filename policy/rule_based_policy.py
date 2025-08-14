@@ -1,12 +1,12 @@
 """
 Rule-Based Semi-Random Policy for Regicide
-Combines rule-based suggestions with neural network context-dependent weighting.
+Combines rule-based suggestions with neural network action-level corrections.
 
-The policy starts with a uniform distribution over valid actions and applies rule-based
-suggestions weighted by a neural network that learns context-dependent importance.
-Rules are implemented as simple functions for easy expansion.
+The policy applies all rules equally and accumulates their scores, then uses a neural 
+network to learn context-dependent corrections for individual actions. This allows the 
+policy to start with rule-based behavior and gradually learn improvements through training.
 
-Game State Features (12 dimensions):
+Game State Features (11 dimensions):
     Enemy features (0-3):
         0: enemy_max_health / 40.0
         1: enemy_current_health / 40.0  
@@ -61,18 +61,24 @@ CURRENT_PLAYER = 10
 
 class RuleBasedPolicy(nn.Module):
     """
-    Semi-random policy that combines rule-based suggestions with neural network weighting.
-    Compatible with existing training infrastructure.
+    Semi-random policy that combines rule-based suggestions with neural network action corrections.
+    
+    Architecture:
+    - 11 strategic rules each provide equal-weight suggestions for actions
+    - Neural network learns context-dependent corrections for individual actions
+    - Final action scores = sum(rule_scores) + neural_corrections
+    - Compatible with existing training infrastructure
     """
     
     def __init__(self, max_hand_size: int = 8, max_actions: int = 20, 
-                 game_state_dim: int = 11, hidden_dim: int = 64):  # Updated to 11 features
+                 game_state_dim: int = 11, hidden_dim: int = 64, temperature: float = 1.0):  # Updated to 11 features
         super(RuleBasedPolicy, self).__init__()
         
         self.max_hand_size = max_hand_size
         self.max_actions = max_actions
         self.game_state_dim = game_state_dim
         self.hidden_dim = hidden_dim
+        self.temperature = temperature  # For exploration control
 
         self.card_embed_dim = 12  # Embedding size for cards (can be adjusted)
         
@@ -125,6 +131,7 @@ class RuleBasedPolicy(nn.Module):
                 torch.nn.init.normal_(m.weight, mean=0, std=0.1)
                 if m.padding_idx is not None:
                     torch.nn.init.constant_(m.weight[m.padding_idx], 0)
+
     
     def forward(self, observation: Dict[str, torch.Tensor]) -> torch.Tensor:
         """
@@ -157,35 +164,15 @@ class RuleBasedPolicy(nn.Module):
         for rule_func in self.rules:
             rule_scores = rule_func(observation)  # [num_valid_actions] or None
             if rule_scores is not None:
-                # Ensure proper shape and device
-                if isinstance(rule_scores, (list, np.ndarray)):
-                    rule_scores = torch.tensor(rule_scores, dtype=torch.float32, device=device)
-                if rule_scores.dim() == 1:
-                    rule_scores = rule_scores.unsqueeze(0)
-                
-                # Pad or truncate to match valid actions
-                if rule_scores.size(1) > num_valid_actions:
-                    rule_scores = rule_scores[:, :num_valid_actions]
-                elif rule_scores.size(1) < num_valid_actions:
-                    padding = torch.zeros(batch_size, num_valid_actions - rule_scores.size(1), device=device)
-                    rule_scores = torch.cat([rule_scores, padding], dim=1)
-                
+                # Normalize and prepare rule scores
+                rule_scores = self._normalize_rule_scores(rule_scores, num_valid_actions, batch_size, device)
                 # Add rule scores equally weighted
                 action_scores += rule_scores
         
-        # Apply neural network corrections per action
-        hand_cards = observation['hand_cards']
         
         for i in range(num_valid_actions):
-            # Get action representation (cards involved in this action)
-            # For simplicity, use the i-th card from hand as action representation
-            if hand_cards.dim() == 1:
-                action_card_idx = hand_cards[min(i, hand_cards.size(0) - 1)]
-            else:
-                action_card_idx = hand_cards[0, min(i, hand_cards.size(1) - 1)]
-            
-            # Get action embedding
-            action_embed = self.card_embedding(action_card_idx.unsqueeze(0))
+            # Get better action representation based on actual action cards
+            action_embed = self._get_action_embedding(observation, i, device)
             
             # Combine state and action features
             combined_input = torch.cat([game_state, action_embed], dim=-1)
@@ -518,11 +505,66 @@ class RuleBasedPolicy(nn.Module):
         card = self._index_to_card(idx)
         return card.suit if card else None
     
+    def _get_action_embedding(self, observation: Dict[str, torch.Tensor], action_idx: int, device) -> torch.Tensor:
+        """Get a meaningful embedding for an action based on the cards involved"""
+        hand_cards = self._get_hand_cards_from_observation(observation)
+        action_cards = self._get_action_cards(observation, action_idx, hand_cards)
+        
+        if not action_cards:  # Yield action or no cards
+            # Use a special "empty action" embedding (index 0 - padding)
+            return self.card_embedding(torch.tensor([0], device=device))
+        
+        # For multiple cards, average their embeddings
+        card_indices = []
+        for card in action_cards:
+            # Convert card back to index for embedding lookup
+            if card.value == 0:  # Jester
+                card_indices.append(53)
+            else:
+                # Regular cards: suit * 13 + (value - 1) + 1
+                suit_idx = list(Suit).index(card.suit)
+                idx = suit_idx * 13 + (card.value - 1) + 1
+                card_indices.append(idx)
+        
+        # Get embeddings and average them
+        card_tensor = torch.tensor(card_indices, device=device)
+        embeddings = self.card_embedding(card_tensor)  # [num_cards, embed_dim]
+        
+        # Average the embeddings to get a single action representation
+        action_embed = embeddings.mean(dim=0, keepdim=True)  # [1, embed_dim]
+        
+        return action_embed
+    
+    def _normalize_rule_scores(self, rule_scores, num_valid_actions: int, batch_size: int, device) -> torch.Tensor:
+        """Normalize rule scores to consistent format and range"""
+        # Ensure proper shape and device
+        if isinstance(rule_scores, (list, np.ndarray)):
+            rule_scores = torch.tensor(rule_scores, dtype=torch.float32, device=device)
+        if rule_scores.dim() == 1:
+            rule_scores = rule_scores.unsqueeze(0)
+        
+        # Pad or truncate to match valid actions
+        if rule_scores.size(1) > num_valid_actions:
+            rule_scores = rule_scores[:, :num_valid_actions]
+        elif rule_scores.size(1) < num_valid_actions:
+            padding = torch.zeros(batch_size, num_valid_actions - rule_scores.size(1), device=device)
+            rule_scores = torch.cat([rule_scores, padding], dim=1)
+        
+        # Normalize to prevent any single rule from dominating
+        # Convert from softmax probabilities back to logits for accumulation
+        rule_scores = torch.log(rule_scores + 1e-8)  # Add epsilon to avoid log(0)
+        
+        return rule_scores
+    
     # ======================== INTERFACE COMPATIBILITY ========================
     
     def get_action(self, observation: Dict[str, torch.Tensor], 
                    action_mask: Optional[torch.Tensor] = None) -> Tuple[int, torch.Tensor]:
         """Get action and log probability from the policy (compatible with CardAwarePolicy)"""
+        # Ensure we're in eval mode for consistent action selection
+        was_training = self.training
+        self.eval()
+        
         # Ensure batch dimension
         if observation['hand_cards'].dim() == 1:
             for key, value in observation.items():
@@ -535,39 +577,59 @@ class RuleBasedPolicy(nn.Module):
         # Apply action mask (only consider valid actions)
         num_valid_actions = observation['num_valid_actions'].item()
         if num_valid_actions > 0:
-            # Mask invalid actions
-            masked_logits = logits.clone()
-            masked_logits[:, num_valid_actions:] = -1e8
+            # Get probabilities using the same method as get_action_probabilities
+            valid_logits = logits[:, :num_valid_actions] #/ self.temperature
+            probs = F.softmax(valid_logits, dim=-1)
             
-            # Get probabilities
-            probs = F.softmax(masked_logits, dim=-1)
-            
-            # Sample from valid actions only
-            valid_probs = probs[:, :num_valid_actions]
-            action_dist = torch.distributions.Categorical(valid_probs)
+            # Choose the most probable action
+    
+            # Sample from valid actions
+            action_dist = torch.distributions.Categorical(probs)
+            # action = torch.argmax(probs, dim=-1)
             action = action_dist.sample()
+            log_prob = torch.log(probs.gather(1, action.unsqueeze(-1)))
             log_prob = action_dist.log_prob(action)
-            
+
+            # Restore training mode
+            if was_training:
+                self.train()
+                
             return action.item(), log_prob.squeeze()
         else:
             # No valid actions (shouldn't happen)
+            if was_training:
+                self.train()
             return 0, torch.tensor(0.0)
     
     def get_action_probabilities(self, observation: Dict[str, torch.Tensor]) -> torch.Tensor:
         """Get action probabilities for analysis (compatible with CardAwarePolicy)"""
+        # Ensure we're in eval mode for consistent results
+        was_training = self.training
+        self.eval()
+        
         logits = self.forward(observation)
         num_valid_actions = observation['num_valid_actions'].item()
         
         if num_valid_actions > 0:
-            # Only return probabilities for valid actions
-            valid_logits = logits[:, :num_valid_actions]
-            return F.softmax(valid_logits, dim=-1)
+            # Only return probabilities for valid actions with temperature scaling
+            valid_logits = logits[:, :num_valid_actions]# / self.temperature
+            result = F.softmax(valid_logits, dim=-1)
         else:
-            return torch.zeros(1, 1)
+            result = torch.zeros(1, 1)
+        
+        # Restore training mode
+        if was_training:
+            self.train()
+            
+        return result
     
     def analyze_decision(self, observation: Dict[str, torch.Tensor], 
                         card_names: Optional[List[str]] = None) -> Dict:
         """Analyze the decision-making process for debugging (compatible with CardAwarePolicy)"""
+        # Ensure we're in eval mode for consistent results
+        was_training = self.training
+        self.eval()
+        
         with torch.no_grad():
             # Ensure batch dimension
             if observation['hand_cards'].dim() == 1:
@@ -593,6 +655,10 @@ class RuleBasedPolicy(nn.Module):
             # Add card information if provided
             if card_names:
                 analysis['hand_cards'] = card_names
+        
+        # Restore training mode
+        if was_training:
+            self.train()
             
-            return analysis
+        return analysis
                 

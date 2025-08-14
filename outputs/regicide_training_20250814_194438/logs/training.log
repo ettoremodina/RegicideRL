@@ -1,0 +1,29 @@
+Training log started
+==================================================
+EXPERIMENT CONFIGURATION
+==================================================
+num_episodes: 100000
+learning_rate: 0.001
+gamma: 0.99
+policy_type: card_aware
+num_players: 3
+max_hand_size: 6
+card_embed_dim: 12
+hidden_dim: 64
+==================================================
+Episode 1000: Reward=-70.50, Length=23, Bosses=3, 
+Episode 2000: Reward=-52.00, Length=11, Bosses=1, 
+Episode 3000: Reward=-47.50, Length=15, Bosses=2, 
+Episode 4000: Reward=-106.50, Length=17, Bosses=1, 
+Episode 5000: Reward=-96.00, Length=17, Bosses=1, 
+Episode 6000: Reward=-14.00, Length=21, Bosses=4, 
+Episode 7000: Reward=-33.50, Length=14, Bosses=2, 
+Episode 8000: Reward=-18.00, Length=16, Bosses=3, 
+Episode 9000: Reward=-109.50, Length=32, Bosses=4, 
+Episode 10000: Reward=-53.00, Length=16, Bosses=2, 
+Episode 11000: Reward=-122.00, Length=23, Bosses=2, 
+Episode 12000: Reward=-136.50, Length=31, Bosses=3, 
+Episode 13000: Reward=46.00, Length=14, Bosses=4, 
+Episode 14000: Reward=-55.00, Length=28, Bosses=4, 
+Episode 15000: Reward=-93.00, Length=15, Bosses=1, 
+Episode 16000: Reward=-112.50, Length=24, Bosses=2, 

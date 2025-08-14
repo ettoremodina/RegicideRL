@@ -370,7 +370,7 @@ def main():
     """
     # Create test hand
     test_hand = [
-        Card(5, Suit.CLUBS),
+        Card(6, Suit.CLUBS),
         Card(6, Suit.DIAMONDS),
         Card(8, Suit.CLUBS),
         Card(9, Suit.CLUBS),

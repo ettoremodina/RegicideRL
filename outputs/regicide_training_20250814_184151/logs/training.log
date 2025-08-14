@@ -1,0 +1,19 @@
+Training log started
+==================================================
+EXPERIMENT CONFIGURATION
+==================================================
+num_episodes: 100
+learning_rate: 0.05
+gamma: 0.95
+policy_type: card_aware
+num_players: 3
+max_hand_size: 6
+card_embed_dim: 12
+hidden_dim: 64
+==================================================
+Episode 20: Reward=74.80, Length=13, Bosses=2, 
+Episode 40: Reward=86.50, Length=16, Bosses=2, 
+Episode 60: Reward=37.30, Length=13, Bosses=1, 
+Episode 80: Reward=30.80, Length=8, Bosses=1, 
+Episode 100: Reward=103.70, Length=14, Bosses=2, 
+Training log ended

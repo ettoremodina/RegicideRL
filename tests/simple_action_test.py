@@ -18,13 +18,13 @@ def test_action():
     
     # Define hardcoded hand (you can modify these)
     hand = [  
-        Card(3, Suit.DIAMONDS),   
-        Card(3, Suit.CLUBS),   
+        Card(9, Suit.DIAMONDS),   
+        Card(9, Suit.CLUBS),   
         Card(3, Suit.SPADES),   
         Card(6, Suit.CLUBS),    
     
     ]
-    action_indices = [0,1,2]  # Modify this to test different combinations
+    action_indices = [0,1]  # Modify this to test different combinations
     
     # Set the hand for player 0
     game.players[0] = hand.copy()

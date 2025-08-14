@@ -527,9 +527,9 @@ def main():
     print("=" * 50)
     
     # Configuration
-    NUM_GAMES = 100000  # Number of games to run
-    NUM_PLAYERS = 2
-    MAX_HAND_SIZE = 7
+    NUM_GAMES = 1000000  # Number of games to run
+    NUM_PLAYERS = 3
+    MAX_HAND_SIZE = 6
     MAX_STEPS = 500  # Maximum steps per game
     
     print(f"Configuration:")

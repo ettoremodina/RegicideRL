@@ -5,10 +5,322 @@ Extracted from custom_training.py to keep the main training script focused
 
 import torch
 import numpy as np
+import os
+import glob
+from pathlib import Path
 from typing import List, Dict, Tuple, Optional
 from collections import deque
+from datetime import datetime
 import matplotlib.pyplot as plt
 from config import PathManager
+
+
+class ModelManager:
+    """
+    Handles model saving, loading, versioning, and automatic resume functionality
+    """
+    
+    def __init__(self, path_manager: PathManager):
+        self.path_manager = path_manager
+        
+    def save_model_with_versioning(self, model_state: Dict, filename: str, 
+                                 is_checkpoint: bool = False, keep_versions: int = 3) -> str:
+        """
+        Save model with automatic versioning and cleanup of old versions
+        
+        Args:
+            model_state: Dictionary containing model state and metadata
+            filename: Base filename for the model
+            is_checkpoint: Whether this is a checkpoint save
+            keep_versions: Number of versions to keep (older ones deleted)
+            
+        Returns:
+            Path to saved model
+        """
+        # Get the appropriate directory
+        if is_checkpoint:
+            base_dir = self.path_manager.checkpoint_dir
+        else:
+            base_dir = self.path_manager.model_dir
+            
+        # Ensure directory exists
+        os.makedirs(base_dir, exist_ok=True)
+        
+        # Create filename with timestamp for versioning
+        base_name = Path(filename).stem
+        extension = Path(filename).suffix
+        
+        # Find existing versions
+        pattern = os.path.join(base_dir, f"{base_name}_v*.pth")
+        existing_files = glob.glob(pattern)
+        
+        # Determine next version number
+        version_numbers = []
+        for file_path in existing_files:
+            try:
+                # Extract version number from filename like "model_v001.pth"
+                basename = os.path.basename(file_path)
+                version_str = basename.split('_v')[1].split('.')[0]
+                version_numbers.append(int(version_str))
+            except (IndexError, ValueError):
+                continue
+                
+        next_version = max(version_numbers, default=0) + 1
+        
+        # Create new filename with version
+        versioned_filename = f"{base_name}_v{next_version:03d}{extension}"
+        filepath = os.path.join(base_dir, versioned_filename)
+        
+        # Save the model
+        torch.save(model_state, filepath)
+        
+        # Clean up old versions
+        self._cleanup_old_versions(base_dir, base_name, extension, keep_versions)
+        
+        return filepath
+    
+    def _cleanup_old_versions(self, directory: str, base_name: str, extension: str, keep_versions: int):
+        """Clean up old model versions, keeping only the most recent ones"""
+        pattern = os.path.join(directory, f"{base_name}_v*{extension}")
+        existing_files = glob.glob(pattern)
+        
+        if len(existing_files) <= keep_versions:
+            return
+            
+        # Sort by modification time (newest first)
+        existing_files.sort(key=os.path.getmtime, reverse=True)
+        
+        # Delete older files
+        files_to_delete = existing_files[keep_versions:]
+        for file_path in files_to_delete:
+            try:
+                os.remove(file_path)
+                print(f"🗑️  Deleted old model version: {os.path.basename(file_path)}")
+            except OSError as e:
+                print(f"⚠️  Could not delete {file_path}: {e}")
+    
+    def find_latest_compatible_model(self, model_config: Dict, search_checkpoints: bool = True) -> Optional[str]:
+        """
+        Find the latest model file that's compatible with the current architecture
+        
+        Args:
+            model_config: Current model configuration to match against
+            search_checkpoints: Whether to search checkpoint directory as well
+            
+        Returns:
+            Path to compatible model file or None if not found
+        """
+        candidate_files = []
+        
+        # Search model directory
+        model_pattern = os.path.join(self.path_manager.model_dir, "*.pth")
+        candidate_files.extend(glob.glob(model_pattern))
+        
+        # Optionally search checkpoint directory
+        if search_checkpoints:
+            checkpoint_pattern = os.path.join(self.path_manager.checkpoint_dir, "*.pth")
+            candidate_files.extend(glob.glob(checkpoint_pattern))
+        
+        if not candidate_files:
+            return None
+        
+        # Sort by modification time (newest first)
+        candidate_files.sort(key=os.path.getmtime, reverse=True)
+        
+        # Find the most recent compatible model
+        for file_path in candidate_files:
+            try:
+                # Load model metadata without loading the full model
+                checkpoint = torch.load(file_path, map_location='cpu')
+                
+                if 'model_config' not in checkpoint:
+                    continue
+                    
+                saved_config = checkpoint['model_config']
+                
+                # Check compatibility
+                if self._is_config_compatible(model_config, saved_config):
+                    return file_path
+                    
+            except Exception as e:
+                print(f"⚠️  Could not load {file_path}: {e}")
+                continue
+        
+        return None
+    
+    def _is_config_compatible(self, current_config: Dict, saved_config: Dict) -> bool:
+        """
+        Check if two model configurations are compatible
+        
+        Args:
+            current_config: Current model configuration
+            saved_config: Saved model configuration
+            
+        Returns:
+            True if compatible, False otherwise
+        """
+        # Key parameters that must match for compatibility
+        critical_params = [
+            'policy_type',
+            'max_hand_size', 
+            'max_actions',
+            'card_embed_dim',
+            'hidden_dim'
+        ]
+        
+        for param in critical_params:
+            if param in current_config and param in saved_config:
+                if current_config[param] != saved_config[param]:
+                    return False
+            elif param in current_config or param in saved_config:
+                # One has the parameter, the other doesn't
+                return False
+        
+        return True
+    
+    def auto_resume_training(self, model_config: Dict) -> Tuple[Optional[str], Optional[Dict]]:
+        """
+        Automatically find and load the latest compatible model for resuming training
+        
+        Args:
+            model_config: Current model configuration
+            
+        Returns:
+            Tuple of (model_path, loaded_state) or (None, None) if no compatible model found
+        """
+        latest_model_path = self.find_latest_compatible_model(model_config)
+        
+        if latest_model_path is None:
+            return None, None
+        
+        try:
+            # Load the model state
+            checkpoint = torch.load(latest_model_path, map_location='cpu')
+            print(f"🔄 Found compatible model for resume: {os.path.basename(latest_model_path)}")
+            print(f"   Model config: {checkpoint.get('model_config', {})}")
+            
+            return latest_model_path, checkpoint
+            
+        except Exception as e:
+            print(f"⚠️  Error loading model {latest_model_path}: {e}")
+            return None, None
+
+
+class TrainingResumer:
+    """
+    Handles automatic training resume with compatibility checking
+    """
+    
+    def __init__(self, model_manager: ModelManager):
+        self.model_manager = model_manager
+    
+    def attempt_resume(self, policy, optimizer, model_config: Dict, 
+                      force_resume: bool = False) -> Tuple[int, float, bool]:
+        """
+        Attempt to resume training from a compatible checkpoint
+        
+        Args:
+            policy: The policy model to load state into
+            optimizer: The optimizer to load state into  
+            model_config: Current model configuration
+            force_resume: If True, skip user confirmation
+            
+        Returns:
+            Tuple of (start_episode, best_score, resumed_successfully)
+        """
+        model_path, checkpoint = self.model_manager.auto_resume_training(model_config)
+        
+        if model_path is None:
+            print("🆕 No compatible model found - starting fresh training")
+            return 0, float('-inf'), False
+        
+        # Ask user for confirmation unless forced
+        if not force_resume:
+            response = input(f"\n📄 Found compatible model: {os.path.basename(model_path)}\n"
+                           f"   Episodes trained: {checkpoint.get('episode', 'Unknown')}\n"
+                           f"   Best score: {checkpoint.get('best_score', 'Unknown')}\n"
+                           f"   Resume training? (y/n): ").lower().strip()
+            
+            if response != 'y' and response != 'yes':
+                print("🆕 Starting fresh training")
+                return 0, float('-inf'), False
+        
+        try:
+            # Load model state
+            policy.load_state_dict(checkpoint['model_state_dict'])
+            
+            # Load optimizer state if available
+            if 'optimizer_state_dict' in checkpoint:
+                optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+            
+            # Extract training progress
+            start_episode = checkpoint.get('episode', 0)
+            best_score = checkpoint.get('best_score', float('-inf'))
+            
+            print(f"✅ Successfully resumed from episode {start_episode}")
+            print(f"   Best score so far: {best_score:.2f}")
+            
+            return start_episode, best_score, True
+            
+        except Exception as e:
+            print(f"❌ Error loading checkpoint: {e}")
+            print("🆕 Starting fresh training instead")
+            return 0, float('-inf'), False
+    
+    def create_resume_config(self, policy, optimizer, episode: int, 
+                           best_score: float, model_config: Dict) -> Dict:
+        """
+        Create a complete checkpoint state for resuming
+        
+        Args:
+            policy: Policy model
+            optimizer: Optimizer
+            episode: Current episode number
+            best_score: Best score achieved
+            model_config: Model configuration
+            
+        Returns:
+            Complete checkpoint dictionary
+        """
+        checkpoint = {
+            'episode': episode,
+            'model_state_dict': policy.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'best_score': best_score,
+            'model_config': model_config,
+            'timestamp': datetime.now().isoformat(),
+            'torch_version': torch.__version__
+        }
+        
+        return checkpoint
+
+
+def create_model_config(policy_type: str = "rule_based", **kwargs) -> Dict:
+    """
+    Create a standardized model configuration dictionary for compatibility checking
+    
+    Args:
+        policy_type: Type of policy ("rule_based", "neural", etc.)
+        **kwargs: Additional configuration parameters
+        
+    Returns:
+        Model configuration dictionary
+    """
+    config = {
+        'policy_type': policy_type,
+        'max_hand_size': kwargs.get('max_hand_size', 30),
+        'max_actions': kwargs.get('max_actions', 100),
+        'card_embed_dim': kwargs.get('card_embed_dim', 128),
+        'hidden_dim': kwargs.get('hidden_dim', 256),
+        'created_at': datetime.now().isoformat()
+    }
+    
+    # Add any additional parameters
+    for key, value in kwargs.items():
+        if key not in config:
+            config[key] = value
+    
+    return config
 
 
 class TrainingVisualizer:

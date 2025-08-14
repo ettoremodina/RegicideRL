@@ -1,17 +1,17 @@
 Random Policy Evaluation Summary
 ========================================
 
-total_games: 100000
+total_games: 1000000
 victories: 0
 victory_rate: 0.0
-avg_reward: 82.05831100000002
-std_reward: 49.69287534775262
-avg_length: 16.20484
-std_length: 6.798358667678545
-avg_bosses_killed: 1.80068
-std_bosses_killed: 1.0937968447568314
-max_bosses_killed: 7
+avg_reward: -56.7165405
+std_reward: 35.711790356433546
+avg_length: 17.013944
+std_length: 6.598083628210845
+avg_bosses_killed: 2.002276
+std_bosses_killed: 1.1300685022705481
+max_bosses_killed: 8
 min_bosses_killed: 0
-boss_kill_distribution: {'distribution': {np.int64(0): np.int64(8065), np.int64(1): np.int64(37040), np.int64(2): np.int64(31209), np.int64(3): np.int64(15038), np.int64(4): np.int64(7818), np.int64(5): np.int64(763), np.int64(6): np.int64(60), np.int64(7): np.int64(7)}, 'percentiles': {'25th': np.float64(1.0), '50th': np.float64(2.0), '75th': np.float64(2.0), '90th': np.float64(3.0)}}
-length_distribution: {'distribution': {np.int64(2): np.int64(1437), np.int64(3): np.int64(368), np.int64(4): np.int64(997), np.int64(5): np.int64(1119), np.int64(6): np.int64(833), np.int64(7): np.int64(2027), np.int64(8): np.int64(1132), np.int64(9): np.int64(3177), np.int64(10): np.int64(5966), np.int64(11): np.int64(10672), np.int64(12): np.int64(6431), np.int64(13): np.int64(6703), np.int64(14): np.int64(5656), np.int64(15): np.int64(5348), np.int64(16): np.int64(5223), np.int64(17): np.int64(4895), np.int64(18): np.int64(5258), np.int64(19): np.int64(4601), np.int64(20): np.int64(4073), np.int64(21): np.int64(3431), np.int64(22): np.int64(3170), np.int64(23): np.int64(2785), np.int64(24): np.int64(2453), np.int64(25): np.int64(2133), np.int64(26): np.int64(1822), np.int64(27): np.int64(1575), np.int64(28): np.int64(1347), np.int64(29): np.int64(1195), np.int64(30): np.int64(882), np.int64(31): np.int64(768), np.int64(32): np.int64(577), np.int64(33): np.int64(462), np.int64(34): np.int64(329), np.int64(35): np.int64(310), np.int64(36): np.int64(212), np.int64(37): np.int64(163), np.int64(38): np.int64(124), np.int64(39): np.int64(110), np.int64(40): np.int64(65), np.int64(41): np.int64(47), np.int64(42): np.int64(36), np.int64(43): np.int64(27), np.int64(44): np.int64(17), np.int64(45): np.int64(12), np.int64(46): np.int64(9), np.int64(47): np.int64(7), np.int64(48): np.int64(7), np.int64(49): np.int64(1), np.int64(50): np.int64(4), np.int64(51): np.int64(2), np.int64(53): np.int64(2)}, 'percentiles': {'25th': np.float64(11.0), '50th': np.float64(15.0), '75th': np.float64(20.0), '90th': np.float64(26.0)}}
-defeat_reasons: {'counts': {'defeated_by_11': 91352, 'defeated_by_12': 8648}, 'percentages': {'defeated_by_11': 91.352, 'defeated_by_12': 8.648}}
+boss_kill_distribution: {'distribution': {np.int64(0): np.int64(46459), np.int64(1): np.int64(338346), np.int64(2): np.int64(321929), np.int64(3): np.int64(170391), np.int64(4): np.int64(107269), np.int64(5): np.int64(13997), np.int64(6): np.int64(1444), np.int64(7): np.int64(146), np.int64(8): np.int64(19)}, 'percentiles': {'25th': np.float64(1.0), '50th': np.float64(2.0), '75th': np.float64(3.0), '90th': np.float64(4.0)}}
+length_distribution: {'distribution': {np.int64(2): np.int64(1183), np.int64(3): np.int64(735), np.int64(4): np.int64(956), np.int64(5): np.int64(2432), np.int64(6): np.int64(1588), np.int64(7): np.int64(9021), np.int64(8): np.int64(32752), np.int64(9): np.int64(80576), np.int64(10): np.int64(36660), np.int64(11): np.int64(60825), np.int64(12): np.int64(43264), np.int64(13): np.int64(58458), np.int64(14): np.int64(69380), np.int64(15): np.int64(80220), np.int64(16): np.int64(65847), np.int64(17): np.int64(51258), np.int64(18): np.int64(49525), np.int64(19): np.int64(42554), np.int64(20): np.int64(42163), np.int64(21): np.int64(38128), np.int64(22): np.int64(35115), np.int64(23): np.int64(30652), np.int64(24): np.int64(26826), np.int64(25): np.int64(23553), np.int64(26): np.int64(20864), np.int64(27): np.int64(18133), np.int64(28): np.int64(15570), np.int64(29): np.int64(13171), np.int64(30): np.int64(10466), np.int64(31): np.int64(8798), np.int64(32): np.int64(6666), np.int64(33): np.int64(5689), np.int64(34): np.int64(4071), np.int64(35): np.int64(3315), np.int64(36): np.int64(2342), np.int64(37): np.int64(1840), np.int64(38): np.int64(1348), np.int64(39): np.int64(1073), np.int64(40): np.int64(799), np.int64(41): np.int64(562), np.int64(42): np.int64(458), np.int64(43): np.int64(322), np.int64(44): np.int64(248), np.int64(45): np.int64(173), np.int64(46): np.int64(90), np.int64(47): np.int64(97), np.int64(48): np.int64(57), np.int64(49): np.int64(49), np.int64(50): np.int64(35), np.int64(51): np.int64(19), np.int64(52): np.int64(15), np.int64(53): np.int64(15), np.int64(54): np.int64(9), np.int64(55): np.int64(5), np.int64(56): np.int64(9), np.int64(57): np.int64(8), np.int64(58): np.int64(5), np.int64(59): np.int64(2), np.int64(60): np.int64(2), np.int64(61): np.int64(1), np.int64(65): np.int64(2), np.int64(66): np.int64(1)}, 'percentiles': {'25th': np.float64(12.0), '50th': np.float64(16.0), '75th': np.float64(21.0), '90th': np.float64(26.0)}}
+defeat_reasons: {'counts': {'defeated_by_11': 877125, 'defeated_by_12': 122856, 'defeated_by_13': 19}, 'percentages': {'defeated_by_11': 87.7125, 'defeated_by_12': 12.2856, 'defeated_by_13': 0.0019000000000000002}}
