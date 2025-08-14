@@ -2,8 +2,8 @@
 
 import torch
 import numpy as np
-from enhanced_policy import EnhancedCardAwarePolicy
-from regicide_gym_env import RegicideGymEnv
+from policy.enhanced_policy import EnhancedCardAwarePolicy
+from train.regicide_gym_env import RegicideGymEnv
 
 def test_enhanced_policy():
     """Test enhanced policy with environment"""

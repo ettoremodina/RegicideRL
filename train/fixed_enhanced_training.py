@@ -15,7 +15,7 @@ from collections import deque
 import random
 from typing import Dict, Tuple, List, Optional
 
-from card_aware_policy import CardAwarePolicy
+from policy.card_aware_policy import CardAwarePolicy
 from streamlined_training import CardAwareRegicideTrainer
 from training_utils import TrainingVisualizer, TrainingLogger, TrainingStatistics
 from config import PathManager

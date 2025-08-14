@@ -18,8 +18,8 @@ except Exception:
     pass
 
 # Import our modules
-from regicide_gym_env import make_regicide_env
-from training_utils import TrainingVisualizer
+from train.regicide_gym_env import make_regicide_env
+from train.training_utils import TrainingVisualizer
 from config import PathManager
 from tqdm import tqdm
 

@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 from typing import List
 
-from regicide import Game, Card, Suit
+from game.regicide import Game, Card, Suit
 from .theme import DARK_THEME
 from .widgets import CardButton, LogBox, EnemyView
 from .sound import play_thud, play_draw, play_shimmer, play_clang, play_victory, play_defeat

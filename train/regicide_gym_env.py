@@ -10,8 +10,8 @@ import torch
 from gymnasium import spaces
 from typing import Dict, List, Tuple, Optional, Any, Union
 
-from regicide import Game, Card, Suit
-from action_handler import ActionHandler
+from game.regicide import Game, Card, Suit
+from game.action_handler import ActionHandler
 
 
 class RegicideGymEnv(gym.Env):

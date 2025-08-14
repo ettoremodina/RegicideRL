@@ -7,8 +7,8 @@ Shows comprehensive game state information to verify correct gameplay mechanics
 import torch
 import numpy as np
 from typing import Dict, List, Optional
-from regicide_gym_env import make_regicide_env
-from card_aware_policy import CardAwarePolicy
+from train.regicide_gym_env import make_regicide_env
+from policy.card_aware_policy import CardAwarePolicy
 
 
 class DetailedGameInspector:

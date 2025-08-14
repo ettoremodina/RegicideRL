@@ -4,7 +4,7 @@ Generates all possible valid actions for attack and defense phases
 """
 
 from typing import List, Dict, Tuple, Optional
-from regicide import Card, Game, Enemy
+from game.regicide import Card, Game, Enemy
 import itertools
 
 

@@ -9,10 +9,10 @@ from typing import Dict, List
 import matplotlib.pyplot as plt
 from datetime import datetime
 
-from regicide_gym_env import RegicideGymEnv
-from fixed_enhanced_training import FixedEnhancedCardAwareTrainer
-from enhanced_policy import EnhancedCardAwarePolicy
-
+from train.regicide_gym_env import RegicideGymEnv
+from train.fixed_enhanced_training import FixedEnhancedCardAwareTrainer
+from policy.enhanced_policy import EnhancedCardAwarePolicy
+from policy.card_aware_policy import CardAwarePolicy
 
 class PolicyComparison:
     """Compare different policy architectures"""
@@ -35,7 +35,7 @@ class PolicyComparison:
             )
         else:
             # Would use current CardAwarePolicy
-            from card_aware_policy import CardAwarePolicy
+            
             policy = CardAwarePolicy(max_hand_size=7, max_actions=30)
         
         policy.eval()
@@ -108,7 +108,7 @@ class PolicyComparison:
         
         # Test policies (if they exist)
         try:
-            from card_aware_policy import CardAwarePolicy
+            
             current_results = self.run_policy_test(CardAwarePolicy, "Current Policy", episodes)
         except ImportError:
             print("⚠️  Current policy not found, using random baseline")

@@ -2,7 +2,6 @@
 Streamlined Training Script for Regicide Environment using PyTorch
 Focused only on training logic - utilities moved to training_utils.py
 """
-
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -12,10 +11,10 @@ import random
 from typing import List, Dict, Tuple, Optional
 
 # from card_aware_env import CardAwareRegicideEnv
-from regicide_gym_env import RegicideGymEnv
-from card_aware_policy import CardAwarePolicy
+from train.regicide_gym_env import RegicideGymEnv
+from policy.card_aware_policy import CardAwarePolicy
+from train.training_utils import TrainingVisualizer, TrainingEvaluator, TrainingLogger, TrainingStatistics
 from config import PathManager
-from training_utils import TrainingVisualizer, TrainingEvaluator, TrainingLogger, TrainingStatistics
 
 
 class CardAwareRegicideTrainer:

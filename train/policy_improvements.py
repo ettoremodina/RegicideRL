@@ -8,7 +8,7 @@ import torch.nn as nn
 import numpy as np
 from typing import Dict, Tuple, Optional
 
-from enhanced_policy import EnhancedCardAwarePolicy, AdaptiveLearningRate, CurriculumLearning
+from policy.enhanced_policy import EnhancedCardAwarePolicy, AdaptiveLearningRate, CurriculumLearning
 from fixed_enhanced_training import FixedEnhancedCardAwareTrainer
 
 

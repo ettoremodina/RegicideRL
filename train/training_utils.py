@@ -6,12 +6,9 @@ Extracted from custom_training.py to keep the main training script focused
 import numpy as np
 from typing import List, Dict, Tuple, Optional
 from collections import deque
+import matplotlib.pyplot as plt
 
-try:
-    import matplotlib.pyplot as plt
-    MATPLOTLIB_AVAILABLE = True
-except ImportError:
-    MATPLOTLIB_AVAILABLE = False
+
 
 from config import PathManager
 
@@ -43,9 +40,6 @@ class TrainingVisualizer:
         Returns:
             Path to saved plot or None if failed
         """
-        if not MATPLOTLIB_AVAILABLE:
-            print("⚠️  Matplotlib not available, skipping plot generation")
-            return None
         
         try:
             fig, axes = plt.subplots(2, 3, figsize=(15, 8))
@@ -154,9 +148,6 @@ class TrainingVisualizer:
         Returns:
             Path to saved plot or None if failed
         """
-        if not MATPLOTLIB_AVAILABLE:
-            print("⚠️  Matplotlib not available, skipping comparison plot")
-            return None
         
         try:
             fig, axes = plt.subplots(2, 2, figsize=(12, 8))
