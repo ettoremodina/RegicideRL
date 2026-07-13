@@ -147,6 +147,15 @@ class RegicideApp:
         elif phase == "defense_needed":
             self.state = "DEFENSE"
             self.defense_required = res.get("defense_required", 0)
+            
+            # Auto-defeat check
+            hand = self.game.get_current_player_hand()
+            all_total = sum(c.get_discard_value() for c in hand)
+            if all_total < self.defense_required:
+                self.game.game_over = True
+                self.state = "GAME_OVER"
+                self.game_over_msg = "Defeat... No possible defense."
+                play_defeat()
         elif phase in ("victory", "game_over") or self.game.victory or self.game.game_over:
             self.state = "GAME_OVER"
             if phase == "victory" or self.game.victory:
@@ -294,8 +303,8 @@ class RegicideApp:
             self.enemy_hp_bar.draw(self.screen)
 
         # Action Log (Right side)
-        log_x = self.width - 250
-        pygame.draw.rect(self.screen, DARK_THEME["panel"], (log_x, 20, 230, 200), border_radius=8)
+        log_x = self.width - 450
+        pygame.draw.rect(self.screen, DARK_THEME["panel"], (log_x, 20, 430, 200), border_radius=8)
         log_title = self.bold_font.render("Action Log", True, DARK_THEME["muted"])
         self.screen.blit(log_title, (log_x + 10, 30))
         for i, log_str in enumerate(self.action_log):
@@ -354,7 +363,7 @@ class RegicideApp:
             total = sum(c.get_discard_value() for c in cards)
             t_color = DARK_THEME["success"] if total >= self.defense_required else DARK_THEME["danger"]
             total_lbl = self.bold_font.render(f"Selected: {total} / {self.defense_required}", True, t_color)
-            self.screen.blit(total_lbl, (self.width//2 - total_lbl.get_width()//2, self.height - 290))
+            self.screen.blit(total_lbl, (self.width//2 - total_lbl.get_width()//2, self.height//2 + 20))
             
             self.defend_btn.draw(self.screen)
 
