@@ -64,6 +64,11 @@ def main():
         policy_kwargs=policy_kwargs
     )
     
+    pretrained_path = ppo_cfg.get("pretrained_model_path", None)
+    if pretrained_path and os.path.exists(pretrained_path + ".zip"):
+        print(f"Loading pretrained weights from {pretrained_path}...")
+        model.set_parameters(pretrained_path)
+    
     print(f"Starting training for {train_cfg['total_timesteps']:,} timesteps...")
     model.learn(
         total_timesteps=train_cfg["total_timesteps"],

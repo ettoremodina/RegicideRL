@@ -14,6 +14,7 @@ ppo:
   ent_coef: 0.01  # Increased from default 0.0 to encourage exploration
   device: "cpu"
   net_arch: [256, 256]
+  pretrained_model_path: "models/ppo_bc_pretrained"
 
 training:
   total_timesteps: 100000
@@ -23,5 +24,5 @@ training:
   save_dir: "models"
 
 tuning:
-  n_trials: 20
-  timesteps_per_trial: 150000
+  n_trials: 5
+  timesteps_per_trial: 100000

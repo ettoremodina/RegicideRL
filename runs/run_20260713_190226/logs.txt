@@ -1,0 +1,13 @@
+2026-07-13 19:02:26,022 - Initialized run: run_20260713_190226
+2026-07-13 19:02:26,022 - Run directory: runs\run_20260713_190226
+2026-07-13 19:02:26,023 - Starting run with arguments: {'agent': 'heuristic', 'episodes': 1, 'games_per_episode': 100, 'jobs': None}
+2026-07-13 19:02:28,016 - Using Agent: HeuristicAgent
+2026-07-13 19:02:28,017 - Initialized ParallelSimulator with 19 workers
+2026-07-13 19:02:28,017 - --- Episode 1/1 ---
+2026-07-13 19:02:45,729 - Eval Results:
+2026-07-13 19:02:45,737 -   Win Rate: 0.00%
+2026-07-13 19:02:45,738 -   Avg Enemies Defeated: 2.50 / 12
+2026-07-13 19:02:45,738 -   Avg Turns: 11.3
+2026-07-13 19:02:45,738 -   Speed: 5.67 games/sec
+2026-07-13 19:02:45,747 - Run completed. Generating plots...
+2026-07-13 19:02:47,661 - Plots saved in runs\run_20260713_190226

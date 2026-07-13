@@ -4,3 +4,4 @@ sb3-contrib
 tensorboard
 numpy
 matplotlib
+pygame

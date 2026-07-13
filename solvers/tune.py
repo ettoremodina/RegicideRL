@@ -22,8 +22,8 @@ def objective(trial, config):
     n_epochs = trial.suggest_int("n_epochs", 3, 20)
     gamma = trial.suggest_float("gamma", 0.9, 0.9999, log=True)
     ent_coef = trial.suggest_float("ent_coef", 0.00001, 0.05, log=True)
-    net_arch_size = trial.suggest_categorical("net_arch_size", [64, 128, 256])
-    net_arch = [net_arch_size, net_arch_size]
+    net_arch = config["ppo"].get("net_arch", [256, 256])
+    
     
     # 2. Setup Environment
     raw_env = RegicideEnv(num_players=config["env"].get("num_players", 1))
@@ -55,6 +55,11 @@ def objective(trial, config):
         ent_coef=ent_coef,
         policy_kwargs=policy_kwargs
     )
+    
+    pretrained_path = config["ppo"].get("pretrained_model_path", None)
+    if pretrained_path and os.path.exists(pretrained_path + ".zip"):
+        # Load weights, matching architecture is required
+        model.set_parameters(pretrained_path)
     
     # 4. Train
     timesteps = config["tuning"].get("timesteps_per_trial", 100000)
