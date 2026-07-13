@@ -1,6 +1,10 @@
 from enum import Enum
 from typing import List, Optional, Dict
 import random
+import logging
+
+logger = logging.getLogger("regicide")
+logger.addHandler(logging.NullHandler())
 
 class Suit(Enum):
     HEARTS = "♥"
@@ -118,6 +122,11 @@ class Game:
         self.players_yielded_this_round = [False] * num_players
         # Track who had the last non-yield turn (for yield eligibility)
         self.last_active_player = None
+        # Track spade protection blocked by immunity (for Jester retroactive effect)
+        self.blocked_spade_value = 0
+        # Solo Jester rules: 2 jester tokens set aside for single-player mode
+        self.solo_jesters_remaining = 2 if num_players == 1 else 0
+        self.solo_jesters_used = 0
         
         self._setup_game()
     
@@ -156,6 +165,7 @@ class Game:
         random.shuffle(kings)
         
         self.castle_deck = jacks + queens + kings
+        logger.info(f"Castle deck prepared with 12 enemies.")
         
         # Create tavern deck
         for suit in Suit:
@@ -185,6 +195,7 @@ class Game:
         # Reveal first enemy
         if self.castle_deck:
             self.current_enemy = Enemy(self.castle_deck.pop(0))
+            logger.info(f"First enemy revealed: {self.current_enemy}")
         # Reset any lingering attack buffer at start
         self.attack_cards_buffer = []
     
@@ -261,13 +272,19 @@ class Game:
         self._sort_hand(self.current_player)
         
         cards_played_str = [str(card) for card in cards_to_play]
+        logger.info(f"Player {self.current_player + 1} plays: {', '.join(cards_played_str)}")
 
         # Accumulate attack cards; they will be discarded only once the enemy is defeated
         self.attack_cards_buffer.extend(cards_to_play)
         
-        # Handle Jester
+        # Handle Jester (multiplayer — solo jesters are separate tokens)
         if any(card.value == 0 for card in cards_to_play):
             self.jester_immunity_cancelled = True
+            # Retroactive spade protection: per rules, "spades played prior to
+            # the Jester will begin reducing the attack value of the enemy"
+            if self.blocked_spade_value > 0:
+                self.current_enemy.spade_protection += self.blocked_spade_value
+                self.blocked_spade_value = 0
             return {
                 'success': True,
                 'phase': 'next_player_choice',
@@ -292,6 +309,7 @@ class Game:
         initial_damage = self.current_enemy.damage_taken
         self.current_enemy.damage_taken += total_attack
         actual_damage = self.current_enemy.damage_taken - initial_damage
+        logger.info(f"Enemy takes {actual_damage} damage. (Total HP: {self.current_enemy.health - self.current_enemy.damage_taken}/{self.current_enemy.health})")
         
         # Check if enemy defeated
         if self.current_enemy.is_defeated():
@@ -321,6 +339,7 @@ class Game:
         else:
             # Enemy attacks - check if defense is needed
             enemy_attack = self.current_enemy.get_effective_attack()
+            logger.info(f"Enemy counter-attacks for {enemy_attack} damage.")
             if enemy_attack == 0:
                 self._next_player()
                 return {
@@ -343,7 +362,8 @@ class Game:
                     'defense_required': enemy_attack
                 }
     
-    def _is_valid_combo(self, cards: List[Card]) -> bool:
+    @staticmethod
+    def _is_valid_combo(cards: List[Card]) -> bool:
         """Validate a play.
 
         Jester behaviour intentionally left unchanged per user request (no extra restrictions).
@@ -371,8 +391,8 @@ class Game:
             # Two Aces
             if len(aces) == 2:
                 return True
-            # One Ace + one other (any value inc. Jester allowed here as per current engine flexibility)
-            if len(aces) == 1 and len(others) == 1:
+            # One Ace + one other card (rules explicitly forbid Ace + Jester pairing)
+            if len(aces) == 1 and len(others) == 1 and others[0].value != 0:
                 return True
             return False
 
@@ -396,29 +416,34 @@ class Game:
             return total_attack
 
         effective = [c for c in cards if not self._is_immune(c)]
+        immune_cards = [c for c in cards if self._is_immune(c)]
+
+        # Track blocked spade protection for potential Jester retroactive effect
+        has_immune_spade = any(c.suit == Suit.SPADES for c in immune_cards)
+        has_effective_spade = any(c.suit == Suit.SPADES for c in effective)
+        if has_immune_spade and not has_effective_spade:
+            self.blocked_spade_value += total_attack
+
         if not effective:
             return total_attack
 
-        suits = {c.suit for c in effective} 
+        suits = {c.suit for c in effective}
 
-        hearts_count = Suit.HEARTS in suits 
-        diamonds_count = Suit.DIAMONDS in suits 
-        spades_count =Suit.SPADES in suits 
-        any_clubs = Suit.CLUBS in suits
+        # All suit powers use the base attack value (before clubs doubling)
+        power_value = total_attack
 
-
-        # Hearts first
-        if hearts_count:
-            self._hearts_power(total_attack)
-        # Diamonds next
-        if diamonds_count:
-            self._diamonds_power(total_attack)
-        # Spades protection stacks
-        if spades_count:
-            self.current_enemy.spade_protection += total_attack
-            self.last_spade_protection_added += total_attack
-        # Clubs: single doubling
-        if any_clubs:
+        # Hearts first (heal from discard)
+        if Suit.HEARTS in suits:
+            self._hearts_power(power_value)
+        # Diamonds next (draw cards)
+        if Suit.DIAMONDS in suits:
+            self._diamonds_power(power_value)
+        # Spades protection (cumulative, uses base attack value)
+        if Suit.SPADES in suits:
+            self.current_enemy.spade_protection += power_value
+            self.last_spade_protection_added += power_value
+        # Clubs: doubles DAMAGE only (does not affect other suit power values)
+        if Suit.CLUBS in suits:
             total_attack *= 2
 
         return total_attack
@@ -467,14 +492,18 @@ class Game:
         # Exact kill -> enemy card goes to TOP of tavern deck (end of list)
         if self.current_enemy.damage_taken == self.current_enemy.health:
             self.tavern_deck.append(self.current_enemy.card)
+            logger.info(f"Enemy exactly defeated! {self.current_enemy.card} joins the Tavern.")
         else:
             self.discard_pile.append(self.current_enemy.card)
+            logger.info(f"Enemy defeated! {self.current_enemy.card} moves to discard.")
 
         # Reset for next enemy
         if self.castle_deck:
             self.current_enemy = Enemy(self.castle_deck.pop(0))
+            logger.info(f"New enemy revealed: {self.current_enemy}")
             self.jester_immunity_cancelled = False
             self.attack_cards_buffer = []
+            self.blocked_spade_value = 0
         else:
             self.current_enemy = None
     
@@ -522,6 +551,7 @@ class Game:
         # Calculate total defense value
         defense_value = sum(card.get_discard_value() for card in cards_to_discard)
         cards_discarded_str = [str(card) for card in cards_to_discard]
+        logger.info(f"Player {self.current_player + 1} defends with {', '.join(cards_discarded_str)} (value: {defense_value})")
         
         # Check if defense is sufficient
         if defense_value < enemy_damage:
@@ -617,6 +647,8 @@ class Game:
         self.current_player = (self.current_player + 1) % self.num_players
         # Reset yield status for the new current player
         self.players_yielded_this_round[self.current_player] = False
+        # Per rules: "players also lose if any player is unable to play a card or yield"
+        self._check_player_can_act()
     
     def choose_next_player(self, chosen_player: int) -> bool:
         """Set the next player (used when Jester is played). Returns True if valid."""
@@ -624,6 +656,8 @@ class Game:
             self.current_player = chosen_player
             # Reset yield status for the new current player
             self.players_yielded_this_round[self.current_player] = False
+            # Per rules: "players also lose if any player is unable to play a card or yield"
+            self._check_player_can_act()
             return True
         return False
     
@@ -658,9 +692,11 @@ class Game:
         
         # Mark current player as yielded
         self.players_yielded_this_round[self.current_player] = True
+        logger.info(f"Player {self.current_player + 1} yields their turn.")
         
         # Enemy attacks
         enemy_damage = self.current_enemy.get_effective_attack()
+        logger.info(f"Enemy counter-attacks for {enemy_damage} damage.")
         if enemy_damage == 0:
             self._next_player()
             return {
@@ -692,11 +728,16 @@ class Game:
             'enemies_remaining': len(self.castle_deck),
             'game_over': self.game_over,
             'victory': self.victory,
+            'victory_tier': self.get_victory_tier(),
             'players_yielded_this_round': self.players_yielded_this_round.copy(),
             'last_active_player': self.last_active_player,
             'can_yield': self.can_yield(),
             'can_defend': self.can_defend() if self.current_enemy else True,
-            'enemy_attack_damage': self.current_enemy.get_effective_attack() if self.current_enemy else 0
+            'enemy_attack_damage': self.current_enemy.get_effective_attack() if self.current_enemy else 0,
+            'has_legal_action': self.has_legal_action(),
+            'solo_jesters_remaining': self.solo_jesters_remaining,
+            'solo_jesters_used': self.solo_jesters_used,
+            'can_use_solo_jester': self.can_use_solo_jester(),
         }
     
     def _handle_yield(self) -> Dict[str, any]:
@@ -721,3 +762,103 @@ class Game:
     def _reset_yield_tracking(self):
         """Reset yield tracking when a player takes an active turn"""
         self.players_yielded_this_round = [False] * self.num_players
+
+    def _check_player_can_act(self):
+        """Check if current player has any legal action. If not, game over.
+        
+        Per rules: 'The players also lose if any player is unable to play
+        a card or yield on their turn.'
+        """
+        if self.game_over:
+            return
+        hand = self.players[self.current_player]
+        # A player can always play any single card from hand.
+        # The only stuck state is: empty hand AND cannot yield.
+        if not hand and not self.can_yield():
+            self.game_over = True
+
+    def has_legal_action(self) -> bool:
+        """Check if the current player has any legal action available."""
+        if self.game_over:
+            return False
+        hand = self.players[self.current_player]
+        return bool(hand) or self.can_yield()
+
+    # --- Solo Jester Rules ---
+
+    def can_use_solo_jester(self) -> bool:
+        """Check if the solo player can use a jester token.
+        
+        Solo jesters are separate from the deck jesters used in multiplayer.
+        They can be used at the start of Step 1 (before playing) or
+        at the start of Step 4 (before defending).
+        """
+        return self.num_players == 1 and self.solo_jesters_remaining > 0
+
+    def use_solo_jester(self, timing: str) -> Dict[str, any]:
+        """Use a solo jester token: discard entire hand and refill to 8 cards.
+        
+        Per rules: 'Discard your hand and refill to 8 cards - this does not
+        count as drawing for the purpose of enemy diamond immunity.'
+        Solo jesters do NOT cancel enemy immunity.
+        
+        Args:
+            timing: 'step1' (before playing a card) or 'step4' (before defending)
+        
+        Returns:
+            Dict with result information
+        """
+        if not self.can_use_solo_jester():
+            return {
+                'success': False,
+                'message': 'No solo jesters remaining' if self.num_players == 1 else 'Solo jesters only available in single-player',
+                'jesters_remaining': self.solo_jesters_remaining
+            }
+
+        if timing not in ('step1', 'step4'):
+            return {
+                'success': False,
+                'message': f'Invalid timing: {timing}. Must be "step1" or "step4".',
+                'jesters_remaining': self.solo_jesters_remaining
+            }
+
+        # Discard entire hand to discard pile
+        hand = self.players[0]
+        self.discard_pile.extend(hand)
+        hand.clear()
+
+        # Refill to max hand size (8 for solo) — NOT treated as diamond drawing
+        max_hand = self.get_max_hand_size()
+        while len(hand) < max_hand and self.tavern_deck:
+            hand.append(self.tavern_deck.pop())
+
+        self._sort_hand(0)
+
+        self.solo_jesters_remaining -= 1
+        self.solo_jesters_used += 1
+
+        return {
+            'success': True,
+            'message': f'Solo jester used! Hand refilled to {len(hand)} cards. '
+                       f'{self.solo_jesters_remaining} jester(s) remaining.',
+            'jesters_remaining': self.solo_jesters_remaining,
+            'cards_drawn': len(hand)
+        }
+
+    def get_victory_tier(self) -> Optional[str]:
+        """Get the victory tier (solo play only).
+        
+        Returns:
+            'gold' (0 jesters used), 'silver' (1 used), 'bronze' (2 used),
+            'victory' (multiplayer), or None (game not won).
+        """
+        if not self.victory:
+            return None
+        if self.num_players != 1:
+            return 'victory'
+        if self.solo_jesters_used == 0:
+            return 'gold'
+        elif self.solo_jesters_used == 1:
+            return 'silver'
+        else:
+            return 'bronze'

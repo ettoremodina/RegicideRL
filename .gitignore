@@ -1,4 +1,25 @@
-# rimuovi tutti i file pyc
-*.pyc
-venv/
 __pycache__/
+*.py[cod]
+*$py.class
+
+# Pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Editor
+.vscode/
+.idea/
+
+# Ignore outputs and legacy files
+outputs/
+archive/
+
+# Ignore environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/

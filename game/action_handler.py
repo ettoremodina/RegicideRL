@@ -22,8 +22,6 @@ class ActionHandler:
             max_hand_size: Maximum number of cards a player can have
         """
         self.max_hand_size = max_hand_size
-        # Create a temporary game instance to use its validation logic
-        self._temp_game = Game(1)  # Single player for validation only
     
     def get_all_possible_actions(self, 
                                hand: List[Card], 
@@ -41,7 +39,7 @@ class ActionHandler:
             List of action masks, each mask is a binary list of length max_hand_size
         """
         if phase == "attack":
-            allow_yield = game_state.get('allow_yield', True) if game_state else True
+            allow_yield = game_state.get('can_yield', True) if game_state else True
             return self._get_attack_actions(hand, allow_yield, game_state)
         elif phase == "defense":
             return self._get_defense_actions(hand, game_state)
@@ -80,8 +78,8 @@ class ActionHandler:
             for combo_indices in itertools.combinations(range(hand_size), r):
                 combo_cards = [hand[i] for i in combo_indices]
                 
-                # Use the game's validation logic
-                if self._temp_game._is_valid_combo(combo_cards):
+                # Use the game's validation logic (staticmethod)
+                if Game._is_valid_combo(combo_cards):
                     # Create action mask
                     action_mask = [0] * self.max_hand_size
                     for idx in combo_indices:
@@ -299,8 +297,8 @@ class ActionHandler:
         Returns:
             True if combination is valid, False otherwise
         """
-        # Use the game's validation logic instead
-        return self._temp_game._is_valid_combo(cards)
+        # Use the game's validation logic (staticmethod)
+        return Game._is_valid_combo(cards)
 
     def is_yield_action(self, action_mask: List[int]) -> bool:
         """

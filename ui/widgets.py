@@ -48,9 +48,8 @@ class CardButton(ttk.Frame):
                 takefocus=0,
             )
         self.btn.pack(fill="both", expand=True)
-        # Make whole frame clickable too
+        # Make whole frame clickable too (for the padding area)
         self.bind("<Button-1>", lambda e: on_click())
-        self.btn.bind("<Button-1>", lambda e: on_click())
         self._tooltip = None
         if tooltip:
             self._tooltip = ToolTip(self.btn, tooltip)

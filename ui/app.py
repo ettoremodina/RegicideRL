@@ -29,27 +29,47 @@ class RegicideApp(tk.Tk):
         # Track last enemy HP for animations
         self._last_hp = None
 
+        self._bind_shortcuts()
         self._build_start_menu()
+
+    def _bind_shortcuts(self):
+        self.bind("<Return>", lambda e: self.play_btn.invoke() if self.game and str(self.play_btn["state"]) == "normal" else None)
+        self.bind("<Escape>", lambda e: self.yield_btn.invoke() if self.game and str(self.yield_btn["state"]) == "normal" else None)
+        for i in range(8):
+            # bind 1-8 to toggle cards 0-7
+            self.bind(str(i+1), lambda e, idx=i: self._toggle_card(idx) if self.game else None)
+
 
     # ----- UI Build -----
     def _build_start_menu(self):
         self.menu_frame = ttk.Frame(self)
         self.menu_frame.pack(fill="both", expand=True)
-        title = ttk.Label(self.menu_frame, text="Regicide", style="H1.TLabel")
-        subtitle = ttk.Label(self.menu_frame, text="A digital tabletop of corrupted royalty.", style="Muted.TLabel")
-        title.pack(pady=(80, 6))
-        subtitle.pack(pady=(0, 20))
+        
+        # Center container
+        center = ttk.Frame(self.menu_frame, style="Panel.TFrame")
+        center.place(relx=0.5, rely=0.45, anchor="center")
 
-        ttk.Label(self.menu_frame, text="Choose number of players:").pack(pady=8)
+        title = tk.Label(center, text="REGICIDE", font=("Uncial Antiqua", 54, "bold"), bg=DARK_THEME["panel"], fg=DARK_THEME["danger"])
+        subtitle = ttk.Label(center, text="A digital tabletop of corrupted royalty.", style="Muted.TLabel")
+        title.pack(pady=(40, 6), padx=60)
+        subtitle.pack(pady=(0, 40))
+
+        ttk.Label(center, text="Party Size:").pack(pady=8)
         self.players_var = tk.IntVar(value=1)
-        controls = ttk.Frame(self.menu_frame)
+        controls = ttk.Frame(center, style="Panel.TFrame")
         controls.pack()
         for n in [1, 2, 3, 4]:
-            rb = ttk.Radiobutton(controls, text=str(n), variable=self.players_var, value=n)
+            rb = ttk.Radiobutton(controls, text=f"{n} Player{'s' if n>1 else ''}", variable=self.players_var, value=n)
             rb.pack(side=tk.LEFT, padx=10)
 
-        ttk.Button(self.menu_frame, text="Start", command=self._start_game).pack(pady=18)
-        ttk.Button(self.menu_frame, text="Rules / Help", command=self._show_help).pack()
+        btn_frame = ttk.Frame(center, style="Panel.TFrame")
+        btn_frame.pack(pady=40)
+        
+        start_btn = tk.Button(btn_frame, text="Begin Crusade", font=("Merriweather", 14, "bold"), bg=DARK_THEME["danger"], fg="white", activebackground="#a02020", activeforeground="white", command=self._start_game, padx=30, pady=10, relief=tk.RAISED, bd=3)
+        start_btn.pack(pady=(0, 15))
+        
+        help_btn = tk.Button(btn_frame, text="Rules Reference", font=("Merriweather", 11), bg=DARK_THEME["wood"], fg=DARK_THEME["text"], activebackground="#4a3b3b", activeforeground="white", command=self._show_help, padx=15, pady=6, relief=tk.RAISED, bd=2)
+        help_btn.pack(pady=(0, 20))
 
     def _build_board(self):
         self.menu_frame.destroy()
@@ -80,11 +100,25 @@ class RegicideApp(tk.Tk):
         ttk.Label(decks, text="Decks & Piles", style="H2.TLabel").pack(anchor="w")
         self.castle_label = ttk.Label(decks, text="Castle: 0 enemies remain")
         self.castle_label.pack(anchor="w", pady=(8, 2))
+        self.castle_progress_label = ttk.Label(decks, text="", style="Muted.TLabel")
+        self.castle_progress_label.pack(anchor="w", pady=(0, 4))
+        
         self.tavern_label = ttk.Label(decks, text="Tavern: 0 cards")
         self.tavern_label.pack(anchor="w")
+        
         self.discard_label = ttk.Label(decks, text="Discard: 0 cards (click to view)")
         self.discard_label.pack(anchor="w", pady=(2, 0))
         self.discard_label.bind("<Button-1>", lambda _e: self._show_discard())
+        
+        self.attack_buffer_label = ttk.Label(decks, text="Attack Buffer: (none)", style="Muted.TLabel")
+        self.attack_buffer_label.pack(anchor="w", pady=(8, 0))
+
+        # Other players' hands
+        self.other_players_frame = ttk.Frame(top_left, style="Panel.TFrame")
+        self.other_players_frame.pack(side=tk.LEFT, fill="y", padx=(10, 0), ipadx=8, ipady=8)
+        ttk.Label(self.other_players_frame, text="Party", style="H2.TLabel").pack(anchor="w")
+        self.other_players_label = ttk.Label(self.other_players_frame, text="")
+        self.other_players_label.pack(anchor="w", pady=(8, 0))
 
         # Right side: smaller action log
         ttk.Label(right, text="Action Log", style="H2.TLabel").pack(anchor="w", padx=8, pady=6)
@@ -103,8 +137,9 @@ class RegicideApp(tk.Tk):
         btns.pack(fill="x", pady=8)
         self.play_btn = ttk.Button(btns, text="Play Selected", command=self._on_play)
         self.yield_btn = ttk.Button(btns, text="Yield", command=self._on_yield)
+        self.jester_btn = ttk.Button(btns, text="Use Solo Jester (0 left)", command=self._on_solo_jester)
         self.help_btn = ttk.Button(btns, text="Help", command=self._show_help)
-        for b in (self.play_btn, self.yield_btn, self.help_btn):
+        for b in (self.play_btn, self.yield_btn, self.jester_btn, self.help_btn):
             b.pack(side=tk.LEFT, padx=6)
 
         self.hand_frame = ttk.Frame(bottom, style="Panel.TFrame")
@@ -158,16 +193,59 @@ class RegicideApp(tk.Tk):
 
         # Decks/piles
         self.castle_label.config(text=f"Castle: {state['enemies_remaining']} enemies remain")
+        # Determine J/Q/K progress (Jacks are first 4, Queens next 4, Kings last 4)
+        rem = state['enemies_remaining']
+        if rem > 8:
+            tier = f"Fighting Jacks ({rem - 8} left)"
+        elif rem > 4:
+            tier = f"Fighting Queens ({rem - 4} left)"
+        elif rem > 0:
+            tier = f"Fighting Kings ({rem} left)"
+        else:
+            tier = "Castle Empty!"
+        self.castle_progress_label.config(text=tier)
+        
         self.tavern_label.config(text=f"Tavern: {state['tavern_cards']} cards")
         self.discard_label.config(text=f"Discard: {state['discard_cards']} cards (click to view)")
+        
+        # Attack buffer
+        buffer_cards = self.game.attack_cards_buffer
+        if buffer_cards:
+            self.attack_buffer_label.config(text="Attack Buffer:\n" + ", ".join(str(c) for c in buffer_cards))
+        else:
+            self.attack_buffer_label.config(text="Attack Buffer: (none)")
 
         # Player info
         current = state["current_player"]
         max_hand = self.game.get_max_hand_size()
         self.player_title.config(text=f"Player {current+1}  |  Hand: {len(self.game.players[current])}/{max_hand}")
+        
+        # Other players info
+        if self.game.num_players > 1:
+            others = []
+            for i in range(self.game.num_players):
+                if i != current:
+                    others.append(f"Player {i+1}: {len(self.game.players[i])} cards")
+            self.other_players_label.config(text="\n".join(others))
+            self.other_players_frame.pack(side=tk.LEFT, fill="y", padx=(10, 0), ipadx=8, ipady=8)
+        else:
+            self.other_players_frame.pack_forget()
 
         # Yield availability
         self.yield_btn.config(state=(tk.NORMAL if state["can_yield"] else tk.DISABLED))
+        
+        # Solo Jester
+        if self.game.num_players == 1 and state.get('solo_jesters_remaining', 0) > 0:
+            self.jester_btn.pack(side=tk.LEFT, padx=6)
+            self.jester_btn.config(text=f"Use Solo Jester ({state['solo_jesters_remaining']} left)")
+            # Enable only if not in the middle of a defense step? Wait, can be used at start of step1 or step4.
+            # For simplicity, if it's the player's turn and no defense is active.
+            if self.game.current_enemy and self.game.current_enemy.get_effective_attack() > 0 and self.game.players_yielded_this_round[current]:
+                # In defense phase - wait, if we yielded, we might be defending. But app handles defense via modal popup!
+                pass
+            self.jester_btn.config(state=tk.NORMAL)
+        else:
+            self.jester_btn.pack_forget()
 
         # Hand
         for w in self.card_buttons:
@@ -183,15 +261,7 @@ class RegicideApp(tk.Tk):
             counts[c.value] = counts.get(c.value, 0) + 1
 
         def make_click(idx: int):
-            def _cb():
-                if idx in self.selected_indices:
-                    self.selected_indices.remove(idx)
-                else:
-                    self.selected_indices.append(idx)
-                # Visual feedback
-                self.card_buttons[idx].btn.config(relief=(tk.SUNKEN if idx in self.selected_indices else tk.RAISED))
-                self._update_play_preview()
-            return _cb
+            return lambda: self._toggle_card(idx)
 
         for i, c in enumerate(hand):
             tooltip = self._card_tooltip([c])
@@ -199,6 +269,21 @@ class RegicideApp(tk.Tk):
             btn.pack(side=tk.LEFT, padx=4, pady=6)
             self.card_buttons.append(btn)
 
+        self._update_play_preview()
+
+    def _toggle_card(self, idx: int):
+        if idx >= len(self.card_buttons):
+            return
+        if idx in self.selected_indices:
+            self.selected_indices.remove(idx)
+        else:
+            self.selected_indices.append(idx)
+        # Visual feedback: update relief and change background color slightly
+        selected = idx in self.selected_indices
+        self.card_buttons[idx].btn.config(
+            relief=(tk.SUNKEN if selected else tk.RAISED),
+            bg=("#5a4b4b" if selected else DARK_THEME["wood"])
+        )
         self._update_play_preview()
 
     # No longer used (handled by EnemyView)
@@ -277,6 +362,17 @@ class RegicideApp(tk.Tk):
         else:
             self._refresh_all()
 
+    def _on_solo_jester(self):
+        if not self.game:
+            return
+        if messagebox.askyesno("Solo Jester", "Discard your hand and refill to 8 cards?"):
+            res = self.game.use_solo_jester("step1")
+            if res.get("success"):
+                self.log.log("Used Solo Jester! Discarded hand and refilled.")
+                self._refresh_all()
+            else:
+                messagebox.showerror("Error", res.get("message", "Could not use Jester."))
+
     def _log_result_on_play(self, res: dict):
         if not res:
             return
@@ -303,13 +399,37 @@ class RegicideApp(tk.Tk):
             self._prompt_jester()
         elif phase == "defense_needed":
             self._prompt_defense(res.get("defense_required", 0))
-        elif phase in ("enemy_defeated", "turn_complete", "victory"):
+        elif phase in ("enemy_defeated", "turn_complete", "victory", "game_over"):
             self._refresh_all()
-            if phase == "victory":
-                messagebox.showinfo("Victory", "All enemies defeated!")
-                play_victory()
+            if phase == "victory" or self.game.victory:
+                self._show_game_over("Victory", "All enemies defeated!\nThe King is dead!")
+            elif phase == "game_over" or self.game.game_over:
+                self._show_game_over("Defeat", "The party has fallen...")
         else:
             self._refresh_all()
+
+    def _show_game_over(self, title: str, message: str):
+        if title == "Victory":
+            play_victory()
+        else:
+            play_defeat()
+            
+        tier = self.game.get_victory_tier()
+        tier_text = f"\nSolo Victory Tier: {tier.title()}" if tier else ""
+        
+        stats = (
+            f"{message}\n\n"
+            f"Enemies Defeated: {12 - len(self.game.castle_deck) - (1 if not self.game.victory else 0)}\n"
+            f"Cards in Tavern: {len(self.game.tavern_deck)}\n"
+            f"Cards in Discard: {len(self.game.discard_pile)}"
+            f"{tier_text}"
+        )
+        messagebox.showinfo(title, stats)
+        # Reset to start menu
+        self.game = None
+        for widget in self.winfo_children():
+            widget.destroy()
+        self._build_start_menu()
 
     def _prompt_jester(self):
         if not self.game:
@@ -335,6 +455,11 @@ class RegicideApp(tk.Tk):
             return
         win = tk.Toplevel(self)
         win.title(f"Suffer {required} Damage")
+        # Make non-dismissable
+        win.protocol("WM_DELETE_WINDOW", lambda: None)
+        win.transient(self) # Keep on top of main window
+        win.grab_set() # Modal
+        
         ttk.Label(win, text=f"Suffer {required} damage. Select cards to discard.").pack(padx=10, pady=8)
         selected: List[int] = []
 
@@ -377,21 +502,21 @@ class RegicideApp(tk.Tk):
             win.destroy()
             self._refresh_all()
             if res.get("game_over"):
-                play_defeat()
-                messagebox.showerror("Defeat", "The party has fallen...")
+                win.destroy()
+                self._show_game_over("Defeat", "The party has fallen...")
+            else:
+                win.destroy()
+                self._refresh_all()
         confirm = ttk.Button(actions, text="Discard & Resolve", command=on_confirm, state=tk.DISABLED)
         confirm.pack(side=tk.LEFT, padx=4)
-        ttk.Button(actions, text="Cancel", command=win.destroy).pack(side=tk.LEFT, padx=4)
-
+        
         update_total()
 
     def _resolve_auto_defeat(self, dialog):
         # Set game over if cannot defend
         self.game.game_over = True
-        self._refresh_all()
         dialog.destroy()
-        play_defeat()
-        messagebox.showerror("Defeat", "No possible defense. The party has fallen...")
+        self._show_game_over("Defeat", "No possible defense. The party has fallen...")
 
     def _show_discard(self):
         if not self.game:
