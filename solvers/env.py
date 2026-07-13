@@ -104,6 +104,10 @@ class RegicideEnv(gym.Env):
             else:
                 res = self.game.play_card(indices)
                 
+            if not res.get('success', False):
+                # Invalid action taken - terminate to prevent infinite loops
+                return self._get_obs(), -1.0, True, False, res
+                
             self.required_defense = res.get("defense_required", 0)
             
             # If it's a multi-player game and Jester was played
