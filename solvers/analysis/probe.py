@@ -33,7 +33,11 @@ def probe_policy(model_path, num_games=50):
     scenarios = {
         'played_jester': 0,
         'yield_on_defense': 0,
-        'wasted_face_card': 0 # playing J/Q/K unnecessarily
+        'wasted_face_card': 0, # playing J/Q/K unnecessarily
+        'over_defense': 0,
+        'wasted_jester': 0,
+        'combos_played': 0,
+        'animal_companion': 0
     }
     
     for game_idx in range(num_games):
@@ -73,9 +77,22 @@ def probe_policy(model_path, num_games=50):
                 if raw_env.required_defense > 0:
                     scenarios['yield_on_defense'] += 1
             else:
+                if len(cards_played) > 1:
+                    scenarios['combos_played'] += 1
+                    if any(c.value == 1 for c in cards_played):
+                        scenarios['animal_companion'] += 1
+                        
+                # Check for over-defense
+                if raw_env.required_defense > 0:
+                    played_defense_value = sum(c.value for c in cards_played if c.value <= 10)
+                    if played_defense_value > raw_env.required_defense + 5:
+                        scenarios['over_defense'] += 1
+                        
                 for c in cards_played:
                     if c.value == 0: # Jester
                         scenarios['played_jester'] += 1
+                        if raw_env.game.current_enemy and raw_env.game.current_enemy.attack == 0 and raw_env.required_defense == 0:
+                            scenarios['wasted_jester'] += 1
                     if c.value in [11, 12, 13]: # Face cards
                         # Simple heuristic: if attack is 0 and defense is 0, playing a face card might be a waste
                         # (Though could be valid to cycle hand)

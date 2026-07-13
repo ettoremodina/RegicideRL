@@ -22,6 +22,8 @@ def objective(trial, config):
     n_epochs = trial.suggest_int("n_epochs", 3, 20)
     gamma = trial.suggest_float("gamma", 0.9, 0.9999, log=True)
     ent_coef = trial.suggest_float("ent_coef", 0.00001, 0.05, log=True)
+    net_arch_size = trial.suggest_categorical("net_arch_size", [64, 128, 256])
+    net_arch = [net_arch_size, net_arch_size]
     
     # 2. Setup Environment
     raw_env = RegicideEnv(num_players=config["env"].get("num_players", 1))
@@ -31,6 +33,13 @@ def objective(trial, config):
     # Use a temporary log directory for the trial
     trial_log_dir = os.path.join(config["training"]["log_dir"], f"trial_{trial.number}")
     os.makedirs(trial_log_dir, exist_ok=True)
+    
+    from solvers.architecture import RegicideFeatureExtractor
+    policy_kwargs = dict(
+        features_extractor_class=RegicideFeatureExtractor,
+        features_extractor_kwargs=dict(features_dim=256),
+        net_arch=dict(pi=net_arch, vf=net_arch)
+    )
     
     model = MaskablePPO(
         "MultiInputPolicy",
@@ -43,7 +52,8 @@ def objective(trial, config):
         batch_size=batch_size,
         n_epochs=n_epochs,
         gamma=gamma,
-        ent_coef=ent_coef
+        ent_coef=ent_coef,
+        policy_kwargs=policy_kwargs
     )
     
     # 4. Train
@@ -70,8 +80,14 @@ def objective(trial, config):
     bosses = probe_results.get('bosses_killed', [])
     mean_bosses = float(np.mean(bosses)) if bosses else 0.0
     
-    # Alternatively, you could optimize a combination of bosses killed and win rate
-    return mean_bosses
+    # Custom score: bosses killed minus a penalty for bad habits
+    scenarios = probe_results.get('scenarios', {})
+    over_defense = scenarios.get('over_defense', 0)
+    wasted_jester = scenarios.get('wasted_jester', 0)
+    
+    penalty = (over_defense * 0.1) + (wasted_jester * 0.1)
+    
+    return mean_bosses - penalty
 
 def run_tuner(config_path="config.yaml"):
     config = load_config(config_path)

@@ -38,7 +38,17 @@ def main():
     logger_callback = EpisodeLoggerCallback()
     callbacks = CallbackList([checkpoint_callback, logger_callback])
     
+    from solvers.architecture import RegicideFeatureExtractor
+    
     print(f"Initializing MaskablePPO agent on {ppo_cfg['device'].upper()}...")
+    
+    # Custom architecture kwargs
+    policy_kwargs = dict(
+        features_extractor_class=RegicideFeatureExtractor,
+        features_extractor_kwargs=dict(features_dim=256),
+        net_arch=dict(pi=ppo_cfg.get("net_arch", [128, 128]), vf=ppo_cfg.get("net_arch", [128, 128]))
+    )
+    
     model = MaskablePPO(
         "MultiInputPolicy",
         env,
@@ -50,7 +60,8 @@ def main():
         batch_size=ppo_cfg["batch_size"],
         n_epochs=ppo_cfg["n_epochs"],
         gamma=ppo_cfg["gamma"],
-        ent_coef=ppo_cfg.get("ent_coef", 0.0)
+        ent_coef=ppo_cfg.get("ent_coef", 0.0),
+        policy_kwargs=policy_kwargs
     )
     
     print(f"Starting training for {train_cfg['total_timesteps']:,} timesteps...")

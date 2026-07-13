@@ -23,5 +23,5 @@ training:
   save_dir: "models"
 
 tuning:
-  n_trials: 20
-  timesteps_per_trial: 150000
+  n_trials: 1
+  timesteps_per_trial: 1000

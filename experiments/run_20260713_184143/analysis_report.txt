@@ -1,0 +1,24 @@
+Regicide RL Policy Analysis Report
+Generated: 2026-07-13T18:44:55.014560
+
+--- High-Level Performance ---
+Games Played: 100
+Win Rate: 0.00%
+Average Bosses Defeated: 1.87 / 12
+Max Bosses Defeated: 5
+Average Episode Reward: -0.81
+
+--- Decision Making (Probing) ---
+Total Decisions Made: 906
+Yield Rate: 9.27% (Action 0)
+Unique Actions Used: 39 / 256
+Most Common Action ID: 2 (Used 161 times)
+
+--- Model Confidence ---
+Mean Entropy: 4.4010 
+(Lower = more decisive, Higher = random/confused)
+
+--- Behavioral Scenarios ---
+Jesters Played: 0
+Yielded During Defense: 72 (Often fatal)
+Wasted Face Cards (No attack/defense required): 0
