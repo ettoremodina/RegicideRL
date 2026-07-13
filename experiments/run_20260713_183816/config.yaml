@@ -1,0 +1,26 @@
+env:
+  num_players: 1
+  reward_win: 1.0
+  reward_loss: -1.0
+  reward_enemy_defeated: 0.1
+  reward_invalid_action: -1.0
+
+ppo:
+  learning_rate: 0.0003
+  n_steps: 2048
+  batch_size: 64
+  n_epochs: 10
+  gamma: 0.99
+  ent_coef: 0.01  # Increased from default 0.0 to encourage exploration
+  device: "cpu"
+
+training:
+  total_timesteps: 1000000
+  checkpoint_freq: 200000
+  model_name: "ppo_regicide_tuned"
+  log_dir: "runs/rl_logs"
+  save_dir: "models"
+
+tuning:
+  n_trials: 20
+  timesteps_per_trial: 150000

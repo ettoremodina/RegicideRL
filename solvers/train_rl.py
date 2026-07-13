@@ -1,56 +1,69 @@
 import os
 import argparse
-from stable_baselines3.common.callbacks import CheckpointCallback
+import yaml
+from stable_baselines3.common.callbacks import CheckpointCallback, CallbackList
 from sb3_contrib.ppo_mask import MaskablePPO
 from solvers.env import RegicideEnv
 from solvers.wrappers import NumericObsWrapper
+from solvers.callbacks import EpisodeLoggerCallback
+
+def load_config(config_path="config.yaml"):
+    with open(config_path, "r") as f:
+        return yaml.safe_load(f)
 
 def main():
     parser = argparse.ArgumentParser(description="Train MaskablePPO on Regicide")
-    parser.add_argument("--timesteps", type=int, default=5000000, help="Total timesteps to train (default: 5,000,000)")
-    parser.add_argument("--device", type=str, default="cpu", help="Device to use (default: cpu)")
-    parser.add_argument("--name", type=str, default="ppo_regicide_v2", help="Model save name")
+    parser.add_argument("--config", type=str, default="config.yaml", help="Path to config.yaml")
     args = parser.parse_args()
 
+    config = load_config(args.config)
+    env_cfg = config["env"]
+    ppo_cfg = config["ppo"]
+    train_cfg = config["training"]
+
     print("Initializing environment...")
-    raw_env = RegicideEnv(num_players=1)
+    # Apply environment configuration (for future expansion)
+    raw_env = RegicideEnv(num_players=env_cfg.get("num_players", 1))
     env = NumericObsWrapper(raw_env)
     
-    # Define models directory
-    os.makedirs("models", exist_ok=True)
-    os.makedirs("runs/rl_logs", exist_ok=True)
+    os.makedirs(train_cfg["save_dir"], exist_ok=True)
+    os.makedirs(train_cfg["log_dir"], exist_ok=True)
     
-    # Save a checkpoint every 500,000 steps
     checkpoint_callback = CheckpointCallback(
-        save_freq=500000,
-        save_path='./models/logs/',
+        save_freq=train_cfg["checkpoint_freq"],
+        save_path=f'./{train_cfg["save_dir"]}/logs/',
         name_prefix='rl_model'
     )
     
-    print(f"Initializing MaskablePPO agent on {args.device.upper()}...")
+    logger_callback = EpisodeLoggerCallback()
+    callbacks = CallbackList([checkpoint_callback, logger_callback])
+    
+    print(f"Initializing MaskablePPO agent on {ppo_cfg['device'].upper()}...")
     model = MaskablePPO(
         "MultiInputPolicy",
         env,
-        device=args.device,
+        device=ppo_cfg["device"],
         verbose=1,
-        tensorboard_log="runs/rl_logs",
-        learning_rate=3e-4,
-        n_steps=2048,
-        batch_size=64,
-        n_epochs=10,
-        gamma=0.99
+        tensorboard_log=train_cfg["log_dir"],
+        learning_rate=ppo_cfg["learning_rate"],
+        n_steps=ppo_cfg["n_steps"],
+        batch_size=ppo_cfg["batch_size"],
+        n_epochs=ppo_cfg["n_epochs"],
+        gamma=ppo_cfg["gamma"],
+        ent_coef=ppo_cfg.get("ent_coef", 0.0)
     )
     
-    print(f"Starting training for {args.timesteps:,} timesteps...")
+    print(f"Starting training for {train_cfg['total_timesteps']:,} timesteps...")
     model.learn(
-        total_timesteps=args.timesteps,
-        callback=checkpoint_callback,
+        total_timesteps=train_cfg["total_timesteps"],
+        callback=callbacks,
         progress_bar=True
     )
     
-    print("Saving final model...")
-    model.save(f"models/{args.name}")
-    print(f"Done! Model saved to models/{args.name}.zip")
+    final_model_path = os.path.join(train_cfg["save_dir"], train_cfg["model_name"])
+    print(f"Saving final model to {final_model_path}...")
+    model.save(final_model_path)
+    print("Training Complete!")
     
 if __name__ == "__main__":
     main()
