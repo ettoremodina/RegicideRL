@@ -1,0 +1,30 @@
+2026-07-16 01:08:15,523 - Initialized run: run_20260716_010815
+2026-07-16 01:08:15,523 - Run directory: runs\run_20260716_010815
+2026-07-16 01:08:15,523 - Starting run with arguments: {'agent': 'ppo', 'episodes': 10, 'games_per_episode': 1000, 'jobs': 4}
+2026-07-16 01:08:17,599 - Using Agent: PPOAgent
+2026-07-16 01:08:17,600 - Initialized ParallelSimulator with 4 workers
+2026-07-16 01:08:17,600 - --- Episode 1/10 ---
+2026-07-16 01:08:34,808 - Eval Results:
+2026-07-16 01:08:34,809 -   Win Rate: 0.00%
+2026-07-16 01:08:34,809 -   Avg Enemies Defeated: 1.23 / 12
+2026-07-16 01:08:34,809 -   Avg Turns: 9.7
+2026-07-16 01:08:34,809 -   Speed: 58.11 games/sec
+2026-07-16 01:08:34,815 - --- Episode 2/10 ---
+2026-07-16 01:08:51,683 - Eval Results:
+2026-07-16 01:08:51,685 -   Win Rate: 0.00%
+2026-07-16 01:08:51,685 -   Avg Enemies Defeated: 1.27 / 12
+2026-07-16 01:08:51,686 -   Avg Turns: 9.7
+2026-07-16 01:08:51,686 -   Speed: 59.28 games/sec
+2026-07-16 01:08:51,689 - --- Episode 3/10 ---
+2026-07-16 01:09:08,295 - Eval Results:
+2026-07-16 01:09:08,296 -   Win Rate: 0.00%
+2026-07-16 01:09:08,296 -   Avg Enemies Defeated: 1.19 / 12
+2026-07-16 01:09:08,296 -   Avg Turns: 9.6
+2026-07-16 01:09:08,296 -   Speed: 60.22 games/sec
+2026-07-16 01:09:08,299 - --- Episode 4/10 ---
+2026-07-16 01:09:25,133 - Eval Results:
+2026-07-16 01:09:25,133 -   Win Rate: 0.00%
+2026-07-16 01:09:25,133 -   Avg Enemies Defeated: 1.21 / 12
+2026-07-16 01:09:25,133 -   Avg Turns: 9.6
+2026-07-16 01:09:25,134 -   Speed: 59.41 games/sec
+2026-07-16 01:09:25,137 - --- Episode 5/10 ---

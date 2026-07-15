@@ -29,6 +29,25 @@ class RegicideEnv(gym.Env):
         self.observation_space = spaces.Dict({
             "action_mask": spaces.Box(low=0, high=1, shape=(256,), dtype=np.int8)
         })
+    
+    def clone(self) -> 'RegicideEnv':
+        """Create a fast clone of the environment for search simulation.
+        
+        Clones the inner Game state and the wrapper's required_defense,
+        so search agents can fork a full env state without affecting
+        the real game.
+        
+        Returns:
+            A new RegicideEnv with identical but independent state.
+        """
+        new_env = object.__new__(RegicideEnv)
+        new_env.num_players = self.num_players
+        new_env.handler = self.handler  # ActionHandler is stateless, safe to share
+        new_env.required_defense = self.required_defense
+        new_env.action_space = self.action_space
+        new_env.observation_space = self.observation_space
+        new_env.game = self.game.clone()
+        return new_env
         
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)

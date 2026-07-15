@@ -199,6 +199,55 @@ class Game:
         # Reset any lingering attack buffer at start
         self.attack_cards_buffer = []
     
+    def clone(self) -> 'Game':
+        """Create a fast deep copy of the game state for search simulation.
+        
+        Manually copies all mutable fields instead of using copy.deepcopy,
+        which is significantly faster for MCTS/PIMC where thousands of
+        clones are created per decision.
+        
+        Returns:
+            A new Game instance with identical but independent state.
+        """
+        # Bypass __init__ and _setup_game entirely
+        new = object.__new__(Game)
+        new.num_players = self.num_players
+        new.current_player = self.current_player
+        new.game_over = self.game_over
+        new.victory = self.victory
+        new.jester_immunity_cancelled = self.jester_immunity_cancelled
+        new.last_active_player = self.last_active_player
+        new.blocked_spade_value = self.blocked_spade_value
+        new.solo_jesters_remaining = self.solo_jesters_remaining
+        new.solo_jesters_used = self.solo_jesters_used
+        
+        # Instrumentation counters
+        new.last_hearts_healed = self.last_hearts_healed
+        new.last_diamonds_drawn = self.last_diamonds_drawn
+        new.last_spade_protection_added = self.last_spade_protection_added
+        
+        # Deep-copy card lists (Card objects are immutable, so shallow-copy of lists suffices)
+        new.players = [hand[:] for hand in self.players]
+        new.tavern_deck = self.tavern_deck[:]
+        new.discard_pile = self.discard_pile[:]
+        new.castle_deck = self.castle_deck[:]
+        new.attack_cards_buffer = self.attack_cards_buffer[:]
+        new.players_yielded_this_round = self.players_yielded_this_round[:]
+        
+        # Clone the current enemy (Enemy is mutable — has damage_taken, spade_protection)
+        if self.current_enemy is not None:
+            new_enemy = object.__new__(Enemy)
+            new_enemy.card = self.current_enemy.card  # Card is immutable
+            new_enemy.health = self.current_enemy.health
+            new_enemy.attack = self.current_enemy.attack
+            new_enemy.damage_taken = self.current_enemy.damage_taken
+            new_enemy.spade_protection = self.current_enemy.spade_protection
+            new.current_enemy = new_enemy
+        else:
+            new.current_enemy = None
+        
+        return new
+
     def get_max_hand_size(self):
         hand_sizes = {1: 8, 2: 7, 3: 6, 4: 5}
         return hand_sizes[self.num_players]

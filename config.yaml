@@ -6,18 +6,18 @@ env:
   reward_invalid_action: -1.0
 
 ppo:
-  learning_rate: 0.0003
-  n_steps: 2048
-  batch_size: 64
-  n_epochs: 10
-  gamma: 0.99
-  ent_coef: 0.01  # Increased from default 0.0 to encourage exploration
+  learning_rate: 0.000499320956710208
+  n_steps: 4096
+  batch_size: 128
+  n_epochs: 6
+  gamma: 0.9325316491322991
+  ent_coef: 0.002266137838935706
   device: "cpu"
   net_arch: [256, 256]
   pretrained_model_path: "models/ppo_bc_pretrained"
 
 training:
-  total_timesteps: 100000
+  total_timesteps: 500000
   checkpoint_freq: 20000
   model_name: "ppo_regicide_tuned"
   log_dir: "runs/rl_logs"
