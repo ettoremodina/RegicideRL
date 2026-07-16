@@ -22,6 +22,7 @@ class ActionHandler:
             max_hand_size: Maximum number of cards a player can have
         """
         self.max_hand_size = max_hand_size
+        self._global_attack_actions = self._generate_global_attack_actions()
     
     def get_all_possible_actions(self, 
                                hand: List[Card], 
@@ -380,6 +381,122 @@ class ActionHandler:
             if idx < self.max_hand_size:
                 action_mask[idx] = 1
         return action_mask
+
+    def _generate_global_attack_actions(self) -> List[Dict]:
+        """
+        Generates all 286 possible unique attack actions in Regicide,
+        independent of the player's current hand.
+        """
+        actions = []
+        
+        # 0. Yield
+        actions.append({"type": "Yield", "cards": []})
+        
+        # Generate a standard deck for reference
+        deck = []
+        for suit in Suit:
+            for val in range(1, 14):
+                deck.append(Card(val, suit))
+        jester = Card(0, Suit.HEARTS)
+        
+        # 1. Single Cards
+        for card in deck: # All 52 standard cards
+            actions.append({"type": "Single", "cards": [card]})
+        actions.append({"type": "Single", "cards": [jester]}) # 1 Jester action
+        
+        # 2. Ace + Ace (Animal Companions)
+        aces = [c for c in deck if c.value == 1]
+        for combo in itertools.combinations(aces, 2):
+            actions.append({"type": "Ace+Ace", "cards": list(combo)})
+            
+        # 3. Ace + Non-Jester
+        non_jesters = [c for c in deck if c.value not in (0, 1)]
+        for ace in aces:
+            for other in non_jesters:
+                actions.append({"type": "Ace+Other", "cards": [ace, other]})
+                
+        # 4. Same-value combos (sum <= 10)
+        for val in range(2, 11):
+            same_val_cards = [c for c in deck if c.value == val]
+            for r in range(2, 5):
+                if val * r <= 10:
+                    for combo in itertools.combinations(same_val_cards, r):
+                        actions.append({"type": "SameValue", "cards": list(combo)})
+                        
+        return actions
+
+    def get_global_action_mask(self, hand: List[Card], phase: str, game_state: Optional[Dict] = None) -> List[int]:
+        """
+        Get a 542-length binary array representing all valid actions globally.
+        Indices 0-285: Attack Actions (Global combinations)
+        Indices 286-541: Defense Actions (Hand-relative subsets)
+        """
+        mask = [0] * 542
+        
+        if phase == "attack":
+            valid_local_masks = self.get_all_possible_actions(hand, phase, game_state)
+            
+            valid_card_subsets = []
+            for action_mask in valid_local_masks:
+                indices = self.mask_to_card_indices(action_mask, len(hand))
+                cards = [hand[i] for i in indices]
+                valid_card_subsets.append(cards)
+            
+            # Use tuple of sorted cards for O(1) matching
+            valid_card_tuples = {tuple(sorted(cards)) for cards in valid_card_subsets}
+            
+            for i, global_action in enumerate(self._global_attack_actions):
+                global_cards = tuple(sorted(global_action["cards"]))
+                if global_cards in valid_card_tuples:
+                    mask[i] = 1
+                    
+        elif phase == "defense":
+            valid_local_masks = self.get_all_possible_actions(hand, phase, game_state)
+            for action_mask in valid_local_masks:
+                val = 0
+                for i, bit in enumerate(action_mask):
+                    if bit:
+                        val += (1 << i)
+                if 286 + val < 542:
+                    mask[286 + val] = 1
+                    
+        return mask
+
+    def global_action_to_hand_indices(self, action_id: int, hand: List[Card]) -> List[int]:
+        """
+        Decodes a global action ID (0-541) into a list of hand indices to pass to the env.
+        """
+        if action_id < 0 or action_id >= 542:
+            raise ValueError(f"Invalid global action id: {action_id}")
+            
+        if action_id < 286:
+            # Attack action
+            global_action = self._global_attack_actions[action_id]
+            cards_to_play = global_action["cards"]
+            
+            indices = []
+            used = set()
+            for card in cards_to_play:
+                found = False
+                for i, hand_card in enumerate(hand):
+                    if i not in used and hand_card == card:
+                        indices.append(i)
+                        used.add(i)
+                        found = True
+                        break
+                if not found:
+                    raise ValueError(f"Action requires {card} but it's not in hand or already used.")
+            return indices
+            
+        else:
+            # Defense action
+            val = action_id - 286
+            indices = []
+            for i in range(self.max_hand_size):
+                if val & (1 << i):
+                    indices.append(i)
+            # Ensure indices don't exceed current hand size
+            return [idx for idx in indices if idx < len(hand)]
 
 
 def main():

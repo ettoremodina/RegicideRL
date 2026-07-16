@@ -20,14 +20,14 @@ class RegicideEnv(gym.Env):
         self.game = None
         self.required_defense = 0
         
-        # Action space: 2^8 = 256 possible card combinations
-        self.action_space = spaces.Discrete(256)
+        # Action space: 286 global attack actions + 256 hand-relative defense actions
+        self.action_space = spaces.Discrete(542)
         
         # Observation space: 
         # For now, we only formally define the action_mask for Gym algorithms.
         # The raw game state and hand are passed as dict elements for custom featurizers.
         self.observation_space = spaces.Dict({
-            "action_mask": spaces.Box(low=0, high=1, shape=(256,), dtype=np.int8)
+            "action_mask": spaces.Box(low=0, high=1, shape=(542,), dtype=np.int8)
         })
     
     def clone(self) -> 'RegicideEnv':
@@ -71,13 +71,9 @@ class RegicideEnv(gym.Env):
         else:
             actions = self.handler.get_all_possible_actions(hand, "attack", state)
             
-        # Create flat action_mask for Gymnasium
-        action_mask = np.zeros(256, dtype=np.int8)
-        for mask in actions:
-            # mask is a list of 8 binary ints, e.g., [1, 0, 0, 1, 0, 0, 0, 0]
-            # Convert to integer index 0-255
-            idx = sum(val * (1 << i) for i, val in enumerate(mask))
-            action_mask[idx] = 1
+        # Create global action mask for Gymnasium
+        phase = "defense" if self.required_defense > 0 else "attack"
+        action_mask = np.array(self.handler.get_global_action_mask(hand, phase, state), dtype=np.int8)
             
         return {
             'game_state': state,
@@ -91,7 +87,7 @@ class RegicideEnv(gym.Env):
         
     def step(self, action):
         """
-        Takes an action index (0-255) OR a list mask (backward compatibility).
+        Takes an action index (0-541) OR a list mask (backward compatibility).
         Returns: next_obs, reward, terminated, truncated, info
         """
         if self.game.game_over:
@@ -101,12 +97,20 @@ class RegicideEnv(gym.Env):
         
         # Convert action integer to mask if necessary
         if isinstance(action, (int, np.integer)):
-            # Convert 0-255 int to binary array of length 8
-            action_mask = [(action >> i) & 1 for i in range(self.handler.max_hand_size)]
+            if self.action_space.n == 542:
+                # Decode 542-dimensional global action ID
+                indices = self.handler.global_action_to_hand_indices(int(action), hand)
+                # determine if it's a yield by checking if it's attack phase and action == 0
+                is_yield = (self.required_defense == 0 and action == 0)
+            else:
+                # Fallback for old 256 space just in case
+                action_mask = [(action >> i) & 1 for i in range(self.handler.max_hand_size)]
+                indices = self.handler.mask_to_card_indices(action_mask, len(hand))
+                is_yield = self.handler.is_yield_action(action_mask)
         else:
             action_mask = action
-            
-        indices = self.handler.mask_to_card_indices(action_mask, len(hand))
+            indices = self.handler.mask_to_card_indices(action_mask, len(hand))
+            is_yield = self.handler.is_yield_action(action_mask)
         
         if self.required_defense > 0:
             res = self.game.defend_with_card_indices(indices)
@@ -119,7 +123,7 @@ class RegicideEnv(gym.Env):
             
             reward = 0.0 # Standard transition reward
         else:
-            if self.handler.is_yield_action(action_mask):
+            if is_yield:
                 res = self.game.yield_turn()
             else:
                 res = self.game.play_card(indices)

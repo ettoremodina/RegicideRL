@@ -55,6 +55,9 @@ class PerfectSolver:
         self.verbose = verbose
         self.callback = callback
         self.callback_freq = callback_freq
+        self.max_bosses_defeated = 0
+        self.best_sequence = []
+        self.current_path = []
         
     def solve(self, initial_env: RegicideEnv) -> Optional[List[int]]:
         """
@@ -63,6 +66,9 @@ class PerfectSolver:
         """
         self.visited.clear()
         self.nodes_evaluated = 0
+        self.max_bosses_defeated = 0
+        self.best_sequence = []
+        self.current_path = []
         
         start_time = time.time()
         
@@ -89,6 +95,13 @@ class PerfectSolver:
         
         if self.callback and self.nodes_evaluated % self.callback_freq == 0:
             self.callback(self.callback_freq)
+            
+        # Track max bosses defeated
+        enemies_left = len(env.game.castle_deck) + (1 if env.game.current_enemy and not env.game.victory else 0)
+        enemies_defeated = 12 - enemies_left
+        if enemies_defeated > self.max_bosses_defeated:
+            self.max_bosses_defeated = enemies_defeated
+            self.best_sequence = self.current_path.copy()
         
         # Check termination
         if env.game.victory:
@@ -132,10 +145,13 @@ class PerfectSolver:
         for action_idx, mask in action_tuples:
             # Clone env to branch
             next_env = env.clone()
-            next_env.step(action_idx)
+            next_env.step(mask)
             
+            self.current_path.append(action_idx)
             # Recursive DFS
             path = self._dfs(next_env)
+            self.current_path.pop()
+            
             if path is not None:
                 return [action_idx] + path
                 

@@ -186,3 +186,64 @@ class TestActionHandlerUtilities:
         count = handler.get_action_count(hand, "attack", {'can_yield': True})
         # Yield + 5♥ + 3♣ = 3 actions (no valid combos since different values)
         assert count == 3
+
+class TestGlobalActionSpace:
+    """Test global 542-dimensional action space."""
+
+    def test_get_global_action_mask_attack(self, handler):
+        """Check attack mask is correctly mapped."""
+        hand = [Card(2, Suit.HEARTS)]
+        mask = handler.get_global_action_mask(hand, "attack", {'can_yield': False})
+        
+        # 542 dimensions
+        assert len(mask) == 542
+        
+        # Only 1 action (Play 2 of Hearts) should be 1
+        # No yield because can_yield is False
+        assert sum(mask) == 1
+        
+        # Find the active index
+        active_idx = mask.index(1)
+        
+        # Assert the active index is in the attack range
+        assert 0 <= active_idx < 286
+
+    def test_get_global_action_mask_defense(self, handler):
+        """Check defense mask is correctly mapped."""
+        hand = [Card(10, Suit.HEARTS)]
+        game_state = {'enemy_attack': 5}
+        mask = handler.get_global_action_mask(hand, "defense", game_state)
+        
+        assert len(mask) == 542
+        
+        # 10 is enough to defend against 5. 
+        # Only the minimal set (the single 10) should be available.
+        assert sum(mask) == 1
+        
+        active_idx = mask.index(1)
+        
+        # Assert the active index is in the defense range
+        assert 286 <= active_idx < 542
+        
+        # It should correspond to masking index 0 (which is 1)
+        # 286 + 1 = 287
+        assert active_idx == 287
+
+    def test_global_action_to_hand_indices(self, handler):
+        """Decode global action to local indices."""
+        hand = [Card(2, Suit.HEARTS), Card(3, Suit.CLUBS), Card(2, Suit.SPADES)]
+        
+        # Let's find the global action ID for 'Play 2 of Hearts + 2 of Spades'
+        global_id = -1
+        for i, a in enumerate(handler._global_attack_actions):
+            if a["type"] == "SameValue" and len(a["cards"]) == 2:
+                suits = {c.suit for c in a["cards"]}
+                if a["cards"][0].value == 2 and Suit.HEARTS in suits and Suit.SPADES in suits:
+                    global_id = i
+                    break
+        
+        assert global_id != -1
+        
+        indices = handler.global_action_to_hand_indices(global_id, hand)
+        # Should map to indices 0 (2 of Hearts) and 2 (2 of Spades)
+        assert sorted(indices) == [0, 2]

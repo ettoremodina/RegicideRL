@@ -1,0 +1,64 @@
+{
+  "title": "PLANNING IN STOCHASTIC ENVIRONMENTS WITH A LEARNED MODEL",
+  "authors": "Ioannis Antonoglou, Julian Schrittwieser, Sherjil Ozair, Thomas Hubert, David Silver",
+  "year": "2022",
+  "paper_type": "research_article",
+  "color_theme": "blue",
+  "tags": ["Reinforcement Learning", "Model-Based RL", "MuZero", "Stochastic Environments", "Monte Carlo Tree Search"],
+  "tldr": "Introduces Stochastic MuZero, extending the MuZero algorithm to learn and plan with stochastic models, achieving state-of-the-art performance in stochastic domains like 2048 and Backgammon without sacrificing its superhuman strength in Go.",
+  "sections": [
+    {
+      "heading": "Problem Statement",
+      "icon": "🎯",
+      "type": "quote",
+      "quote": "However, value equivalent methods such as MuZero have in practice been limited to a deterministic class of models, which severely limits their applicability. Many environments are inherently stochastic and may be poorly approximated by a deterministic model.",
+      "attribution": "Section 1 (Introduction)"
+    },
+    {
+      "heading": "Related Work",
+      "icon": "🔬",
+      "type": "card",
+      "content": "Prior works in model-based RL fall into several categories:\n- **Observation models** (e.g., Dyna-style models) explicitly learn environment dynamics by predicting future observations and rewards, but struggle with high-dimensional inputs and accumulating errors.\n- **Latent models** (e.g., standard MuZero) predict values, policies, and rewards in a latent space, which is highly effective but assumes deterministic dynamics.\n- **Stochastic latent models** (e.g., VQ-VAE for planning) attempt to handle stochasticity, but previously failed to match MuZero's performance in combined planning and learning, or required supervised expert data."
+    },
+    {
+      "heading": "Methodology: Stochastic MuZero",
+      "icon": "⚙️",
+      "type": "flowchart",
+      "steps": [
+        {"icon": "🎲", "label": "Afterstates", "description": "Transitions are factored into a deterministic step to an 'afterstate' (post-action), followed by a stochastic chance transition."},
+        {"icon": "🗃️", "label": "VQ-VAE", "description": "Models chance outcomes using a Vector Quantised Variational AutoEncoder with a constant codebook of size M."},
+        {"icon": "🌳", "label": "Stochastic MCTS", "description": "Extends MCTS by interleaving decision nodes and chance nodes, sampling chance codes from the learned prior distribution."}
+      ]
+    },
+    {
+      "heading": "Results & Validation",
+      "icon": "📊",
+      "type": "table",
+      "columns": ["Environment", "Stochastic MuZero Performance", "Comparison"],
+      "rows": [
+        ["2048", "State-of-the-art (no prior knowledge)", "Outperformed previous SotA (Jaskowski 2016) using less data; matched AlphaZero."],
+        ["Backgammon", "Superhuman level", "Matched GNUbg Grandmaster and AlphaZero; outperformed standard deterministic MuZero."],
+        ["Go (9x9 and 19x19)", "Superhuman level", "Matched the performance of standard MuZero, proving it doesn't sacrifice deterministic strength."]
+      ]
+    },
+    {
+      "heading": "Contributions",
+      "icon": "💡",
+      "type": "two_column",
+      "left": {
+        "title": "Algorithmic Innovations",
+        "content": "- **Factored Dynamics:** Separates transitions into deterministic afterstates and stochastic chance outcomes.\n- **VQ-VAE Integration:** Learns discrete chance codes end-to-end within the RL loop."
+      },
+      "right": {
+        "title": "Impact",
+        "content": "- Extends MuZero to stochastic and partially observed domains.\n- Removes the need for perfect simulators in complex stochastic games like Backgammon and 2048."
+      }
+    }
+  ],
+  "key_figures": ["fig_001.png", "fig_002.png", "fig_003.png"],
+  "key_takeaways": [
+    "Standard MuZero struggles in environments where transitions are inherently stochastic or appear stochastic due to partial observability.",
+    "By factoring transitions into afterstates and chance outcomes using a VQ-VAE, Stochastic MuZero effectively models uncertainty.",
+    "The approach matches perfect-simulator AlphaZero in stochastic games without losing its dominance in deterministic ones like Go."
+  ]
+}

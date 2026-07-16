@@ -26,3 +26,28 @@ training:
 tuning:
   n_trials: 5
   timesteps_per_trial: 100000
+
+alphazero:
+  # MCTS
+  n_simulations: 50
+  c_puct: 1.5
+  dirichlet_alpha: 0.3
+  dirichlet_epsilon: 0.25
+  temp_threshold: 15
+
+  # Network
+  hidden_dim: 256
+  num_hidden_layers: 2
+  learning_rate: 0.001
+  weight_decay: 0.0001
+
+  # Self-play & training
+  games_per_iteration: 100
+  eval_games: 50
+  buffer_size: 50000
+  batch_size: 256
+  epochs_per_iteration: 10
+  max_iterations: 100
+  checkpoint_freq: 5
+  device: "cpu"
+  save_dir: "runs/alphazero"
