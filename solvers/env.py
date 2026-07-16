@@ -53,7 +53,8 @@ class RegicideEnv(gym.Env):
         super().reset(seed=seed)
         if seed is not None:
             # If the game engine supports seeding, apply it here
-            pass
+            import random
+            random.seed(seed)
             
         self.game = Game(num_players=self.num_players)
         self.required_defense = 0

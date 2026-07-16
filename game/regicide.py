@@ -103,8 +103,9 @@ class Enemy:
         return f"{self.card} (HP: {self.health - self.damage_taken}/{self.health}, ATK: {self.get_effective_attack()})"
 
 class Game:
-    def __init__(self, num_players: int):
+    def __init__(self, num_players: int, deterministic_hearts: bool = False):
         self.num_players = num_players
+        self.deterministic_hearts = deterministic_hearts
         self.players = [[] for _ in range(num_players)]
         self.current_player = 0
         self.tavern_deck = []
@@ -212,6 +213,7 @@ class Game:
         # Bypass __init__ and _setup_game entirely
         new = object.__new__(Game)
         new.num_players = self.num_players
+        new.deterministic_hearts = self.deterministic_hearts
         new.current_player = self.current_player
         new.game_over = self.game_over
         new.victory = self.victory
@@ -505,7 +507,14 @@ class Game:
     def _hearts_power(self, value: int):
         if not self.discard_pile:
             return
-        random.shuffle(self.discard_pile)
+            
+        if self.deterministic_hearts:
+            # Sort discard pile deterministically (e.g., by value then suit) 
+            # to make perfect information solving possible without random shuffles.
+            self.discard_pile.sort(key=lambda c: (c.value, c.suit.value))
+        else:
+            random.shuffle(self.discard_pile)
+            
         cards_to_heal = min(value, len(self.discard_pile))
         healed_cards = self.discard_pile[:cards_to_heal]
         self.discard_pile = self.discard_pile[cards_to_heal:]

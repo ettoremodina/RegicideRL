@@ -3,6 +3,7 @@ import sys
 from typing import List, Optional
 
 from game.regicide import Game, Card, Suit
+from game.action_handler import ActionHandler
 from .theme import DARK_THEME, SUIT_COLORS
 from .ui_elements import Button, Label, HealthBar, draw_card
 from .sound import play_thud, play_draw, play_shimmer, play_clang, play_victory, play_defeat
@@ -51,6 +52,9 @@ class RegicideApp:
         # Popups
         self.defense_required = 0
         self.jester_active = False
+        
+        self.action_scroll_y = 0
+        self.action_handler = None
 
         self._build_menu()
 
@@ -77,7 +81,14 @@ class RegicideApp:
         self.selected_indices = []
         self.defense_required = 0
         self.jester_active = False
+        self.action_scroll_y = 0
+        self.action_handler = ActionHandler(max_hand_size=self.game.get_max_hand_size())
         self._build_game_ui()
+        
+        # Clear log file on new game
+        with open("ui_game_log.txt", "w", encoding="utf-8") as f:
+            f.write("--- New Game Started ---\n")
+            
         self.action_log = ["Game started!"]
 
     def _build_game_ui(self):
@@ -93,6 +104,12 @@ class RegicideApp:
         self.action_log.append(text)
         if len(self.action_log) > 8:
             self.action_log.pop(0)
+            
+        try:
+            with open("ui_game_log.txt", "a", encoding="utf-8") as f:
+                f.write(text + "\n")
+        except Exception:
+            pass
 
     # --- Actions ---
     def _on_play(self):
@@ -107,9 +124,11 @@ class RegicideApp:
         self._handle_result(res)
 
     def _on_jester(self):
-        if self.state != "GAME": return
-        res = self.game.use_solo_jester("step1")
+        if self.state not in ("GAME", "DEFENSE"): return
+        timing = "step1" if self.state == "GAME" else "step4"
+        res = self.game.use_solo_jester(timing)
         if res.get("success"):
+            self.selected_indices = []
             self.log("Used Solo Jester! Refilled hand.")
 
     def _on_defend(self):
@@ -152,10 +171,13 @@ class RegicideApp:
             hand = self.game.get_current_player_hand()
             all_total = sum(c.get_discard_value() for c in hand)
             if all_total < self.defense_required:
-                self.game.game_over = True
-                self.state = "GAME_OVER"
-                self.game_over_msg = "Defeat... No possible defense."
-                play_defeat()
+                if self.game.can_use_solo_jester():
+                    self.log("No possible defense, but you can use Solo Jester!")
+                else:
+                    self.game.game_over = True
+                    self.state = "GAME_OVER"
+                    self.game_over_msg = "Defeat... No possible defense."
+                    play_defeat()
         elif phase in ("victory", "game_over") or self.game.victory or self.game.game_over:
             self.state = "GAME_OVER"
             if phase == "victory" or self.game.victory:
@@ -196,6 +218,11 @@ class RegicideApp:
                 return False
             if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                 return False
+                
+            if event.type == pygame.MOUSEWHEEL:
+                self.action_scroll_y += event.y * 25
+                if self.action_scroll_y > 0:
+                    self.action_scroll_y = 0
             
             if self.state == "MENU":
                 for b in self.menu_buttons:
@@ -283,6 +310,64 @@ class RegicideApp:
         self.screen.blit(castle, (20, top_bar_y))
         self.screen.blit(tavern, (20, top_bar_y + 25))
         self.screen.blit(discard, (20, top_bar_y + 50))
+        
+        # Possible Actions Panel (Left side)
+        panel_x = 20
+        panel_y = 120
+        panel_w = 280
+        panel_h = self.height - 240
+        pygame.draw.rect(self.screen, DARK_THEME["panel"], (panel_x, panel_y, panel_w, panel_h), border_radius=8)
+        actions_title = self.bold_font.render("Possible Actions", True, DARK_THEME["muted"])
+        self.screen.blit(actions_title, (panel_x + 10, panel_y + 10))
+        
+        hand = self.game.get_current_player_hand()
+        if self.action_handler and hand:
+            phase = "attack" if self.state == "GAME" else "defense"
+            try:
+                actions = self.action_handler.get_all_possible_actions(hand, phase, gstate)
+                
+                clip_rect = pygame.Rect(panel_x, panel_y + 40, panel_w, panel_h - 40)
+                self.screen.set_clip(clip_rect)
+                
+                list_y = panel_y + 40 + self.action_scroll_y
+                for i, action_mask in enumerate(actions):
+                    if self.action_handler.is_yield_action(action_mask):
+                        act_str = "Yield"
+                    else:
+                        indices = self.action_handler.mask_to_card_indices(action_mask, len(hand))
+                        cards_played = [hand[idx] for idx in indices]
+                        act_str = "Play: " + ", ".join(str(c) for c in cards_played)
+                        
+                        if phase == "attack" and self.game.current_enemy:
+                            total_attack = sum(card.get_attack_value() for card in cards_played)
+                            enemy_suit = self.game.current_enemy.card.suit
+                            jester_cancelled = self.game.jester_immunity_cancelled
+                            
+                            has_clubs = False
+                            for card in cards_played:
+                                is_immune = (not jester_cancelled) and (card.suit == enemy_suit)
+                                if not is_immune and card.suit.value == "♣":
+                                    has_clubs = True
+                                    break
+                                    
+                            expected_damage = total_attack * 2 if has_clubs else total_attack
+                            act_str += f" (Dmg: {expected_damage})"
+                    
+                    if list_y + 25 > clip_rect.top and list_y < clip_rect.bottom:
+                        act_surf = self.body_font.render(act_str, True, DARK_THEME["text"])
+                        self.screen.blit(act_surf, (panel_x + 10, list_y))
+                    list_y += 25
+                
+                self.screen.set_clip(None)
+                
+                max_scroll = min(0, (panel_h - 40) - (len(actions) * 25))
+                if self.action_scroll_y < max_scroll:
+                    self.action_scroll_y = max_scroll
+                if self.action_scroll_y > 0:
+                    self.action_scroll_y = 0
+            except Exception as e:
+                err_surf = self.body_font.render("Error loading actions", True, DARK_THEME["danger"])
+                self.screen.blit(err_surf, (panel_x + 10, panel_y + 40))
 
         # Enemy Area
         if self.game.current_enemy:
@@ -322,6 +407,26 @@ class RegicideApp:
 
         player_info = self.h1_font.render(f"Player {gstate['current_player']+1} Turn", True, DARK_THEME["accent2"])
         self.screen.blit(player_info, (start_x, start_y - 40))
+        
+        # Expected Damage
+        cards = [hand[i] for i in sorted(self.selected_indices)]
+        if self.state == "GAME" and cards and not self.play_btn.is_disabled and self.game.current_enemy:
+            total_attack = sum(card.get_attack_value() for card in cards)
+            
+            enemy_suit = self.game.current_enemy.card.suit
+            jester_cancelled = self.game.jester_immunity_cancelled
+            
+            has_clubs = False
+            for card in cards:
+                is_immune = (not jester_cancelled) and (card.suit == enemy_suit)
+                if not is_immune and card.suit.value == "♣":
+                    has_clubs = True
+                    break
+                    
+            expected_damage = total_attack * 2 if has_clubs else total_attack
+            dmg_text = self.bold_font.render(f"Expected Damage: {expected_damage}", True, DARK_THEME["danger"])
+            # Display it to the left or right of player_info
+            self.screen.blit(dmg_text, (start_x + player_info.get_width() + 20, start_y - 35))
 
         for i, c in enumerate(hand):
             cx = start_x + i * (card_w + spacing)
