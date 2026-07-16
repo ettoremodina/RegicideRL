@@ -19,6 +19,7 @@ def simulate_normal(num_games=1000):
     
     for i in range(num_games):
         game = Game(num_players=1)
+        res = {}
         required_defense = 0
         
         while not game.game_over:
@@ -35,7 +36,7 @@ def simulate_normal(num_games=1000):
                 action = random.choice(actions)
                 indices = handler.mask_to_card_indices(action, len(hand))
                 res = game.defend_with_card_indices(indices)
-                required_defense = 0
+                required_defense = res.get("defense_required", 0)
             else:
                 actions = handler.get_all_possible_actions(hand, "attack", game.get_game_state())
                 if not actions:

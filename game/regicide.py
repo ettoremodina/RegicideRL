@@ -382,6 +382,7 @@ class Game:
                     'next_player': -1,
                     'defense_required': 0
                 }
+            self._check_player_can_act()
             return {
                 'success': True,
                 'phase': 'enemy_defeated',
@@ -856,7 +857,7 @@ class Game:
         hand = self.players[self.current_player]
         # A player can always play any single card from hand.
         # The only stuck state is: empty hand AND cannot yield.
-        if not hand and not self.can_yield():
+        if not hand and not self.can_yield() and not self.can_use_solo_jester():
             self.game_over = True
 
     def has_legal_action(self) -> bool:
@@ -864,7 +865,7 @@ class Game:
         if self.game_over:
             return False
         hand = self.players[self.current_player]
-        return bool(hand) or self.can_yield()
+        return bool(hand) or self.can_yield() or self.can_use_solo_jester()
 
     # --- Solo Jester Rules ---
 
