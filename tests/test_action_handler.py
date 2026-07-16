@@ -28,7 +28,7 @@ class TestAttackActionGeneration:
     def test_yield_included_when_allowed(self, handler):
         """Yield action (all zeros) included when allow_yield is True."""
         hand = [Card(5, Suit.HEARTS)]
-        actions = handler.get_all_possible_actions(hand, "attack", {'allow_yield': True})
+        actions = handler.get_all_possible_actions(hand, "attack", {'can_yield': True})
         
         yield_action = [0] * 8
         assert yield_action in actions
@@ -36,7 +36,7 @@ class TestAttackActionGeneration:
     def test_yield_excluded_when_disallowed(self, handler):
         """Yield action NOT included when allow_yield is False."""
         hand = [Card(5, Suit.HEARTS)]
-        actions = handler.get_all_possible_actions(hand, "attack", {'allow_yield': False})
+        actions = handler.get_all_possible_actions(hand, "attack", {'can_yield': False})
         
         yield_action = [0] * 8
         assert yield_action not in actions
@@ -90,7 +90,7 @@ class TestAttackActionGeneration:
         """No duplicate action masks should be generated."""
         hand = [Card(2, Suit.HEARTS), Card(2, Suit.CLUBS), Card(2, Suit.SPADES),
                 Card(5, Suit.DIAMONDS), Card(8, Suit.HEARTS)]
-        actions = handler.get_all_possible_actions(hand, "attack", {'allow_yield': True})
+        actions = handler.get_all_possible_actions(hand, "attack", {'can_yield': True})
         
         action_tuples = [tuple(a) for a in actions]
         assert len(action_tuples) == len(set(action_tuples))
@@ -98,7 +98,7 @@ class TestAttackActionGeneration:
     def test_empty_hand(self, handler):
         """Empty hand with yield allowed should only have yield action."""
         hand = []
-        actions = handler.get_all_possible_actions(hand, "attack", {'allow_yield': True})
+        actions = handler.get_all_possible_actions(hand, "attack", {'can_yield': True})
         
         assert len(actions) == 1  # Only yield
         assert handler.is_yield_action(actions[0])
@@ -183,6 +183,6 @@ class TestActionHandlerUtilities:
     def test_action_count(self, handler):
         """get_action_count returns correct number."""
         hand = [Card(5, Suit.HEARTS), Card(3, Suit.CLUBS)]
-        count = handler.get_action_count(hand, "attack", {'allow_yield': True})
+        count = handler.get_action_count(hand, "attack", {'can_yield': True})
         # Yield + 5♥ + 3♣ = 3 actions (no valid combos since different values)
         assert count == 3

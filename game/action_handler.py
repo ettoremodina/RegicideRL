@@ -62,35 +62,55 @@ class ActionHandler:
         """
         valid_actions = []
         hand_size = len(hand)
-        
-        # Use set to avoid duplicates - track all actions including yield
         seen_actions = set()
         
-        # Add yield action (empty mask) if allowed
+        def add_action(combo_indices):
+            action_mask = [0] * self.max_hand_size
+            for idx in combo_indices:
+                if idx < self.max_hand_size:
+                    action_mask[idx] = 1
+            action_tuple = tuple(action_mask)
+            if action_tuple not in seen_actions:
+                seen_actions.add(action_tuple)
+                valid_actions.append(action_mask)
+
+        # 0. Yield action
         if allow_yield:
-            yield_action = [0] * self.max_hand_size
-            yield_tuple = tuple(yield_action)
-            seen_actions.add(yield_tuple)
-            valid_actions.append(yield_action)
-        
-        # Generate all possible combinations of cards (except empty set)
-        for r in range(1, hand_size + 1):  # Include all cards (fixed range)
-            for combo_indices in itertools.combinations(range(hand_size), r):
-                combo_cards = [hand[i] for i in combo_indices]
+            add_action([])
+
+        # 1. Single cards
+        for i in range(hand_size):
+            add_action([i])
+
+        # Group cards by value to easily find pairs/triples etc.
+        cards_by_val = {}
+        for i, card in enumerate(hand):
+            cards_by_val.setdefault(card.value, []).append(i)
+
+        # 2. Ace combinations (exactly two cards)
+        ace_indices = cards_by_val.get(1, [])
+        if ace_indices:
+            # Ace + Ace pairs
+            if len(ace_indices) >= 2:
+                for ace1, ace2 in itertools.combinations(ace_indices, 2):
+                    add_action([ace1, ace2])
+            
+            # Ace + non-Jester
+            for ace_idx in ace_indices:
+                for i, card in enumerate(hand):
+                    if card.value != 1 and card.value != 0:
+                        add_action([ace_idx, i])
+
+        # 3. Same-value combinations (no Aces)
+        for val, indices in cards_by_val.items():
+            if val == 1:
+                continue  # Handled above
                 
-                # Use the game's validation logic (staticmethod)
-                if Game._is_valid_combo(combo_cards):
-                    # Create action mask
-                    action_mask = [0] * self.max_hand_size
-                    for idx in combo_indices:
-                        if idx < self.max_hand_size:
-                            action_mask[idx] = 1
-                    
-                    # Convert to tuple for set comparison to avoid duplicates
-                    action_tuple = tuple(action_mask)
-                    if action_tuple not in seen_actions:
-                        seen_actions.add(action_tuple)
-                        valid_actions.append(action_mask)
+            # Combinations of 2 or more identical cards
+            for r in range(2, len(indices) + 1):
+                if val * r <= 10:
+                    for combo in itertools.combinations(indices, r):
+                        add_action(list(combo))
         
         # Apply filtering if game state is provided
         if game_state and len(valid_actions) > 1:  # Don't filter if only one action available

@@ -61,7 +61,7 @@ class RegicideEnv(gym.Env):
         return self._get_obs(), {}
         
     def _get_obs(self):
-        state = self.game.get_game_state()
+        state = self.game.get_raw_state()
         current = self.game.current_player
         hand = self.game.get_player_hand(current)
         

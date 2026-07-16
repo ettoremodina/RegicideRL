@@ -764,9 +764,44 @@ class Game:
                 'can_yield': True
             }
     
+    def get_raw_state(self):
+        """
+        Return the game state without string allocations. 
+        Used by the environment and search agents for performance.
+        """
+        return {
+            'current_player': self.current_player,
+            'current_enemy': self.current_enemy,
+            'player_hands': self.players,
+            'tavern_cards': len(self.tavern_deck),
+            'discard_cards': len(self.discard_pile),
+            'enemies_remaining': len(self.castle_deck),
+            'game_over': self.game_over,
+            'victory': self.victory,
+            'victory_tier': self.get_victory_tier(),
+            'players_yielded_this_round': self.players_yielded_this_round.copy(),
+            'last_active_player': self.last_active_player,
+            'can_yield': self.can_yield(),
+            'can_defend': self.can_defend() if self.current_enemy else True,
+            'enemy_attack_damage': self.current_enemy.get_effective_attack() if self.current_enemy else 0,
+            
+            # Keys required for the survivability filter
+            'enemy_attack': self.current_enemy.get_effective_attack() if self.current_enemy else 0,
+            'enemy_health': self.current_enemy.health if self.current_enemy else 0,
+            'enemy_damage_taken': self.current_enemy.damage_taken if self.current_enemy else 0,
+            'enemy_suit': self.current_enemy.card.suit.value if self.current_enemy else None,
+            'jester_immunity_cancelled': self.jester_immunity_cancelled,
+            
+            'has_legal_action': self.has_legal_action(),
+            'solo_jesters_remaining': self.solo_jesters_remaining,
+            'solo_jesters_used': self.solo_jesters_used,
+            'can_use_solo_jester': self.can_use_solo_jester(),
+        }
+
     def get_game_state(self):
-        # Ensure all hands are sorted before returning state
-        self._sort_all_hands()
+        # Hands are kept sorted after every mutation (play_card, defend, draw),
+        # so no need to re-sort here. This avoids O(n log n) overhead per call
+        # during MCTS simulation where this is called thousands of times.
         
         return {
             'current_player': self.current_player,
