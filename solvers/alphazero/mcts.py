@@ -230,13 +230,13 @@ def _get_priors(sim_env, network, device, handler, is_defense):
     state = encode_state(sim_env)
     state_t = torch.tensor(state, dtype=torch.float32, device=device)
 
-    # Build the 542-dim action mask
+    # Build the 543-dim action mask
     hand = sim_env.game.get_player_hand(sim_env.game.current_player)
     phase = "defense" if is_defense else "attack"
     raw_state = sim_env.game.get_raw_state()
     game_state = raw_state if phase == "attack" else {"enemy_attack": sim_env.required_defense}
-    mask_542 = handler.get_global_action_mask(hand, phase, game_state)
-    mask_t = torch.tensor(mask_542, dtype=torch.float32, device=device)
+    mask_543 = handler.get_global_action_mask(hand, phase, game_state)
+    mask_t = torch.tensor(mask_543, dtype=torch.float32, device=device)
 
     priors, _ = network.predict(state_t, mask_t)
     return priors
@@ -248,7 +248,7 @@ def _evaluate_network(sim_env, network, device):
     state_t = torch.tensor(state, dtype=torch.float32, device=device)
 
     # We only need the value; create a dummy mask
-    mask_t = torch.ones(542, dtype=torch.float32, device=device)
+    mask_t = torch.ones(543, dtype=torch.float32, device=device)
 
     _, value = network.predict(state_t, mask_t)
     return value

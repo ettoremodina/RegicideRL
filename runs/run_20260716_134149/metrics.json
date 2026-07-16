@@ -1,0 +1,20 @@
+[
+  {
+    "win_rate": 0.0,
+    "avg_enemies_defeated": 2.238,
+    "avg_turns": 15.63,
+    "games_per_second": 189.43884098209105,
+    "total_time": 5.278748512268066,
+    "step": 1,
+    "timestamp": 1784202116.826891
+  },
+  {
+    "win_rate": 0.0,
+    "avg_enemies_defeated": 2.22,
+    "avg_turns": 15.55,
+    "games_per_second": 190.96492673834237,
+    "total_time": 5.236563682556152,
+    "step": 2,
+    "timestamp": 1784202122.072324
+  }
+]

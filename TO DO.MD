@@ -1,0 +1,1 @@
+- get all possible action is calculated in the handler, but it is recalculated every time?

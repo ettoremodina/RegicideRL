@@ -25,7 +25,7 @@ import numpy as np
 class RegicideNet(nn.Module):
     """Dual-headed MLP for Regicide AlphaZero."""
 
-    def __init__(self, state_dim: int = 56, action_dim: int = 542,
+    def __init__(self, state_dim: int = 56, action_dim: int = 543,
                  hidden_dim: int = 256, num_hidden_layers: int = 2):
         super().__init__()
         self.state_dim = state_dim

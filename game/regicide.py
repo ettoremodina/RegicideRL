@@ -679,27 +679,6 @@ class Game:
         total_defense = sum(card.get_discard_value() for card in player_hand)
         return total_defense >= damage
     
-    def get_minimum_defense_cards(self) -> List[Card]:
-        """Get the minimum set of cards needed to defend against enemy attack"""
-        damage = self.current_enemy.get_effective_attack()
-        if damage == 0:
-            return []
-        
-        player_hand = self.players[self.current_player]
-        # Sort cards by defense value (descending) to minimize cards used
-        sorted_cards = sorted(player_hand, key=lambda c: c.get_discard_value(), reverse=True)
-        
-        defense_cards = []
-        defense_value = 0
-        
-        for card in sorted_cards:
-            if defense_value >= damage:
-                break
-            defense_cards.append(card)
-            defense_value += card.get_discard_value()
-        
-        return defense_cards if defense_value >= damage else []
-    
     def _next_player(self):
         """Move to next player and reset their yield status for this round"""
         self.current_player = (self.current_player + 1) % self.num_players
