@@ -98,9 +98,12 @@ def action_mask_to_global_index(action_mask, hand, handler, is_defense):
         handler: An ActionHandler instance.
         is_defense: Whether we are in the defense phase.
 
-    Returns:
-        int in [0, 541].
+        Returns:
+            int: Global action index 0-542.
     """
+    if len(action_mask) == 9 and action_mask[8] == 1:
+        return 542
+        
     if is_defense:
         # Defense actions use the bitmask encoding in indices 286-541.
         val = 0

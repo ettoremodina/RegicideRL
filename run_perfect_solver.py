@@ -66,9 +66,12 @@ def main():
                         obs['valid_actions']
                     ) if idx == act_idx)
                     
-                    cards_played = [env.game.players[0][j] for j, val in enumerate(mask) if val]
                     phase = "DEFENSE" if obs['defense_phase'] else "ATTACK"
-                    action_str = ", ".join(str(c) for c in cards_played) if cards_played else "YIELD"
+                    if len(mask) == 9 and mask[8] == 1:
+                        action_str = "[USE SOLO JESTER]"
+                    else:
+                        cards_played = [env.game.players[0][j] for j, val in enumerate(mask) if val]
+                        action_str = ", ".join(str(c) for c in cards_played) if cards_played else "YIELD"
                     
                     print(f"{step+1:3d}. [{phase}] {action_str}")
                     env.step(mask)
@@ -92,9 +95,12 @@ def main():
                         obs['valid_actions']
                     ) if idx == act_idx)
                     
-                    cards_played = [env.game.players[0][j] for j, val in enumerate(mask) if val]
                     phase = "DEFENSE" if obs['defense_phase'] else "ATTACK"
-                    action_str = ", ".join(str(c) for c in cards_played) if cards_played else "YIELD"
+                    if len(mask) == 9 and mask[8] == 1:
+                        action_str = "[USE SOLO JESTER]"
+                    else:
+                        cards_played = [env.game.players[0][j] for j, val in enumerate(mask) if val]
+                        action_str = ", ".join(str(c) for c in cards_played) if cards_played else "YIELD"
                     
                     print(f"{step+1:3d}. [{phase}] {action_str}")
                     env.step(mask)

@@ -23,6 +23,9 @@ class ActionHandler:
         """
         self.max_hand_size = max_hand_size
         self._global_attack_actions = self._generate_global_attack_actions()
+        self._attack_action_to_id = {
+            action["sorted_cards"]: i for i, action in enumerate(self._global_attack_actions)
+        }
     
     def get_all_possible_actions(self, 
                                hand: List[Card], 
@@ -41,11 +44,17 @@ class ActionHandler:
         """
         if phase == "attack":
             allow_yield = game_state.get('can_yield', True) if game_state else True
-            return self._get_attack_actions(hand, allow_yield, game_state)
+            actions = self._get_attack_actions(hand, allow_yield, game_state)
         elif phase == "defense":
-            return self._get_defense_actions(hand, game_state)
+            actions = self._get_defense_actions(hand, game_state)
         else:
             raise ValueError(f"Unknown phase: {phase}")
+            
+        if game_state and game_state.get('can_use_solo_jester', False):
+            # Solo jester is a special mask of length 9
+            actions.append([0, 0, 0, 0, 0, 0, 0, 0, 1])
+            
+        return actions
     
     def _get_attack_actions(self, hand: List[Card], allow_yield: bool = True, game_state: Optional[Dict] = None) -> List[List[int]]:
         """
@@ -247,29 +256,26 @@ class ActionHandler:
     
         hand_size = len(hand)
         
-        # First, find all combinations that can defend
-        all_valid_combos = []
+        # Find minimal combinations that can defend
+        minimal_combos = []
         for r in range(0, hand_size + 1):
             for combo_indices in itertools.combinations(range(hand_size), r):
-                combo_cards = [hand[i] for i in combo_indices]
+                combo_set = set(combo_indices)
                 
-                # Calculate total discard value
+                # Check if it's a superset of any already found minimal combo
+                is_superset = False
+                for minimal in minimal_combos:
+                    if minimal.issubset(combo_set):
+                        is_superset = True
+                        break
+                if is_superset:
+                    continue
+                
+                combo_cards = [hand[i] for i in combo_indices]
                 total_defense = sum(card.get_discard_value() for card in combo_cards)
                 
                 if total_defense >= required_defense:
-                    all_valid_combos.append(set(combo_indices))
-        
-        # Filter to keep only minimal combinations (no subset is also valid)
-        minimal_combos = []
-        for combo in all_valid_combos:
-            is_minimal = True
-            for other_combo in all_valid_combos:
-                if other_combo != combo and other_combo.issubset(combo):
-                    is_minimal = False
-                    break
-            if is_minimal:
-                minimal_combos.append(combo)
-        # minimal_cobos = all_valid_combos
+                    minimal_combos.append(combo_set)
 
         # Convert to action masks
         valid_actions = []
@@ -423,36 +429,42 @@ class ActionHandler:
                     for combo in itertools.combinations(same_val_cards, r):
                         actions.append({"type": "SameValue", "cards": list(combo)})
                         
+        # Precompute sorted tuples for faster mask generation
+        for action in actions:
+            action["sorted_cards"] = tuple(sorted(action["cards"]))
+            
         return actions
 
-    def get_global_action_mask(self, hand: List[Card], phase: str, game_state: Optional[Dict] = None) -> List[int]:
+    def get_global_action_mask(self, hand: List[Card], phase: str, game_state: Optional[Dict] = None, valid_local_masks: Optional[List[List[int]]] = None) -> List[int]:
         """
-        Get a 542-length binary array representing all valid actions globally.
+        Get a 543-length binary array representing all valid actions globally.
         Indices 0-285: Attack Actions (Global combinations)
         Indices 286-541: Defense Actions (Hand-relative subsets)
+        Index 542: Use Solo Jester
         """
-        mask = [0] * 542
+        mask = [0] * 543
         
-        if phase == "attack":
+        if valid_local_masks is None:
             valid_local_masks = self.get_all_possible_actions(hand, phase, game_state)
             
-            valid_card_subsets = []
+        if phase == "attack":
             for action_mask in valid_local_masks:
+                if len(action_mask) == 9 and action_mask[8] == 1:
+                    mask[542] = 1
+                    continue
                 indices = self.mask_to_card_indices(action_mask, len(hand))
                 cards = [hand[i] for i in indices]
-                valid_card_subsets.append(cards)
-            
-            # Use tuple of sorted cards for O(1) matching
-            valid_card_tuples = {tuple(sorted(cards)) for cards in valid_card_subsets}
-            
-            for i, global_action in enumerate(self._global_attack_actions):
-                global_cards = tuple(sorted(global_action["cards"]))
-                if global_cards in valid_card_tuples:
-                    mask[i] = 1
+                sorted_cards = tuple(sorted(cards))
+                
+                action_id = self._attack_action_to_id.get(sorted_cards)
+                if action_id is not None:
+                    mask[action_id] = 1
                     
         elif phase == "defense":
-            valid_local_masks = self.get_all_possible_actions(hand, phase, game_state)
             for action_mask in valid_local_masks:
+                if len(action_mask) == 9 and action_mask[8] == 1:
+                    mask[542] = 1
+                    continue
                 val = 0
                 for i, bit in enumerate(action_mask):
                     if bit:
@@ -466,7 +478,10 @@ class ActionHandler:
         """
         Decodes a global action ID (0-541) into a list of hand indices to pass to the env.
         """
-        if action_id < 0 or action_id >= 542:
+        if action_id == 542:
+            return [-1]
+            
+        if action_id < 0 or action_id >= 543:
             raise ValueError(f"Invalid global action id: {action_id}")
             
         if action_id < 286:

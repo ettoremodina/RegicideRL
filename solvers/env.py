@@ -20,14 +20,14 @@ class RegicideEnv(gym.Env):
         self.game = None
         self.required_defense = 0
         
-        # Action space: 286 global attack actions + 256 hand-relative defense actions
-        self.action_space = spaces.Discrete(542)
+        # Action space: 286 global attack actions + 256 hand-relative defense actions + 1 Jester action
+        self.action_space = spaces.Discrete(543)
         
         # Observation space: 
         # For now, we only formally define the action_mask for Gym algorithms.
         # The raw game state and hand are passed as dict elements for custom featurizers.
         self.observation_space = spaces.Dict({
-            "action_mask": spaces.Box(low=0, high=1, shape=(542,), dtype=np.int8)
+            "action_mask": spaces.Box(low=0, high=1, shape=(543,), dtype=np.int8)
         })
     
     def clone(self) -> 'RegicideEnv':
@@ -73,7 +73,7 @@ class RegicideEnv(gym.Env):
             
         # Create global action mask for Gymnasium
         phase = "defense" if self.required_defense > 0 else "attack"
-        action_mask = np.array(self.handler.get_global_action_mask(hand, phase, state), dtype=np.int8)
+        action_mask = np.array(self.handler.get_global_action_mask(hand, phase, state, valid_local_masks=actions), dtype=np.int8)
             
         return {
             'game_state': state,
@@ -96,10 +96,12 @@ class RegicideEnv(gym.Env):
         hand = self.game.get_player_hand(self.game.current_player)
         
         # Convert action integer to mask if necessary
+        is_solo_jester = False
         if isinstance(action, (int, np.integer)):
-            if self.action_space.n == 542:
-                # Decode 542-dimensional global action ID
+            if self.action_space.n == 543:
+                # Decode 543-dimensional global action ID
                 indices = self.handler.global_action_to_hand_indices(int(action), hand)
+                is_solo_jester = (indices == [-1])
                 # determine if it's a yield by checking if it's attack phase and action == 0
                 is_yield = (self.required_defense == 0 and action == 0)
             else:
@@ -109,9 +111,22 @@ class RegicideEnv(gym.Env):
                 is_yield = self.handler.is_yield_action(action_mask)
         else:
             action_mask = action
-            indices = self.handler.mask_to_card_indices(action_mask, len(hand))
+            is_solo_jester = (len(action_mask) == 9 and action_mask[8] == 1)
+            if is_solo_jester:
+                indices = [-1]
+            else:
+                indices = self.handler.mask_to_card_indices(action_mask, len(hand))
             is_yield = self.handler.is_yield_action(action_mask)
         
+        if is_solo_jester:
+            phase_str = "step4" if self.required_defense > 0 else "step1"
+            res = self.game.use_solo_jester(phase_str)
+            if not res.get('success', False):
+                return self._get_obs(), -1.0, True, False, res
+            # Standard transition reward
+            self.required_defense = res.get("defense_required", self.required_defense)
+            return self._get_obs(), 0.0, self.game.game_over, False, res
+            
         if self.required_defense > 0:
             res = self.game.defend_with_card_indices(indices)
             self.required_defense = 0

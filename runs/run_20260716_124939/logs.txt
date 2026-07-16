@@ -1,0 +1,13 @@
+2026-07-16 12:49:39,374 - Initialized run: run_20260716_124939
+2026-07-16 12:49:39,375 - Run directory: runs\run_20260716_124939
+2026-07-16 12:49:39,375 - Starting run with arguments: {'agent': 'random', 'episodes': 1, 'games_per_episode': 1000, 'jobs': 1}
+2026-07-16 12:49:42,733 - Using Agent: RandomAgent
+2026-07-16 12:49:42,735 - Initialized ParallelSimulator with 1 workers
+2026-07-16 12:49:42,735 - --- Episode 1/1 ---
+2026-07-16 12:49:51,561 - Eval Results:
+2026-07-16 12:49:51,561 -   Win Rate: 0.00%
+2026-07-16 12:49:51,561 -   Avg Enemies Defeated: 2.13 / 12
+2026-07-16 12:49:51,561 -   Avg Turns: 14.9
+2026-07-16 12:49:51,561 -   Speed: 113.32 games/sec
+2026-07-16 12:49:51,567 - Run completed. Generating plots...
+2026-07-16 12:49:53,029 - Plots saved in runs\run_20260716_124939

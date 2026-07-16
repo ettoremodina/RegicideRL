@@ -42,12 +42,17 @@ def simulate_normal(num_games=1000):
                     game.game_over = True
                     break
                 action = random.choice(actions)
-                indices = handler.mask_to_card_indices(action, len(hand))
                 
-                if handler.is_yield_action(action):
-                    res = game.yield_turn()
+                is_solo_jester = (len(action) == 9 and action[8] == 1)
+                
+                if is_solo_jester:
+                    res = game.use_solo_jester("step1")
                 else:
-                    res = game.play_card(indices)
+                    indices = handler.mask_to_card_indices(action, len(hand))
+                    if handler.is_yield_action(action):
+                        res = game.yield_turn()
+                    else:
+                        res = game.play_card(indices)
                 
                 required_defense = res.get("defense_required", 0)
                 

@@ -28,6 +28,8 @@ tuning:
   timesteps_per_trial: 100000
 
 alphazero:
+  action_space_size: 543
+  state_dim: 56
   # MCTS
   n_simulations: 50
   c_puct: 1.5

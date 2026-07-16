@@ -16,6 +16,8 @@ class Card:
     def __init__(self, value: int, suit: Suit):
         self.value = value
         self.suit = suit
+        self._hash = hash((self.value, self.suit))
+        self._suit_order = {Suit.HEARTS: 0, Suit.DIAMONDS: 1, Suit.CLUBS: 2, Suit.SPADES: 3}[self.suit]
     
     def __str__(self):
         if self.value == 1:
@@ -33,9 +35,7 @@ class Card:
         """Define sorting order for cards: first by value, then by suit"""
         if self.value != other.value:
             return self.value < other.value
-        # Secondary sort by suit (Hearts, Diamonds, Clubs, Spades)
-        suit_order = {Suit.HEARTS: 0, Suit.DIAMONDS: 1, Suit.CLUBS: 2, Suit.SPADES: 3}
-        return suit_order[self.suit] < suit_order[other.suit]
+        return self._suit_order < other._suit_order
     
     def __eq__(self, other):
         """Define equality for cards"""
@@ -43,7 +43,7 @@ class Card:
     
     def __hash__(self):
         """Make cards hashable"""
-        return hash((self.value, self.suit))
+        return self._hash
     
     def get_attack_value(self):
         if self.value == 1:  # Animal Companion
