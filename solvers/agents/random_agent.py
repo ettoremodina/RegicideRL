@@ -9,7 +9,9 @@ class RandomAgent(BaseAgent):
         super().__init__(name)
         
     def select_action(self, obs, env=None):
-        valid_actions = obs['valid_actions']
-        if not valid_actions:
+        import numpy as np
+        action_mask = obs['action_mask']
+        valid_indices = np.nonzero(action_mask)[0]
+        if len(valid_indices) == 0:
             return None # The engine will handle this as a game over
-        return random.choice(valid_actions)
+        return int(random.choice(valid_indices))

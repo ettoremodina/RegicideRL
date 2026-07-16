@@ -1,1 +1,3 @@
 - get all possible action is calculated in the handler, but it is recalculated every time?
+- duplicate code and checks in the game engine
+- game is stuck sometimes or the solver is

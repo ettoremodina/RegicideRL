@@ -6,6 +6,7 @@ Generates all possible valid actions for attack and defense phases
 from typing import List, Dict, Tuple, Optional
 from game.regicide import Card, Game, Enemy, Suit
 import itertools
+import numpy as np
 
 
 class ActionHandler:
@@ -26,368 +27,15 @@ class ActionHandler:
         self._attack_action_to_id = {
             action["sorted_cards"]: i for i, action in enumerate(self._global_attack_actions)
         }
-    
-    def get_all_possible_actions(self, 
-                               hand: List[Card], 
-                               phase: str, 
-                               game_state: Optional[Dict] = None) -> List[List[int]]:
-        """
-        Get all possible actions for the current phase
         
-        Args:
-            hand: Player's current hand
-            phase: Current game phase ("attack" or "defense")
-            game_state: Current game state (enemy info, shields, etc.)
+        # Precompute signatures for fast attack generation
+        self._attack_action_signatures = []
+        for action in self._global_attack_actions:
+            counts = {}
+            for card in action["cards"]:
+                counts[card] = counts.get(card, 0) + 1
+            self._attack_action_signatures.append(counts)
             
-        Returns:
-            List of action masks, each mask is a binary list of length max_hand_size
-        """
-        if phase == "attack":
-            allow_yield = game_state.get('can_yield', True) if game_state else True
-            actions = self._get_attack_actions(hand, allow_yield, game_state)
-        elif phase == "defense":
-            actions = self._get_defense_actions(hand, game_state)
-        else:
-            raise ValueError(f"Unknown phase: {phase}")
-            
-        if game_state and game_state.get('can_use_solo_jester', False):
-            # Solo jester is a special mask of length 9
-            actions.append([0, 0, 0, 0, 0, 0, 0, 0, 1])
-            
-        return actions
-    
-    def _get_attack_actions(self, hand: List[Card], allow_yield: bool = True, game_state: Optional[Dict] = None) -> List[List[int]]:
-        """
-        Generate all valid attack combinations following Regicide rules
-        Uses the game's built-in validation logic to ensure consistency.
-        Optionally filters out actions that would make defense impossible.
-        
-        Args:
-            hand: Player's current hand
-            allow_yield: Whether yielding (empty action) is allowed
-            game_state: Current game state for filtering impossible actions
-            
-        Returns:
-            List of action masks for valid attack combinations
-        """
-        valid_actions = []
-        hand_size = len(hand)
-        seen_actions = set()
-        
-        def add_action(combo_indices):
-            action_mask = [0] * self.max_hand_size
-            for idx in combo_indices:
-                if idx < self.max_hand_size:
-                    action_mask[idx] = 1
-            action_tuple = tuple(action_mask)
-            if action_tuple not in seen_actions:
-                seen_actions.add(action_tuple)
-                valid_actions.append(action_mask)
-
-        # 0. Yield action
-        if allow_yield:
-            add_action([])
-
-        # 1. Single cards
-        for i in range(hand_size):
-            add_action([i])
-
-        # Group cards by value to easily find pairs/triples etc.
-        cards_by_val = {}
-        for i, card in enumerate(hand):
-            cards_by_val.setdefault(card.value, []).append(i)
-
-        # 2. Ace combinations (exactly two cards)
-        ace_indices = cards_by_val.get(1, [])
-        if ace_indices:
-            # Ace + Ace pairs
-            if len(ace_indices) >= 2:
-                for ace1, ace2 in itertools.combinations(ace_indices, 2):
-                    add_action([ace1, ace2])
-            
-            # Ace + non-Jester
-            for ace_idx in ace_indices:
-                for i, card in enumerate(hand):
-                    if card.value != 1 and card.value != 0:
-                        add_action([ace_idx, i])
-
-        # 3. Same-value combinations (no Aces)
-        for val, indices in cards_by_val.items():
-            if val == 1:
-                continue  # Handled above
-                
-            # Combinations of 2 or more identical cards
-            for r in range(2, len(indices) + 1):
-                if val * r <= 10:
-                    for combo in itertools.combinations(indices, r):
-                        add_action(list(combo))
-        
-        # Apply filtering if game state is provided
-        if game_state and len(valid_actions) > 1:  # Don't filter if only one action available
-            filtered_actions = self._filter_survivable_actions(hand, valid_actions, game_state)
-            # Only use filtered actions if some remain (otherwise player is doomed anyway)
-            if filtered_actions:
-                valid_actions = filtered_actions
-        
-        return valid_actions
-    
-    def _filter_survivable_actions(self, hand: List[Card], actions: List[List[int]], game_state: Dict) -> List[List[int]]:
-        """
-        Filter out attack actions that would make defense impossible.
-        
-        Args:
-            hand: Player's current hand
-            actions: List of action masks to filter
-            game_state: Current game state with enemy and tavern info
-            
-        Returns:
-            List of action masks that allow for possible defense
-        """
-        if not game_state:
-            return actions
-            
-        # Extract game state information
-        enemy_attack = game_state.get('enemy_attack', 0)
-        enemy_health = game_state.get('enemy_health', 0)
-        enemy_damage_taken = game_state.get('enemy_damage_taken', 0)
-        enemy_suit = game_state.get('enemy_suit')
-        jester_immunity_cancelled = game_state.get('jester_immunity_cancelled', False)
-        
-        if enemy_attack == 0:
-            return actions  # No need to defend if enemy doesn't attack
-            
-        survivable_actions = []
-        
-        for action_mask in actions:
-            # Skip yield action (all zeros) - handle separately
-            if self.is_yield_action(action_mask):
-                survivable_actions.append(action_mask)
-                continue
-                
-            # Get cards being played
-            card_indices = self.mask_to_card_indices(action_mask, len(hand))
-            cards_played = [hand[i] for i in card_indices]
-            
-            # Calculate attack damage
-            total_attack = sum(card.get_attack_value() for card in cards_played)
-            
-            # Calculate total damage including clubs single doubling effect
-            total_damage = total_attack
-            has_clubs = any(card.suit.value == "♣" for card in cards_played if 
-                          not self._is_immune_to_suit_power(card, enemy_suit, jester_immunity_cancelled))
-            if has_clubs:
-                total_damage += total_attack  # Clubs double the damage once per play
-            
-            # Check if this action would kill the enemy
-            if enemy_damage_taken + total_damage >= enemy_health:
-                # Action kills enemy - always include these
-                survivable_actions.append(action_mask)
-                continue
-                
-            # Check for Jester - these don't deal damage but cancel immunity
-            if any(card.value == 0 for card in cards_played):
-                # Jester actions don't trigger enemy attack, so they're safe
-                survivable_actions.append(action_mask)
-                continue
-                
-            # Calculate remaining hand after playing cards
-            remaining_hand = [card for i, card in enumerate(hand) if i not in card_indices]
-            
-            # Check if diamonds are played (for potential card draws)
-            has_diamonds = any(card.suit.value == "♦" for card in cards_played if 
-                             not self._is_immune_to_suit_power(card, enemy_suit, jester_immunity_cancelled))
-            
-            # If diamonds are played and not immune, don't filter this action
-            if has_diamonds:
-                survivable_actions.append(action_mask)
-                continue
-            
-            # Calculate spade protection from this attack
-            spade_protection = 0
-            has_spades = any(card.suit.value == "♠" for card in cards_played if
-                             not self._is_immune_to_suit_power(card, enemy_suit, jester_immunity_cancelled))
-            if has_spades:
-                spade_protection += total_attack
-            
-            # Calculate effective enemy attack after spade protection
-            effective_enemy_attack = max(0, enemy_attack - spade_protection)
-            
-            # Check if defense is possible with remaining hand
-            if self._can_defend_with_hand(remaining_hand, effective_enemy_attack, 0):
-                survivable_actions.append(action_mask)
-        
-        return survivable_actions
-    
-    def _is_immune_to_suit_power(self, card: Card, enemy_suit, jester_immunity_cancelled: bool) -> bool:
-        """Check if a card's suit power is immune due to matching enemy suit"""
-        if jester_immunity_cancelled:
-            return False
-        return card.suit.value == enemy_suit
-    
-    def _can_defend_with_hand(self, hand: List[Card], required_defense: int, extra_potential: int = 0) -> bool:
-        """Check if a hand can defend against the required damage"""
-        if required_defense <= 0:
-            return True
-            
-        total_defense = sum(card.get_discard_value() for card in hand) + extra_potential
-        return total_defense >= required_defense
-    
-    def _get_defense_actions(self, 
-                           hand: List[Card], 
-                           game_state: Optional[Dict] = None) -> List[List[int]]:
-        """
-        Generate all minimal valid defense combinations
-        
-        A valid defense must have total discard value >= enemy attack - shields
-        Returns only the minimum subsets of cards that can defend (no supersets)
-        
-        Args:
-            hand: Player's current hand
-            game_state: Dict containing 'enemy_attack'
-            
-        Returns:
-            List of action masks for minimal valid defense combinations
-        """
-        if not game_state:
-            # If no game state provided, return all possible combinations
-            return self._get_all_combinations(hand)
-        
-        required_defense = game_state.get('enemy_attack', 0)
-    
-        hand_size = len(hand)
-        
-        # Find minimal combinations that can defend
-        minimal_combos = []
-        for r in range(0, hand_size + 1):
-            for combo_indices in itertools.combinations(range(hand_size), r):
-                combo_set = set(combo_indices)
-                
-                # Check if it's a superset of any already found minimal combo
-                is_superset = False
-                for minimal in minimal_combos:
-                    if minimal.issubset(combo_set):
-                        is_superset = True
-                        break
-                if is_superset:
-                    continue
-                
-                combo_cards = [hand[i] for i in combo_indices]
-                total_defense = sum(card.get_discard_value() for card in combo_cards)
-                
-                if total_defense >= required_defense:
-                    minimal_combos.append(combo_set)
-
-        # Convert to action masks
-        valid_actions = []
-        for combo_indices in minimal_combos:
-            action_mask = [0] * self.max_hand_size
-            for idx in combo_indices:
-                if idx < self.max_hand_size:
-                    action_mask[idx] = 1
-            valid_actions.append(action_mask)
-        
-        return valid_actions
-    
-    def _get_all_combinations(self, hand: List[Card]) -> List[List[int]]:
-        """
-        Get all possible combinations of cards (for when game state is unknown)
-        
-        Args:
-            hand: Player's current hand
-            
-        Returns:
-            List of all possible action masks
-        """
-        valid_actions = []
-        hand_size = len(hand)
-        
-        # Generate all possible combinations (including empty)
-        for r in range(0, hand_size + 1):
-            for combo_indices in itertools.combinations(range(hand_size), r):
-                action_mask = [0] * self.max_hand_size
-                for idx in combo_indices:
-                    if idx < self.max_hand_size:
-                        action_mask[idx] = 1
-                valid_actions.append(action_mask)
-        
-        return valid_actions
-    
-    def _is_valid_attack_combo(self, cards: List[Card]) -> bool:
-        """
-        Check if a combination of cards is valid for attack
-        This method is deprecated - use the game's built-in validation instead.
-        Kept for backward compatibility.
-        
-        Args:
-            cards: List of cards to check
-            
-        Returns:
-            True if combination is valid, False otherwise
-        """
-        # Use the game's validation logic (staticmethod)
-        return Game._is_valid_combo(cards)
-
-    def is_yield_action(self, action_mask: List[int]) -> bool:
-        """
-        Check if an action mask represents a yield action (all zeros)
-        
-        Args:
-            action_mask: Binary mask to check
-            
-        Returns:
-            True if action is yield (all zeros), False otherwise
-        """
-        return all(x == 0 for x in action_mask)
-
-    
-    def get_action_count(self, hand: List[Card], phase: str, game_state: Optional[Dict] = None) -> int:
-        """
-        Get the number of possible actions for the current state
-        
-        Args:
-            hand: Player's current hand
-            phase: Current game phase
-            game_state: Current game state
-            
-        Returns:
-            Number of possible actions
-        """
-        actions = self.get_all_possible_actions(hand, phase, game_state)
-        return len(actions)
-    
-    def mask_to_card_indices(self, action_mask: List[int], hand_size: int) -> List[int]:
-        """
-        Convert action mask to list of card indices
-        
-        Args:
-            action_mask: Binary mask indicating which cards to use
-            hand_size: Current hand size
-            
-        Returns:
-            List of card indices to use
-        """
-        indices = []
-        for i in range(min(len(action_mask), hand_size)):
-            if action_mask[i] == 1:
-                indices.append(i)
-        return indices
-    
-    def cards_to_mask(self, card_indices: List[int]) -> List[int]:
-        """
-        Convert list of card indices to action mask
-        
-        Args:
-            card_indices: List of card indices
-            
-        Returns:
-            Action mask of length max_hand_size
-        """
-        action_mask = [0] * self.max_hand_size
-        for idx in card_indices:
-            if idx < self.max_hand_size:
-                action_mask[idx] = 1
-        return action_mask
-
     def _generate_global_attack_actions(self) -> List[Dict]:
         """
         Generates all 286 possible unique attack actions in Regicide,
@@ -442,37 +90,190 @@ class ActionHandler:
         Indices 286-541: Defense Actions (Hand-relative subsets)
         Index 542: Use Solo Jester
         """
-        mask = [0] * 543
+        mask = np.zeros(543, dtype=np.int8)
         
-        if valid_local_masks is None:
-            valid_local_masks = self.get_all_possible_actions(hand, phase, game_state)
+        hand_size = len(hand)
+        hand_counts = {}
+        for c in hand:
+            hand_counts[c] = hand_counts.get(c, 0) + 1
             
         if phase == "attack":
-            for action_mask in valid_local_masks:
-                if len(action_mask) == 9 and action_mask[8] == 1:
-                    mask[542] = 1
-                    continue
-                indices = self.mask_to_card_indices(action_mask, len(hand))
-                cards = [hand[i] for i in indices]
-                sorted_cards = tuple(sorted(cards))
+            allow_yield = game_state.get('can_yield', True) if game_state else True
+            if allow_yield:
+                mask[0] = 1
                 
-                action_id = self._attack_action_to_id.get(sorted_cards)
-                if action_id is not None:
-                    mask[action_id] = 1
+            enemy_attack = 0
+            enemy_health = 0
+            enemy_damage_taken = 0
+            enemy_suit = None
+            jester_cancelled = False
+            
+            if game_state:
+                enemy_attack = game_state.get('enemy_attack', 0)
+                enemy_health = game_state.get('enemy_health', 0)
+                enemy_damage_taken = game_state.get('enemy_damage_taken', 0)
+                enemy_suit = game_state.get('enemy_suit')
+                jester_cancelled = game_state.get('jester_immunity_cancelled', False)
+                
+            hand_defense = sum(c.get_discard_value() for c in hand)
+            
+            has_survivable = False
+            
+            # Find all playable actions first
+            playable_actions = []
+            for i in range(1, len(self._global_attack_actions)):
+                action_counts = self._attack_action_signatures[i]
+                can_play = True
+                for card, count in action_counts.items():
+                    if hand_counts.get(card, 0) < count:
+                        can_play = False
+                        break
+                if can_play:
+                    playable_actions.append(i)
+            
+            if not game_state or enemy_attack == 0:
+                for i in playable_actions:
+                    mask[i] = 1
+            else:
+                for i in playable_actions:
+                    cards = self._global_attack_actions[i]["cards"]
                     
+                    has_jester = any(c.value == 0 for c in cards)
+                    if has_jester:
+                        mask[i] = 1
+                        has_survivable = True
+                        continue
+                        
+                    total_attack = sum(c.get_attack_value() for c in cards)
+                    
+                    has_clubs = False
+                    has_diamonds = False
+                    has_spades = False
+                    
+                    for c in cards:
+                        immune = False if jester_cancelled else (c.suit.value == enemy_suit)
+                        if not immune:
+                            val = c.suit.value
+                            if val == "♣": has_clubs = True
+                            elif val == "♦": has_diamonds = True
+                            elif val == "♠": has_spades = True
+                            
+                    if has_diamonds:
+                        mask[i] = 1
+                        has_survivable = True
+                        continue
+                        
+                    total_damage = total_attack * 2 if has_clubs else total_attack
+                    if enemy_damage_taken + total_damage >= enemy_health:
+                        mask[i] = 1
+                        has_survivable = True
+                        continue
+                        
+                    spade_protection = total_attack if has_spades else 0
+                    eff_enemy_attack = max(0, enemy_attack - spade_protection)
+                    
+                    played_defense = sum(c.get_discard_value() for c in cards)
+                    remaining_defense = hand_defense - played_defense
+                    
+                    if remaining_defense >= eff_enemy_attack:
+                        mask[i] = 1
+                        has_survivable = True
+                        
+                # If no survivable actions (excluding yield), revert to all playable
+                if not has_survivable:
+                    for i in playable_actions:
+                        mask[i] = 1
+                        
         elif phase == "defense":
-            for action_mask in valid_local_masks:
-                if len(action_mask) == 9 and action_mask[8] == 1:
-                    mask[542] = 1
-                    continue
-                val = 0
-                for i, bit in enumerate(action_mask):
-                    if bit:
-                        val += (1 << i)
-                if 286 + val < 542:
-                    mask[286 + val] = 1
+            offset = len(self._global_attack_actions)
+            req = game_state.get('enemy_attack', 0) if game_state else 0
+            hand_vals = np.array([c.get_discard_value() for c in hand])
+            
+            has_defense = False
+            for b in range(1, 1 << hand_size):
+                defense = 0
+                for i in range(hand_size):
+                    if b & (1 << i):
+                        defense += hand_vals[i]
+                        
+                if defense >= req:
+                    is_min = True
+                    for i in range(hand_size):
+                        if b & (1 << i):
+                            if defense - hand_vals[i] >= req:
+                                is_min = False
+                                break
+                    if is_min:
+                        mask[offset + b] = 1
+                        has_defense = True
+                        
+            if not has_defense:
+                if hand_size > 0:
+                    for b in range(1, 1 << hand_size):
+                        mask[offset + b] = 1
+                else:
+                    mask[0] = 1
+
+        if game_state and game_state.get('can_use_solo_jester', False):
+            mask[542] = 1
+            
+        # Fallback: MaskablePPO fails drastically if the mask is all zeros
+        if sum(mask) == 0:
+            mask[0] = 1
+            
+        return mask.tolist()
+
+    def get_all_possible_actions(self, hand: List[Card], phase: str, game_state: Optional[Dict] = None) -> List[List[int]]:
+        """
+        Get all possible actions for the current phase
+        Backward compatibility wrapper that derives local masks from the global mask.
+        """
+        global_mask = self.get_global_action_mask(hand, phase, game_state)
+        local_masks = []
+        
+        if phase == "attack":
+            for i in range(len(self._global_attack_actions)):
+                if global_mask[i]:
+                    if i == 0:
+                        local_masks.append([0] * self.max_hand_size)
+                    else:
+                        indices = self.global_action_to_hand_indices(i, hand)
+                        local_masks.append(self.cards_to_mask(indices))
+        elif phase == "defense":
+            offset = len(self._global_attack_actions)
+            for i in range(offset, offset + 256):
+                if global_mask[i]:
+                    val = i - offset
+                    local_mask = [0] * self.max_hand_size
+                    for j in range(self.max_hand_size):
+                        if val & (1 << j):
+                            local_mask[j] = 1
+                    local_masks.append(local_mask)
                     
-        return mask
+        if global_mask[542]:
+            local_masks.append([0, 0, 0, 0, 0, 0, 0, 0, 1])
+            
+        return local_masks
+
+    def is_yield_action(self, action_mask: List[int]) -> bool:
+        """Check if an action mask represents a yield action (all zeros)"""
+        return all(x == 0 for x in action_mask)
+
+    def mask_to_card_indices(self, action_mask: List[int], hand_size: int) -> List[int]:
+        """Convert action mask to list of card indices"""
+        indices = []
+        for i in range(min(len(action_mask), hand_size)):
+            if action_mask[i] == 1:
+                indices.append(i)
+        return indices
+    
+    def cards_to_mask(self, card_indices: List[int]) -> List[int]:
+        """Convert list of card indices to action mask"""
+        action_mask = [0] * self.max_hand_size
+        for idx in card_indices:
+            if idx < self.max_hand_size:
+                action_mask[idx] = 1
+        return action_mask
 
     def global_action_to_hand_indices(self, action_id: int, hand: List[Card]) -> List[int]:
         """
@@ -484,8 +285,11 @@ class ActionHandler:
         if action_id < 0 or action_id >= 543:
             raise ValueError(f"Invalid global action id: {action_id}")
             
-        if action_id < 286:
-            # Attack action
+        offset = len(self._global_attack_actions)
+            
+        if action_id < offset:
+            if action_id == 0:
+                return []
             global_action = self._global_attack_actions[action_id]
             cards_to_play = global_action["cards"]
             
@@ -500,12 +304,14 @@ class ActionHandler:
                         found = True
                         break
                 if not found:
-                    raise ValueError(f"Action requires {card} but it's not in hand or already used.")
+                    hand_str = ", ".join(str(c) for c in hand)
+                    req_str = ", ".join(str(c) for c in cards_to_play)
+                    raise ValueError(f"Action requires {card} (full action: {req_str}) but it's not in hand or already used. Hand: [{hand_str}]")
             return indices
             
         else:
             # Defense action
-            val = action_id - 286
+            val = action_id - offset
             indices = []
             for i in range(self.max_hand_size):
                 if val & (1 << i):
@@ -515,46 +321,7 @@ class ActionHandler:
 
 
 def main():
-    """
-    Example usage and testing
-    """
-    # Create test hand
-    test_hand = [
-        Card(6, Suit.CLUBS),
-        Card(6, Suit.DIAMONDS),
-        Card(8, Suit.CLUBS),
-        Card(9, Suit.CLUBS),
-        Card(10, Suit.CLUBS)
-    ]
-    
-    # Create action handler
-    handler = ActionHandler(max_hand_size=7)  # For 2-player game
-    
-    print("=== Testing Attack Actions ===")
-    attack_actions = handler.get_all_possible_actions(test_hand, "attack")
-    print(f"Number of valid attack combinations: {len(attack_actions)}")
-    
-    # Show first few actions
-    for i, action in enumerate(attack_actions):
-        indices = handler.mask_to_card_indices(action, len(test_hand))
-        selected_cards = [test_hand[idx] for idx in indices]
-        print(f"Action {i+1}: {action} -> Cards: {[str(card) for card in selected_cards]}")
-    
-    print("\n=== Testing Defense Actions ===")
-    game_state = {
-        'enemy_attack': 10,
-        'current_shields': 8
-    }
-    defense_actions = handler.get_all_possible_actions(test_hand, "defense", game_state)
-    print(f"Number of valid defense combinations: {len(defense_actions)}")
-    
-    # Show first few actions
-    for i, action in enumerate(defense_actions):
-        indices = handler.mask_to_card_indices(action, len(test_hand))
-        selected_cards = [test_hand[idx] for idx in indices]
-        total_defense = sum(card.get_discard_value() for card in selected_cards)
-        print(f"Defense {i+1}: {action} -> Cards: {[str(card) for card in selected_cards]} (Defense: {total_defense})")
-
+    pass
 
 if __name__ == "__main__":
     main()

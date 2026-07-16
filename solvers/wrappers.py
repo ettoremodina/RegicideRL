@@ -16,7 +16,7 @@ class NumericObsWrapper(gym.ObservationWrapper):
             'hand_suits': spaces.Box(low=0, high=4, shape=(8,), dtype=np.int8),
             'enemy_stats': spaces.Box(low=0, high=100, shape=(3,), dtype=np.int8), # health, attack, suit
             'flags': spaces.Box(low=0, high=50, shape=(2,), dtype=np.int8), # defense_phase (0/1), required_defense
-            'action_mask': spaces.Box(low=0, high=1, shape=(256,), dtype=np.int8)
+            'action_mask': spaces.Box(low=0, high=1, shape=(543,), dtype=np.int8)
         })
         
         self._last_action_mask = None

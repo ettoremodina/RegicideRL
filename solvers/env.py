@@ -66,20 +66,14 @@ class RegicideEnv(gym.Env):
         current = self.game.current_player
         hand = self.game.get_player_hand(current)
         
-        if self.required_defense > 0:
-            actions = self.handler.get_all_possible_actions(hand, "defense", {'enemy_attack': self.required_defense})
-        else:
-            actions = self.handler.get_all_possible_actions(hand, "attack", state)
-            
         # Create global action mask for Gymnasium
         phase = "defense" if self.required_defense > 0 else "attack"
-        action_mask = np.array(self.handler.get_global_action_mask(hand, phase, state, valid_local_masks=actions), dtype=np.int8)
+        action_mask = np.array(self.handler.get_global_action_mask(hand, phase, state), dtype=bool)
             
         return {
             'game_state': state,
             'hand': hand,
             'current_player': current,
-            'valid_actions': actions, # Kept for backward compatibility with HeuristicAgent
             'action_mask': action_mask,
             'defense_phase': self.required_defense > 0,
             'required_defense': self.required_defense

@@ -130,13 +130,48 @@ def simulate_training(device, steps=10000):
     print(f"Speed: {fps:.2f} steps/second")
     return fps
 
+def simulate_env(num_games=1000):
+    print(f"\n--- Env Benchmark ---")
+    start_time = time.time()
+    
+    env = RegicideEnv(num_players=1)
+    victories = 0
+    total_turns = 0
+    
+    for _ in range(num_games):
+        obs, _ = env.reset()
+        done = False
+        while not done:
+            # Random agent logic using action_mask
+            action_mask = obs['action_mask']
+            # Find valid actions
+            valid_actions = [i for i, valid in enumerate(action_mask) if valid]
+            if not valid_actions:
+                break
+            action = random.choice(valid_actions)
+            obs, reward, done, truncated, info = env.step(action)
+            total_turns += 1
+            
+        if env.game.victory:
+            victories += 1
+
+    elapsed = time.time() - start_time
+    fps = num_games / elapsed
+    
+    print(f"Games played: {num_games}")
+    print(f"Time taken: {elapsed:.2f} seconds")
+    print(f"Speed: {fps:.2f} games/second")
+    print(f"Avg turns per game: {total_turns / num_games:.1f}")
+    print(f"Win rate: {victories / num_games * 100:.2f}%")
+    return fps
+
 def main():
     import torch
     parser = argparse.ArgumentParser(description="Regicide Benchmarking Utility")
-    parser.add_argument("--mode", type=str, choices=["all", "normal", "parallel", "cpu", "gpu"], default="all", 
+    parser.add_argument("--mode", type=str, choices=["all", "normal", "env", "parallel", "cpu", "gpu"], default="all", 
                         help="Which benchmark to run (default: all)")
     parser.add_argument("--games", type=int, default=1000, 
-                        help="Number of games to simulate for normal/parallel (default: 1000)")
+                        help="Number of games to simulate for normal/env/parallel (default: 1000)")
     parser.add_argument("--steps", type=int, default=10000, 
                         help="Number of training steps to simulate for cpu/gpu (default: 10000)")
     parser.add_argument("--jobs", type=int, default=None, 
@@ -146,7 +181,7 @@ def main():
     
     modes_to_run = []
     if args.mode == "all":
-        modes_to_run = ["normal", "parallel", "cpu"]
+        modes_to_run = ["normal", "env", "parallel", "cpu"]
         if torch.cuda.is_available():
             modes_to_run.append("gpu")
         else:
@@ -158,6 +193,9 @@ def main():
     
     if "normal" in modes_to_run:
         results["Normal   (Games/sec)"] = simulate_normal(args.games)
+        
+    if "env" in modes_to_run:
+        results["Env      (Games/sec)"] = simulate_env(args.games)
         
     if "parallel" in modes_to_run:
         results["Parallel (Games/sec)"] = simulate_parallel(args.games, args.jobs)

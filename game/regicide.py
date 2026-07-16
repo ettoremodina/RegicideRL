@@ -322,8 +322,11 @@ class Game:
         # Sort hand after removing cards
         self._sort_hand(self.current_player)
         
-        cards_played_str = [str(card) for card in cards_to_play]
-        logger.info(f"Player {self.current_player + 1} plays: {', '.join(cards_played_str)}")
+        if logger.isEnabledFor(logging.INFO):
+            cards_played_str = [str(card) for card in cards_to_play]
+            logger.info(f"Player {self.current_player + 1} plays: {', '.join(cards_played_str)}")
+        else:
+            cards_played_str = []
 
         # Accumulate attack cards; they will be discarded only once the enemy is defeated
         self.attack_cards_buffer.extend(cards_to_play)
@@ -360,7 +363,8 @@ class Game:
         initial_damage = self.current_enemy.damage_taken
         self.current_enemy.damage_taken += total_attack
         actual_damage = self.current_enemy.damage_taken - initial_damage
-        logger.info(f"Enemy takes {actual_damage} damage. (Total HP: {self.current_enemy.health - self.current_enemy.damage_taken}/{self.current_enemy.health})")
+        if logger.isEnabledFor(logging.INFO):
+            logger.info(f"Enemy takes {actual_damage} damage. (Total HP: {self.current_enemy.health - self.current_enemy.damage_taken}/{self.current_enemy.health})")
         
         # Check if enemy defeated
         if self.current_enemy.is_defeated():
@@ -390,7 +394,8 @@ class Game:
         else:
             # Enemy attacks - check if defense is needed
             enemy_attack = self.current_enemy.get_effective_attack()
-            logger.info(f"Enemy counter-attacks for {enemy_attack} damage.")
+            if logger.isEnabledFor(logging.INFO):
+                logger.info(f"Enemy counter-attacks for {enemy_attack} damage.")
             if enemy_attack == 0:
                 self._next_player()
                 return {
@@ -608,8 +613,11 @@ class Game:
         
         # Calculate total defense value
         defense_value = sum(card.get_discard_value() for card in cards_to_discard)
-        cards_discarded_str = [str(card) for card in cards_to_discard]
-        logger.info(f"Player {self.current_player + 1} defends with {', '.join(cards_discarded_str)} (value: {defense_value})")
+        if logger.isEnabledFor(logging.INFO):
+            cards_discarded_str = [str(card) for card in cards_to_discard]
+            logger.info(f"Player {self.current_player + 1} defends with {', '.join(cards_discarded_str)} (value: {defense_value})")
+        else:
+            cards_discarded_str = []
         
         # Check if defense is sufficient
         if defense_value < enemy_damage:
@@ -729,11 +737,13 @@ class Game:
         
         # Mark current player as yielded
         self.players_yielded_this_round[self.current_player] = True
-        logger.info(f"Player {self.current_player + 1} yields their turn.")
+        if logger.isEnabledFor(logging.INFO):
+            logger.info(f"Player {self.current_player + 1} yields their turn.")
         
         # Enemy attacks
         enemy_damage = self.current_enemy.get_effective_attack()
-        logger.info(f"Enemy counter-attacks for {enemy_damage} damage.")
+        if logger.isEnabledFor(logging.INFO):
+            logger.info(f"Enemy counter-attacks for {enemy_damage} damage.")
         if enemy_damage == 0:
             self._next_player()
             return {

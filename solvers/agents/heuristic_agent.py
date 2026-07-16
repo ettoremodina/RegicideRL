@@ -1,4 +1,5 @@
 import random
+import numpy as np
 from solvers.agents.base_agent import BaseAgent
 
 class HeuristicAgent(BaseAgent):
@@ -11,40 +12,47 @@ class HeuristicAgent(BaseAgent):
         if env is None:
             raise ValueError("HeuristicAgent requires the env object to be passed in to access game state directly.")
             
-        valid_actions = obs['valid_actions']
-        if not valid_actions:
+        action_mask = obs['action_mask']
+        valid_indices = np.nonzero(action_mask)[0]
+        
+        if len(valid_indices) == 0:
             return None
             
         hand = obs['hand']
         game = env.game
         
-        # If there's only one action, just take it (often the case when yielding or forced to play one thing)
-        if len(valid_actions) == 1:
-            return valid_actions[0]
+        # If there's only one action, just take it
+        if len(valid_indices) == 1:
+            return int(valid_indices[0])
             
         best_action = None
         best_score = float('-inf')
         
-        for action_mask in valid_actions:
-            score = self._evaluate_action(action_mask, hand, game, env)
+        for idx in valid_indices:
+            idx = int(idx)
+            score = self._evaluate_action(idx, hand, game, env)
             
             # Add a tiny bit of random noise to tie-break equivalent actions
             score += random.uniform(0, 0.1)
             
             if score > best_score:
                 best_score = score
-                best_action = action_mask
+                best_action = idx
                 
         return best_action
         
-    def _evaluate_action(self, action_mask, hand, game, env):
+    def _evaluate_action(self, action_id, hand, game, env):
         # Base score
         score = 0.0
         
-        indices = env.handler.mask_to_card_indices(action_mask, len(hand))
-        action_cards = [hand[i] for i in indices]
+        hand_indices = env.handler.global_action_to_hand_indices(action_id, hand)
+        if hand_indices == [-1]:
+            # Solo jester has no specific card from hand
+            action_cards = []
+        else:
+            action_cards = [hand[i] for i in hand_indices]
         
-        is_yield = env.handler.is_yield_action(action_mask)
+        is_yield = (action_id == 0 and env.required_defense == 0)
         is_defense = env.required_defense > 0
         enemy = game.current_enemy
         
@@ -88,7 +96,7 @@ class HeuristicAgent(BaseAgent):
         enemy_suit = enemy.card.suit.value
         
         # Check if Jester is played (value 0)
-        has_jester = any(c.value == 0 for c in action_cards)
+        has_jester = any(c.value == 0 for c in action_cards) or (hand_indices == [-1])
         if has_jester:
             # Rule: Play Jester against Kings/Queens to cancel immunities (+300)
             if enemy.card.value >= 12:
