@@ -100,49 +100,81 @@ def main():
         help="Number of PIMC determinizations per action (default: 50)"
     )
     parser.add_argument(
-        "--iterations", type=int, default=1000,
-        help="Number of ISMCTS iterations per decision (default: 1000)"
+        "--iterations", type=int, default=200,
+        help="Number of ISMCTS iterations per decision (default: 200)"
     )
     parser.add_argument(
         "--exploration", type=float, default=1.414,
         help="ISMCTS exploration constant C (default: 1.414)"
     )
+    parser.add_argument(
+        "--parallel", action="store_true",
+        help="Run games in parallel across multiple cores"
+    )
+    parser.add_argument(
+        "--jobs", type=int, default=None,
+        help="Number of parallel workers (default: all cores)"
+    )
     args = parser.parse_args()
 
     agents_to_run = []
     if "random" in args.agents:
-        agents_to_run.append(("Random", RandomAgent(name="Random")))
+        agents_to_run.append(("Random", RandomAgent, {"name": "Random"}))
     if "heuristic" in args.agents:
-        agents_to_run.append(("Heuristic", HeuristicAgent(name="Heuristic")))
+        agents_to_run.append(("Heuristic", HeuristicAgent, {"name": "Heuristic"}))
     if "pimc" in args.agents:
         agents_to_run.append((
             f"PIMC (d={args.determinizations})",
-            PIMCAgent(n_determinizations=args.determinizations, name="PIMC")
+            PIMCAgent,
+            {"n_determinizations": args.determinizations, "name": "PIMC"}
         ))
     if "ismcts" in args.agents:
         agents_to_run.append((
             f"ISMCTS (i={args.iterations}, C={args.exploration})",
-            ISMCTSAgent(
-                n_iterations=args.iterations,
-                exploration_constant=args.exploration,
-                name="ISMCTS"
-            )
+            ISMCTSAgent,
+            {
+                "n_iterations": args.iterations,
+                "exploration_constant": args.exploration,
+                "name": "ISMCTS"
+            }
         ))
 
     print(f"\n{'='*70}")
     print(f"  Regicide Search Agent Benchmark — {args.games} games each")
+    if args.parallel:
+        print(f"  Running in PARALLEL mode (Jobs: {args.jobs or 'Max'})")
     print(f"{'='*70}\n")
 
     results = {}
-    for label, agent in agents_to_run:
+    
+    if args.parallel:
+        from solvers.parallel import ParallelSimulator
+        simulator = ParallelSimulator(n_jobs=args.jobs)
+        
+    for label, agent_cls, agent_kwargs in agents_to_run:
         print(f"--- Running: {label} ---")
-        metrics = run_agent(agent, args.games, label)
-        results[label] = metrics
-        print(f"  Win rate: {metrics['win_rate'] * 100:.1f}% "
-              f"({metrics['wins']}/{args.games})")
-        print(f"  Avg enemies defeated: {metrics['avg_enemies_defeated']:.2f}/12")
-        print(f"  Avg time/game: {metrics['avg_time_per_game']:.3f}s")
-        print(f"  Total time: {metrics['total_time']:.1f}s\n")
+        if args.parallel:
+            metrics = simulator.run_eval(agent_cls, agent_kwargs, args.games)
+            if metrics:
+                print(f"  Win rate: {metrics['win_rate'] * 100:.1f}%")
+                print(f"  Avg enemies defeated: {metrics['avg_enemies_defeated']:.2f}/12")
+                print(f"  Avg time/game: {metrics['total_time']/args.games:.3f}s")
+                print(f"  Total time: {metrics['total_time']:.1f}s")
+                results[label] = {
+                    "win_rate": metrics['win_rate'],
+                    "avg_enemies_defeated": metrics['avg_enemies_defeated'],
+                    "avg_time_per_game": metrics['total_time'] / args.games
+                }
+        else:
+            agent = agent_cls(**agent_kwargs)
+            metrics = run_agent(agent, args.games, label)
+            results[label] = metrics
+        if not args.parallel:
+            print(f"  Win rate: {metrics['win_rate'] * 100:.1f}% "
+                  f"({metrics['wins']}/{args.games})")
+            print(f"  Avg enemies defeated: {metrics['avg_enemies_defeated']:.2f}/12")
+            print(f"  Avg time/game: {metrics['avg_time_per_game']:.3f}s")
+            print(f"  Total time: {metrics['total_time']:.1f}s\n")
 
     # Summary table
     print(f"\n{'='*70}")

@@ -1,0 +1,13 @@
+2026-07-17 16:12:54,413 - Initialized run: run_20260717_161254
+2026-07-17 16:12:54,414 - Run directory: runs\run_20260717_161254
+2026-07-17 16:12:54,414 - Starting run with arguments: {'agent': 'ismcts', 'episodes': 1, 'games_per_episode': 10, 'jobs': 4, 'iterations': 1000, 'exploration': 10.0}
+2026-07-17 16:12:57,474 - Using Agent: ISMCTSAgent
+2026-07-17 16:12:57,474 - Initialized ParallelSimulator with 4 workers
+2026-07-17 16:12:57,474 - --- Episode 1/1 ---
+2026-07-17 16:15:58,407 - Eval Results:
+2026-07-17 16:15:58,408 -   Win Rate: 0.00%
+2026-07-17 16:15:58,408 -   Avg Enemies Defeated: 5.60 / 12
+2026-07-17 16:15:58,408 -   Avg Turns: 22.4
+2026-07-17 16:15:58,409 -   Speed: 0.06 games/sec
+2026-07-17 16:15:58,413 - Run completed. Generating plots...
+2026-07-17 16:15:59,797 - Plots saved in runs\run_20260717_161254

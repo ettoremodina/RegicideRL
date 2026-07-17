@@ -10,6 +10,8 @@ def main():
     parser.add_argument("--episodes", type=int, default=10, help="Number of training/eval loops")
     parser.add_argument("--games_per_episode", type=int, default=1000, help="Games to simulate per loop")
     parser.add_argument("--jobs", type=int, default=1, help="Number of parallel workers (default: CPU cores - 1)")
+    parser.add_argument("--iterations", type=int, default=1000, help="ISMCTS iterations per decision (default 1000)")
+    parser.add_argument("--exploration", type=float, default=10.0, help="ISMCTS exploration constant C (default 10.0)")
     
     args = parser.parse_args()
     
@@ -47,13 +49,15 @@ def main():
     for episode in range(1, args.episodes + 1):
         logger.log(f"--- Episode {episode}/{args.episodes} ---")
         
-        # Here you would normally train the agent for a bit. 
-        # For the random agent, we just evaluate.
-        # If it was an RL agent, you'd collect rollouts, update weights, then evaluate.
+        # Build agent kwargs dynamically
+        agent_kwargs = {"name": args.agent}
+        if args.agent == 'ismcts':
+            agent_kwargs["n_iterations"] = args.iterations
+            agent_kwargs["exploration_constant"] = args.exploration
         
         metrics = simulator.run_eval(
             agent_cls=agent_cls, 
-            agent_kwargs={"name": args.agent}, 
+            agent_kwargs=agent_kwargs, 
             total_games=args.games_per_episode
         )
         

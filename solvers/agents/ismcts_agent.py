@@ -99,13 +99,23 @@ class ISMCTSAgent(BaseAgent):
         name: Agent name for logging.
     """
 
-    def __init__(self, n_iterations=200, exploration_constant=1.414, name="ISMCTSAgent"):
+    def __init__(self, n_iterations=200, exploration_constant=10*1.414, name="ISMCTSAgent", status_dict=None, worker_id=None):
         super().__init__(name)
         self.n_iterations = n_iterations
         self.exploration_constant = exploration_constant
         self._rollout_agent = HeuristicAgent(name="ISMCTS_Rollout")
         self.root = None
+        self.status_dict = status_dict
+        self.worker_id = worker_id
+        self.ctx_game = 1
+        self.ctx_total_games = 1
+        self.ctx_turn = 1
         
+    def set_context(self, game, total_games, turn):
+        self.ctx_game = game
+        self.ctx_total_games = total_games
+        self.ctx_turn = turn
+
     def reset(self):
         """Reset the search tree for a new game."""
         self.root = None
@@ -137,7 +147,21 @@ class ISMCTSAgent(BaseAgent):
             
         root = self.root
 
-        for _ in range(self.n_iterations):
+        import time
+        start_time = time.time()
+
+        for i in range(self.n_iterations):
+            if self.status_dict is not None and i % max(1, self.n_iterations // 50) == 0:
+                pct = int((i / self.n_iterations) * 100)
+                bar = "#" * (pct // 10) + "-" * (10 - (pct // 10))
+                elapsed = time.time() - start_time
+                its = i / elapsed if elapsed > 0 else 0
+                self.status_dict[self.worker_id] = (
+                    f"Game {self.ctx_game}/{self.ctx_total_games} | "
+                    f"Turn {self.ctx_turn:2d} | "
+                    f"ISMCTS [{bar}] {i:4d}/{self.n_iterations} | {its:6.1f} it/s"
+                )
+                
             # 1. Clone and determinize
             sim_env = env.clone()
             determinize_env(sim_env)
