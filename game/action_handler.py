@@ -80,6 +80,16 @@ class ActionHandler:
         # Precompute sorted tuples for faster mask generation
         for action in actions:
             action["sorted_cards"] = tuple(sorted(action["cards"]))
+            cards = action["cards"]
+            action["has_jester"] = any(c.value == 0 for c in cards)
+            action["total_attack"] = sum(c.get_attack_value() for c in cards)
+            action["played_defense"] = sum(c.get_discard_value() for c in cards)
+            
+            suit_vals = set(c.suit.value for c in cards)
+            action["has_clubs"] = "♣" in suit_vals
+            action["has_diamonds"] = "♦" in suit_vals
+            action["has_spades"] = "♠" in suit_vals
+            action["card_suits"] = list(suit_vals)
             
         return actions
 
@@ -121,43 +131,75 @@ class ActionHandler:
             
             # Find all playable actions first
             playable_actions = []
-            for i in range(1, len(self._global_attack_actions)):
-                action_counts = self._attack_action_signatures[i]
-                can_play = True
-                for card, count in action_counts.items():
-                    if hand_counts.get(card, 0) < count:
-                        can_play = False
-                        break
-                if can_play:
-                    playable_actions.append(i)
+            
+            aces = []
+            non_jesters = []
+            same_val_groups = {}
+            for card in hand:
+                idx = self._attack_action_to_id.get((card,))
+                if idx is not None:
+                    playable_actions.append(idx)
+                    
+                if card.value == 1:
+                    aces.append(card)
+                elif card.value != 0:
+                    non_jesters.append(card)
+                if 2 <= card.value <= 10:
+                    same_val_groups.setdefault(card.value, []).append(card)
+                    
+            if len(aces) >= 2:
+                for c1, c2 in itertools.combinations(aces, 2):
+                    idx = self._attack_action_to_id.get(tuple(sorted((c1, c2))))
+                    if idx is not None:
+                        playable_actions.append(idx)
+                        
+            if aces and non_jesters:
+                for ace in aces:
+                    for other in non_jesters:
+                        idx = self._attack_action_to_id.get(tuple(sorted((ace, other))))
+                        if idx is not None:
+                            playable_actions.append(idx)
+                            
+            for val, cards in same_val_groups.items():
+                n = len(cards)
+                if n >= 2:
+                    for r in range(2, n + 1):
+                        if val * r <= 10:
+                            for combo in itertools.combinations(cards, r):
+                                idx = self._attack_action_to_id.get(tuple(sorted(combo)))
+                                if idx is not None:
+                                    playable_actions.append(idx)
             
             if not game_state or enemy_attack == 0:
                 for i in playable_actions:
                     mask[i] = 1
             else:
                 for i in playable_actions:
-                    cards = self._global_attack_actions[i]["cards"]
+                    action_info = self._global_attack_actions[i]
+                    cards = action_info["cards"]
                     
-                    has_jester = any(c.value == 0 for c in cards)
+                    has_jester = action_info["has_jester"]
                     if has_jester:
                         mask[i] = 1
                         has_survivable = True
                         continue
                         
-                    total_attack = sum(c.get_attack_value() for c in cards)
+                    total_attack = action_info["total_attack"]
+                    has_clubs = action_info["has_clubs"]
+                    has_diamonds = action_info["has_diamonds"]
+                    has_spades = action_info["has_spades"]
                     
-                    has_clubs = False
-                    has_diamonds = False
-                    has_spades = False
+                    if not jester_cancelled and enemy_suit in action_info["card_suits"]:
+                        has_clubs = False
+                        has_diamonds = False
+                        has_spades = False
+                        for c in cards:
+                            if c.suit.value != enemy_suit:
+                                val = c.suit.value
+                                if val == "♣": has_clubs = True
+                                elif val == "♦": has_diamonds = True
+                                elif val == "♠": has_spades = True
                     
-                    for c in cards:
-                        immune = False if jester_cancelled else (c.suit.value == enemy_suit)
-                        if not immune:
-                            val = c.suit.value
-                            if val == "♣": has_clubs = True
-                            elif val == "♦": has_diamonds = True
-                            elif val == "♠": has_spades = True
-                            
                     if has_diamonds:
                         mask[i] = 1
                         has_survivable = True
@@ -172,7 +214,7 @@ class ActionHandler:
                     spade_protection = total_attack if has_spades else 0
                     eff_enemy_attack = max(0, enemy_attack - spade_protection)
                     
-                    played_defense = sum(c.get_discard_value() for c in cards)
+                    played_defense = action_info["played_defense"]
                     remaining_defense = hand_defense - played_defense
                     
                     if remaining_defense >= eff_enemy_attack:
@@ -187,22 +229,24 @@ class ActionHandler:
         elif phase == "defense":
             offset = len(self._global_attack_actions)
             req = game_state.get('enemy_attack', 0) if game_state else 0
-            hand_vals = np.array([c.get_discard_value() for c in hand])
+            hand_vals = [c.get_discard_value() for c in hand]
+            
+            sums = [0] * (1 << hand_size)
+            for i in range(hand_size):
+                val = hand_vals[i]
+                bit = 1 << i
+                for b in range(bit):
+                    sums[b | bit] = sums[b] + val
             
             has_defense = False
             for b in range(1, 1 << hand_size):
-                defense = 0
-                for i in range(hand_size):
-                    if b & (1 << i):
-                        defense += hand_vals[i]
-                        
+                defense = sums[b]
                 if defense >= req:
                     is_min = True
                     for i in range(hand_size):
-                        if b & (1 << i):
-                            if defense - hand_vals[i] >= req:
-                                is_min = False
-                                break
+                        if (b & (1 << i)) and (defense - hand_vals[i] >= req):
+                            is_min = False
+                            break
                     if is_min:
                         mask[offset + b] = 1
                         has_defense = True
@@ -226,31 +270,164 @@ class ActionHandler:
     def get_all_possible_actions(self, hand: List[Card], phase: str, game_state: Optional[Dict] = None) -> List[List[int]]:
         """
         Get all possible actions for the current phase
-        Backward compatibility wrapper that derives local masks from the global mask.
+        Direct computation for fast local mask generation.
         """
-        global_mask = self.get_global_action_mask(hand, phase, game_state)
         local_masks = []
+        hand_size = len(hand)
         
+        def make_mask(indices):
+            m = [0] * self.max_hand_size
+            for idx in indices:
+                if idx < self.max_hand_size:
+                    m[idx] = 1
+            return m
+            
         if phase == "attack":
-            for i in range(len(self._global_attack_actions)):
-                if global_mask[i]:
-                    if i == 0:
-                        local_masks.append([0] * self.max_hand_size)
-                    else:
-                        indices = self.global_action_to_hand_indices(i, hand)
-                        local_masks.append(self.cards_to_mask(indices))
-        elif phase == "defense":
-            offset = len(self._global_attack_actions)
-            for i in range(offset, offset + 256):
-                if global_mask[i]:
-                    val = i - offset
-                    local_mask = [0] * self.max_hand_size
-                    for j in range(self.max_hand_size):
-                        if val & (1 << j):
-                            local_mask[j] = 1
-                    local_masks.append(local_mask)
+            allow_yield = game_state.get('can_yield', True) if game_state else True
+            if allow_yield:
+                local_masks.append([0] * self.max_hand_size)
+                
+            enemy_attack = 0
+            enemy_health = 0
+            enemy_damage_taken = 0
+            enemy_suit = None
+            jester_cancelled = False
+            
+            if game_state:
+                enemy_attack = game_state.get('enemy_attack', 0)
+                enemy_health = game_state.get('enemy_health', 0)
+                enemy_damage_taken = game_state.get('enemy_damage_taken', 0)
+                enemy_suit = game_state.get('enemy_suit')
+                jester_cancelled = game_state.get('jester_immunity_cancelled', False)
+                
+            hand_defense = sum(c.get_discard_value() for c in hand)
+            
+            playable_indices = []
+            
+            aces_idx = []
+            non_jesters_idx = []
+            same_val_groups = {}
+            for i, card in enumerate(hand):
+                playable_indices.append([i])
+                if card.value == 1:
+                    aces_idx.append(i)
+                elif card.value != 0:
+                    non_jesters_idx.append(i)
+                if 2 <= card.value <= 10:
+                    same_val_groups.setdefault(card.value, []).append(i)
                     
-        if global_mask[542]:
+            if len(aces_idx) >= 2:
+                for c1, c2 in itertools.combinations(aces_idx, 2):
+                    playable_indices.append([c1, c2])
+                    
+            if aces_idx and non_jesters_idx:
+                for ace_i in aces_idx:
+                    for other_i in non_jesters_idx:
+                        playable_indices.append([ace_i, other_i])
+                        
+            for val, cards_idx in same_val_groups.items():
+                n = len(cards_idx)
+                if n >= 2:
+                    for r in range(2, n + 1):
+                        if val * r <= 10:
+                            for combo in itertools.combinations(cards_idx, r):
+                                playable_indices.append(list(combo))
+                                
+            if not game_state or enemy_attack == 0:
+                for indices in playable_indices:
+                    local_masks.append(make_mask(indices))
+            else:
+                has_survivable = False
+                survivable_masks = []
+                for indices in playable_indices:
+                    cards = [hand[i] for i in indices]
+                    has_jester = any(c.value == 0 for c in cards)
+                    if has_jester:
+                        survivable_masks.append(make_mask(indices))
+                        has_survivable = True
+                        continue
+                        
+                    total_attack = sum(c.get_attack_value() for c in cards)
+                    
+                    has_clubs = False
+                    has_diamonds = False
+                    has_spades = False
+                    
+                    for c in cards:
+                        immune = False if jester_cancelled else (c.suit.value == enemy_suit)
+                        if not immune:
+                            val = c.suit.value
+                            if val == "♣": has_clubs = True
+                            elif val == "♦": has_diamonds = True
+                            elif val == "♠": has_spades = True
+                            
+                    if has_diamonds:
+                        survivable_masks.append(make_mask(indices))
+                        has_survivable = True
+                        continue
+                        
+                    total_damage = total_attack * 2 if has_clubs else total_attack
+                    if enemy_damage_taken + total_damage >= enemy_health:
+                        survivable_masks.append(make_mask(indices))
+                        has_survivable = True
+                        continue
+                        
+                    spade_protection = total_attack if has_spades else 0
+                    eff_enemy_attack = max(0, enemy_attack - spade_protection)
+                    
+                    played_defense = sum(c.get_discard_value() for c in cards)
+                    remaining_defense = hand_defense - played_defense
+                    
+                    if remaining_defense >= eff_enemy_attack:
+                        survivable_masks.append(make_mask(indices))
+                        has_survivable = True
+                        
+                if has_survivable:
+                    local_masks.extend(survivable_masks)
+                else:
+                    for indices in playable_indices:
+                        local_masks.append(make_mask(indices))
+                        
+        elif phase == "defense":
+            req = game_state.get('enemy_attack', 0) if game_state else 0
+            hand_vals = [c.get_discard_value() for c in hand]
+            
+            sums = [0] * (1 << hand_size)
+            for i in range(hand_size):
+                val = hand_vals[i]
+                bit = 1 << i
+                for b in range(bit):
+                    sums[b | bit] = sums[b] + val
+            
+            has_defense = False
+            for b in range(1, 1 << hand_size):
+                defense = sums[b]
+                if defense >= req:
+                    is_min = True
+                    for i in range(hand_size):
+                        if (b & (1 << i)) and (defense - hand_vals[i] >= req):
+                            is_min = False
+                            break
+                    if is_min:
+                        m = [0] * self.max_hand_size
+                        for i in range(hand_size):
+                            if b & (1 << i):
+                                m[i] = 1
+                        local_masks.append(m)
+                        has_defense = True
+                        
+            if not has_defense:
+                if hand_size > 0:
+                    for b in range(1, 1 << hand_size):
+                        m = [0] * self.max_hand_size
+                        for i in range(hand_size):
+                            if b & (1 << i):
+                                m[i] = 1
+                        local_masks.append(m)
+                else:
+                    local_masks.append([0] * self.max_hand_size)
+
+        if game_state and game_state.get('can_use_solo_jester', False):
             local_masks.append([0, 0, 0, 0, 0, 0, 0, 0, 1])
             
         return local_masks

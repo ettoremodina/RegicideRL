@@ -12,12 +12,22 @@ class Suit(Enum):
     CLUBS = "♣"
     SPADES = "♠"
 
+_CARD_CACHE = {}
+
 class Card:
+    def __new__(cls, value: int, suit: Suit):
+        key = (value, suit)
+        if key not in _CARD_CACHE:
+            instance = super().__new__(cls)
+            _CARD_CACHE[key] = instance
+            instance.value = value
+            instance.suit = suit
+            instance._hash = hash((value, suit))
+            instance._suit_order = {Suit.HEARTS: 0, Suit.DIAMONDS: 1, Suit.CLUBS: 2, Suit.SPADES: 3}[suit]
+        return _CARD_CACHE[key]
+
     def __init__(self, value: int, suit: Suit):
-        self.value = value
-        self.suit = suit
-        self._hash = hash((self.value, self.suit))
-        self._suit_order = {Suit.HEARTS: 0, Suit.DIAMONDS: 1, Suit.CLUBS: 2, Suit.SPADES: 3}[self.suit]
+        pass
     
     def __str__(self):
         if self.value == 1:
@@ -318,9 +328,6 @@ class Game:
         # Remove cards from hand (keep references in cards_to_play)
         for i in sorted(card_indices, reverse=True):
             player_hand.pop(i)
-        
-        # Sort hand after removing cards
-        self._sort_hand(self.current_player)
         
         if logger.isEnabledFor(logging.INFO):
             cards_played_str = [str(card) for card in cards_to_play]

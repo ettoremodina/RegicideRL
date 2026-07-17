@@ -23,7 +23,6 @@ class NumericObsWrapper(gym.ObservationWrapper):
         
     def observation(self, obs):
         hand = obs['hand']
-        enemy = obs['game_state'].get('enemy')
         
         # Parse Hand
         hand_values = np.zeros(8, dtype=np.int8)
@@ -37,18 +36,11 @@ class NumericObsWrapper(gym.ObservationWrapper):
                 
         # Parse Enemy
         enemy_stats = np.zeros(3, dtype=np.int8)
-        if enemy is not None:
-            # enemy is a Dict from get_game_state() in regicide.py
-            # wait, game_state returns the string representation or the actual object?
-            # Let's check: obs['game_state']['enemy'] -> we need to handle this carefully.
-            
-            # Since env.py passes the raw state from game.get_game_state(), 
-            # let's fetch from env.game directly to be safe, as get_game_state() might return strings.
-            enemy_obj = self.env.unwrapped.game.current_enemy
-            if enemy_obj is not None:
-                enemy_stats[0] = max(0, enemy_obj.health - enemy_obj.damage_taken)
-                enemy_stats[1] = enemy_obj.attack
-                enemy_stats[2] = suit_map.get(enemy_obj.card.suit.value, 0)
+        enemy_obj = self.env.unwrapped.game.current_enemy
+        if enemy_obj is not None:
+            enemy_stats[0] = max(0, enemy_obj.health - enemy_obj.damage_taken)
+            enemy_stats[1] = enemy_obj.attack
+            enemy_stats[2] = suit_map.get(enemy_obj.card.suit.value, 0)
             
         # Parse Flags
         flags = np.zeros(2, dtype=np.int8)

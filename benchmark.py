@@ -38,7 +38,11 @@ def simulate_normal(num_games=1000):
                 res = game.defend_with_card_indices(indices)
                 required_defense = res.get("defense_required", 0)
             else:
-                actions = handler.get_all_possible_actions(hand, "attack", game.get_game_state())
+                state_info = {
+                    'can_use_solo_jester': game.can_use_solo_jester(),
+                    'enemy_attack': game.current_enemy.attack if game.current_enemy else 0
+                }
+                actions = handler.get_all_possible_actions(hand, "attack", state_info)
                 if not actions:
                     game.game_over = True
                     break

@@ -62,16 +62,20 @@ class RegicideEnv(gym.Env):
         return self._get_obs(), {}
         
     def _get_obs(self):
-        state = self.game.get_raw_state()
         current = self.game.current_player
         hand = self.game.get_player_hand(current)
         
+        state_info = {
+            'enemy_attack': self.game.current_enemy.attack if self.game.current_enemy else 0,
+            'can_use_solo_jester': self.game.can_use_solo_jester()
+        }
+        
         # Create global action mask for Gymnasium
         phase = "defense" if self.required_defense > 0 else "attack"
-        action_mask = np.array(self.handler.get_global_action_mask(hand, phase, state), dtype=bool)
+        action_mask = np.array(self.handler.get_global_action_mask(hand, phase, state_info), dtype=bool)
             
         return {
-            'game_state': state,
+            'game_state': state_info,
             'hand': hand,
             'current_player': current,
             'action_mask': action_mask,
