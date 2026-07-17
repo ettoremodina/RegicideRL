@@ -43,6 +43,8 @@ def run_agent(agent, num_games, label):
     start = time.time()
 
     for game_idx in range(num_games):
+        if hasattr(agent, 'reset'):
+            agent.reset()
         obs, info = env.reset()
         done = False
 

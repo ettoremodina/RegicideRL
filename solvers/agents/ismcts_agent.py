@@ -99,11 +99,16 @@ class ISMCTSAgent(BaseAgent):
         name: Agent name for logging.
     """
 
-    def __init__(self, n_iterations=1000, exploration_constant=1.414, name="ISMCTSAgent"):
+    def __init__(self, n_iterations=200, exploration_constant=1.414, name="ISMCTSAgent"):
         super().__init__(name)
         self.n_iterations = n_iterations
         self.exploration_constant = exploration_constant
         self._rollout_agent = HeuristicAgent(name="ISMCTS_Rollout")
+        self.root = None
+        
+    def reset(self):
+        """Reset the search tree for a new game."""
+        self.root = None
 
     def select_action(self, obs, env=None):
         """Select the best action via ISMCTS.
@@ -126,8 +131,11 @@ class ISMCTSAgent(BaseAgent):
         if len(valid_actions) == 1:
             return valid_actions[0]
 
-        # Build the ISMCTS tree
-        root = ISMCTSNode()
+        # Use existing tree or build a new one
+        if self.root is None:
+            self.root = ISMCTSNode()
+            
+        root = self.root
 
         for _ in range(self.n_iterations):
             # 1. Clone and determinize
@@ -142,6 +150,9 @@ class ISMCTSAgent(BaseAgent):
             root.children.keys(),
             key=lambda a: root.children[a].visit_count
         )
+        
+        # Advance the root for the next turn
+        self.root = root.children.get(best_action, None)
 
         return best_action
 
@@ -158,6 +169,9 @@ class ISMCTSAgent(BaseAgent):
 
         # --- SELECTION: descend the tree while all children are expanded ---
         import numpy as np
+        cumulative_tree_reward = 0.0
+        terminated = truncated = False
+        
         while not (sim_env.game.game_over):
             action_mask = sim_obs['action_mask']
             legal_actions = np.nonzero(action_mask)[0].tolist()
@@ -182,7 +196,8 @@ class ISMCTSAgent(BaseAgent):
                 node.children[action] = child
 
                 # Apply the action
-                sim_obs, reward, terminated, truncated, info = sim_env.step(action)
+                sim_obs, step_reward, terminated, truncated, info = sim_env.step(action)
+                cumulative_tree_reward += step_reward
 
                 path.append(child)
                 node = child
@@ -196,7 +211,8 @@ class ISMCTSAgent(BaseAgent):
                 child = node.children[action]
 
                 # Apply the action
-                sim_obs, reward, terminated, truncated, info = sim_env.step(action)
+                sim_obs, step_reward, terminated, truncated, info = sim_env.step(action)
+                cumulative_tree_reward += step_reward
 
                 path.append(child)
                 node = child
@@ -205,11 +221,11 @@ class ISMCTSAgent(BaseAgent):
                     break
 
         # --- ROLLOUT: play to completion with heuristic ---
-        if not sim_env.game.game_over:
-            reward = self._rollout(sim_env, sim_obs)
+        if not (sim_env.game.game_over or terminated or truncated):
+            reward = cumulative_tree_reward + self._rollout(sim_env, sim_obs)
         else:
-            # Game already ended during tree traversal
-            reward = self._evaluate_terminal(sim_env)
+            # Game already ended during tree traversal (or invalid action terminated it)
+            reward = cumulative_tree_reward + self._evaluate_terminal(sim_env)
 
         # --- BACKPROPAGATION: update all nodes on the path ---
         for n in path:

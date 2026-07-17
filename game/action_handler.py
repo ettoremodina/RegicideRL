@@ -100,7 +100,7 @@ class ActionHandler:
         Indices 286-541: Defense Actions (Hand-relative subsets)
         Index 542: Use Solo Jester
         """
-        mask = np.zeros(543, dtype=np.int8)
+        mask = np.zeros(543, dtype=bool)
         
         hand_size = len(hand)
         hand_counts = {}

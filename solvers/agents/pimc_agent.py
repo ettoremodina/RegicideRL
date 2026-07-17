@@ -80,11 +80,13 @@ class PIMCAgent(BaseAgent):
                 determinize_env(sim_env)
 
                 # Apply the candidate action
-                sim_obs, reward, terminated, truncated, info = sim_env.step(action)
+                sim_obs, step_reward, terminated, truncated, info = sim_env.step(action)
 
                 # If the game didn't end, roll out with heuristic
-                if not (terminated or truncated):
-                    reward = self._rollout(sim_env, sim_obs)
+                if not (terminated or truncated or sim_env.game.game_over):
+                    reward = step_reward + self._rollout(sim_env, sim_obs)
+                else:
+                    reward = step_reward + self._evaluate_terminal(sim_env)
 
                 total_reward += reward
 

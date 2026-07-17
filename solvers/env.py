@@ -72,7 +72,7 @@ class RegicideEnv(gym.Env):
         
         # Create global action mask for Gymnasium
         phase = "defense" if self.required_defense > 0 else "attack"
-        action_mask = np.array(self.handler.get_global_action_mask(hand, phase, state_info), dtype=bool)
+        action_mask = self.handler.get_global_action_mask(hand, phase, state_info)
             
         return {
             'game_state': state_info,

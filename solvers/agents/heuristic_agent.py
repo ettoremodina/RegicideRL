@@ -45,11 +45,17 @@ class HeuristicAgent(BaseAgent):
         # Base score
         score = 0.0
         
-        hand_indices = env.handler.global_action_to_hand_indices(action_id, hand)
-        if hand_indices == [-1]:
+        if action_id == 542:
             # Solo jester has no specific card from hand
             action_cards = []
+        elif action_id <= 285:
+            # Global attack actions are statically defined, avoid decoding
+            if action_id == 0:
+                action_cards = []
+            else:
+                action_cards = env.handler._global_attack_actions[action_id]["cards"]
         else:
+            hand_indices = env.handler.global_action_to_hand_indices(action_id, hand)
             action_cards = [hand[i] for i in hand_indices]
         
         is_yield = (action_id == 0 and env.required_defense == 0)
@@ -96,7 +102,7 @@ class HeuristicAgent(BaseAgent):
         enemy_suit = enemy.card.suit.value
         
         # Check if Jester is played (value 0)
-        has_jester = any(c.value == 0 for c in action_cards) or (hand_indices == [-1])
+        has_jester = any(c.value == 0 for c in action_cards) or (action_id == 542)
         if has_jester:
             # Rule: Play Jester against Kings/Queens to cancel immunities (+300)
             if enemy.card.value >= 12:
