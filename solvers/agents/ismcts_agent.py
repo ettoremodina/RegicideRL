@@ -118,7 +118,9 @@ class ISMCTSAgent(BaseAgent):
         if env is None:
             raise ValueError("ISMCTSAgent requires the env object for cloning.")
 
-        valid_actions = obs['valid_actions']
+        import numpy as np
+        action_mask = obs['action_mask']
+        valid_actions = np.nonzero(action_mask)[0].tolist()
         if not valid_actions:
             return None
         if len(valid_actions) == 1:
@@ -136,13 +138,12 @@ class ISMCTSAgent(BaseAgent):
             self._run_iteration(root, sim_env)
 
         # Pick action with highest visit count (most robust choice)
-        best_action_tuple = max(
+        best_action = max(
             root.children.keys(),
             key=lambda a: root.children[a].visit_count
         )
 
-        # Convert back to list
-        return list(best_action_tuple)
+        return best_action
 
     def _run_iteration(self, root, sim_env):
         """Run one full ISMCTS iteration: select → expand → rollout → backprop.
@@ -156,16 +157,18 @@ class ISMCTSAgent(BaseAgent):
         sim_obs = sim_env._get_obs()
 
         # --- SELECTION: descend the tree while all children are expanded ---
-        while not (sim_env.game.game_over) and sim_obs['valid_actions']:
-            legal_actions = [tuple(a) for a in sim_obs['valid_actions']]
+        import numpy as np
+        while not (sim_env.game.game_over):
+            action_mask = sim_obs['action_mask']
+            legal_actions = np.nonzero(action_mask)[0].tolist()
 
             if not legal_actions:
                 break
 
             # Update availability counts for all legal actions that have nodes
-            for action_tuple in legal_actions:
-                if action_tuple in node.children:
-                    node.children[action_tuple].availability_count += 1
+            for action in legal_actions:
+                if action in node.children:
+                    node.children[action].availability_count += 1
 
             # Find untried actions (legal actions with no child node)
             untried = [a for a in legal_actions if a not in node.children]
@@ -173,29 +176,27 @@ class ISMCTSAgent(BaseAgent):
             if untried:
                 # --- EXPANSION: create a new child for an untried action ---
                 import random
-                action_tuple = random.choice(untried)
-                child = ISMCTSNode(action=action_tuple, parent=node)
+                action = random.choice(untried)
+                child = ISMCTSNode(action=action, parent=node)
                 child.availability_count = 1  # First time available
-                node.children[action_tuple] = child
+                node.children[action] = child
 
                 # Apply the action
-                action_list = list(action_tuple)
-                sim_obs, reward, terminated, truncated, info = sim_env.step(action_list)
+                sim_obs, reward, terminated, truncated, info = sim_env.step(action)
 
                 path.append(child)
                 node = child
                 break  # Expand one node, then rollout
             else:
                 # All legal actions have been tried — select best via UCB
-                action_tuple = max(
+                action = max(
                     legal_actions,
                     key=lambda a: node.children[a].ucb_score(self.exploration_constant)
                 )
-                child = node.children[action_tuple]
+                child = node.children[action]
 
                 # Apply the action
-                action_list = list(action_tuple)
-                sim_obs, reward, terminated, truncated, info = sim_env.step(action_list)
+                sim_obs, reward, terminated, truncated, info = sim_env.step(action)
 
                 path.append(child)
                 node = child

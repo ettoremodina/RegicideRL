@@ -117,21 +117,26 @@ class PerfectSolver:
         self.visited.add(state_hash)
         
         # Get valid actions
+        import numpy as np
         obs = env._get_obs()
-        valid_actions = obs['valid_actions']
+        valid_actions = np.nonzero(obs['action_mask'])[0].tolist()
         
-        # We pair each mask with its integer representation
         action_tuples = []
-        for mask in valid_actions:
-            idx = sum(val * (1 << j) for j, val in enumerate(mask))
-            action_tuples.append((idx, mask))
+        hand = env.game.get_player_hand(env.game.current_player)
+        for action_id in valid_actions:
+            try:
+                indices = env.handler.global_action_to_hand_indices(action_id, hand)
+                cards_played = 0 if indices == [-1] else len(indices)
+                is_yield = (cards_played == 0 and action_id == 0)
+            except ValueError:
+                cards_played = 1
+                is_yield = False
+            action_tuples.append((action_id, cards_played, is_yield))
             
         # Sort actions heuristically to prune the tree faster.
         # This only affects the ORDER we explore, not the final result.
         def action_heuristic(item):
-            idx, mask = item
-            cards_played = sum(mask)
-            is_yield = (cards_played == 0)
+            action_id, cards_played, is_yield = item
             
             if obs['defense_phase']:
                 # For defense, try playing fewer cards first
@@ -142,18 +147,18 @@ class PerfectSolver:
                 
         action_tuples.sort(key=action_heuristic)
         
-        for action_idx, mask in action_tuples:
+        for action_id, cards_played, is_yield in action_tuples:
             # Clone env to branch
             next_env = env.clone()
-            next_env.step(mask)
+            next_env.step(action_id)
             
-            self.current_path.append(action_idx)
+            self.current_path.append(action_id)
             # Recursive DFS
             path = self._dfs(next_env)
             self.current_path.pop()
             
             if path is not None:
-                return [action_idx] + path
+                return [action_id] + path
                 
         # All actions led to loss (or cyclic state)
         return None

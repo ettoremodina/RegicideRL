@@ -1,0 +1,6 @@
+2026-07-17 02:10:30,926 - Initialized run: run_20260717_021030
+2026-07-17 02:10:30,927 - Run directory: runs\run_20260717_021030
+2026-07-17 02:10:30,927 - Starting run with arguments: {'agent': 'ismcts', 'episodes': 10, 'games_per_episode': 1000, 'jobs': 1}
+2026-07-17 02:10:35,684 - Using Agent: ISMCTSAgent
+2026-07-17 02:10:35,685 - Initialized ParallelSimulator with 1 workers
+2026-07-17 02:10:35,685 - --- Episode 1/10 ---

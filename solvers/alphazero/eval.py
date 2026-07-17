@@ -40,7 +40,8 @@ def evaluate_network(network, config, device, n_games=None):
         moves = 0
 
         while not env.game.game_over:
-            valid_actions = obs["valid_actions"]
+            action_mask_obs = obs["action_mask"]
+            valid_actions = np.nonzero(action_mask_obs)[0].tolist()
             if not valid_actions:
                 break
 
@@ -52,17 +53,8 @@ def evaluate_network(network, config, device, n_games=None):
             policy, _ = run_mcts(env, network, config, device)
             # Greedy: pick action with highest visit count
             action_id = int(np.argmax(policy))
-
-            hand = env.game.get_player_hand(env.game.current_player)
-            try:
-                card_indices = env.handler.global_action_to_hand_indices(
-                    action_id, hand
-                )
-                action_mask = env.handler.cards_to_mask(card_indices)
-                obs, _, terminated, truncated, _ = env.step(action_mask)
-            except ValueError:
-                # Fallback
-                obs, _, terminated, truncated, _ = env.step(valid_actions[0])
+            
+            obs, _, terminated, truncated, _ = env.step(action_id)
             moves += 1
 
         enemies_left = len(env.game.castle_deck) + (

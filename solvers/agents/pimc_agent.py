@@ -59,7 +59,10 @@ class PIMCAgent(BaseAgent):
         if env is None:
             raise ValueError("PIMCAgent requires the env object for cloning.")
 
-        valid_actions = obs['valid_actions']
+        import numpy as np
+        action_mask = obs['action_mask']
+        valid_actions = np.nonzero(action_mask)[0].tolist()
+        
         if not valid_actions:
             return None
         if len(valid_actions) == 1:

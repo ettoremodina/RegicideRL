@@ -40,7 +40,8 @@ def run_self_play_game(network, config, device):
     move_count = 0
 
     while not env.game.game_over:
-        valid_actions = obs["valid_actions"]
+        action_mask_obs = obs["action_mask"]
+        valid_actions = np.nonzero(action_mask_obs)[0].tolist()
         if not valid_actions:
             break
 
@@ -68,24 +69,7 @@ def run_self_play_game(network, config, device):
         history.append((state_vec, policy))
 
         # Execute the action
-        hand = env.game.get_player_hand(env.game.current_player)
-        try:
-            card_indices = env.handler.global_action_to_hand_indices(
-                action_id, hand
-            )
-        except ValueError:
-            # The global index couldn't be decoded — shouldn't happen
-            # if policy and action mask are consistent. Fall back to
-            # the first valid action.
-            logger.warning(
-                f"Could not decode action {action_id}, falling back."
-            )
-            obs, _, terminated, truncated, _ = env.step(valid_actions[0])
-            move_count += 1
-            continue
-
-        action_mask = env.handler.cards_to_mask(card_indices)
-        obs, _, terminated, truncated, _ = env.step(action_mask)
+        obs, _, terminated, truncated, _ = env.step(action_id)
         move_count += 1
 
     # --- Compute terminal value (progress-based) ---

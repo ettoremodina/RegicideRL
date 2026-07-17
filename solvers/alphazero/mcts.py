@@ -136,8 +136,9 @@ def _run_simulation(root, sim_env, network, config, device, handler):
     is_defense = sim_env.required_defense > 0
 
     # --- SELECTION ---
-    while not sim_env.game.game_over and sim_obs["valid_actions"]:
-        legal_actions = [tuple(a) for a in sim_obs["valid_actions"]]
+    while not sim_env.game.game_over:
+        action_mask_obs = sim_obs["action_mask"]
+        legal_actions = np.nonzero(action_mask_obs)[0].tolist()
         if not legal_actions:
             break
 
@@ -158,9 +159,7 @@ def _run_simulation(root, sim_env, network, config, device, handler):
 
             # Expand *all* untried children with their priors
             for at in untried:
-                gid = action_mask_to_global_index(
-                    list(at), sim_obs["hand"], handler, is_defense
-                )
+                gid = at
                 child = PUCTNode(
                     action_tuple=at,
                     global_action_id=gid,
@@ -177,9 +176,7 @@ def _run_simulation(root, sim_env, network, config, device, handler):
             child = node.children[action_tuple]
 
             # Apply action
-            sim_obs, _, terminated, truncated, _ = sim_env.step(
-                list(action_tuple)
-            )
+            sim_obs, _, terminated, truncated, _ = sim_env.step(action_tuple)
             is_defense = sim_env.required_defense > 0
             path.append(child)
             node = child
@@ -199,9 +196,7 @@ def _run_simulation(root, sim_env, network, config, device, handler):
             )
             child = node.children[action_tuple]
 
-            sim_obs, _, terminated, truncated, _ = sim_env.step(
-                list(action_tuple)
-            )
+            sim_obs, _, terminated, truncated, _ = sim_env.step(action_tuple)
             is_defense = sim_env.required_defense > 0
             path.append(child)
             node = child

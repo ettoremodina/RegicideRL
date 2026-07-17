@@ -70,7 +70,9 @@ class AlphaZeroAgent(BaseAgent):
         if env is None:
             raise ValueError("AlphaZeroAgent requires the env object.")
 
-        valid_actions = obs["valid_actions"]
+        import numpy as np
+        action_mask = obs["action_mask"]
+        valid_actions = np.nonzero(action_mask)[0].tolist()
         if not valid_actions:
             return None
         if len(valid_actions) == 1:
@@ -80,15 +82,4 @@ class AlphaZeroAgent(BaseAgent):
         policy, _ = run_mcts(env, self.network, self.config, self.device)
         action_id = int(np.argmax(policy))
 
-        # Decode to hand-relative mask
-        hand = env.game.get_player_hand(env.game.current_player)
-        try:
-            card_indices = env.handler.global_action_to_hand_indices(
-                action_id, hand
-            )
-            return env.handler.cards_to_mask(card_indices)
-        except ValueError:
-            logger.warning(
-                f"Could not decode action {action_id}, falling back."
-            )
-            return valid_actions[0]
+        return action_id

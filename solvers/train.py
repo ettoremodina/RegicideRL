@@ -9,7 +9,7 @@ def main():
     parser.add_argument("--agent", type=str, default="random", help="Agent name (e.g., 'random')")
     parser.add_argument("--episodes", type=int, default=10, help="Number of training/eval loops")
     parser.add_argument("--games_per_episode", type=int, default=1000, help="Games to simulate per loop")
-    parser.add_argument("--jobs", type=int, default=None, help="Number of parallel workers (default: CPU cores - 1)")
+    parser.add_argument("--jobs", type=int, default=1, help="Number of parallel workers (default: CPU cores - 1)")
     
     args = parser.parse_args()
     
@@ -21,12 +21,19 @@ def main():
         from .agents.random_agent import RandomAgent
         from .agents.heuristic_agent import HeuristicAgent
         from .agents.ppo_agent import PPOAgent
+        from .agents.ismcts_agent import ISMCTSAgent
+        from .agents.pimc_agent import PIMCAgent
+        
         if name == 'random':
             return RandomAgent
         elif name == 'heuristic':
             return HeuristicAgent
         elif name == 'ppo':
             return PPOAgent
+        elif name == 'ismcts':
+            return ISMCTSAgent
+        elif name == 'pimc':
+            return PIMCAgent
         else:
             raise ValueError(f"Unknown agent: {name}")
 
