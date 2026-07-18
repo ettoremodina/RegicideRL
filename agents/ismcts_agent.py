@@ -149,19 +149,21 @@ class ISMCTSAgent(BaseAgent):
 
         import time
         start_time = time.time()
+        last_update_time = start_time
 
         for i in range(self.n_iterations):
-            if self.status_dict is not None and i % max(1, self.n_iterations // 50) == 0:
+            current_time = time.time()
+            if self.status_dict is not None and current_time - last_update_time > 0.5:
                 pct = int((i / self.n_iterations) * 100)
                 bar = "#" * (pct // 10) + "-" * (10 - (pct // 10))
-                elapsed = time.time() - start_time
+                elapsed = current_time - start_time
                 its = i / elapsed if elapsed > 0 else 0
                 self.status_dict[self.worker_id] = (
                     f"Game {self.ctx_game}/{self.ctx_total_games} | "
                     f"Turn {self.ctx_turn:2d} | "
                     f"ISMCTS [{bar}] {i:4d}/{self.n_iterations} | {its:6.1f} it/s"
                 )
-                
+                last_update_time = current_time
             # 1. Clone and determinize
             sim_env = env.clone()
             determinize_env(sim_env)

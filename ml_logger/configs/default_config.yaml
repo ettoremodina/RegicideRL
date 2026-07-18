@@ -1,0 +1,27 @@
+settings:
+  refresh_rate: 4
+  max_log_lines: 50
+  
+saving:
+  enabled: true
+  save_dir: "./logs"
+  log_filename: "run.log"
+  metrics_filename: "metrics.jsonl"
+  
+highlights:
+  - pattern: '\b(epoch|step)\b'
+    style: 'bold magenta'
+  - pattern: '\bloss\b'
+    style: 'yellow'
+  - pattern: '\b(accuracy|acc|f1)\b'
+    style: 'green'
+  - pattern: '\b(val|valid)\b'
+    style: 'cyan'
+  - pattern: '\b(warn|warning)\b'
+    style: 'bold yellow'
+  - pattern: '\b(error|fail)\b'
+    style: 'bold red'
+  - pattern: '\b(saved|checkpoint)\b'
+    style: 'bold green'
+  - pattern: '[\d.eE+-]+'
+    style: 'cyan'

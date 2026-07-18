@@ -1,0 +1,6 @@
+2026-07-18 03:29:53,317 - Initialized run: run_20260718_032953
+2026-07-18 03:29:53,318 - Run directory: runs\run_20260718_032953
+2026-07-18 03:29:53,318 - Starting run with arguments: {'agent': 'random', 'episodes': 10, 'games_per_episode': 1000, 'jobs': 1, 'iterations': 1000, 'exploration': 10.0}
+2026-07-18 03:29:56,700 - Using Agent: RandomAgent
+2026-07-18 03:29:56,701 - Initialized ParallelSimulator with 1 workers
+2026-07-18 03:29:56,701 - --- Episode 1/10 ---

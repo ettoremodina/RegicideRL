@@ -2,6 +2,10 @@ gymnasium==0.29.1
 stable-baselines3[extra]
 sb3-contrib
 tensorboard
-numpy
+numpy<2
 matplotlib
 pygame
+pdoc
+rich
+pyaml
+pandas

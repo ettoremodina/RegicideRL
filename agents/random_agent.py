@@ -5,8 +5,8 @@ class RandomAgent(BaseAgent):
     """
     A baseline agent that chooses a random valid action.
     """
-    def __init__(self, name="RandomAgent"):
-        super().__init__(name)
+    def __init__(self, name="RandomAgent", **kwargs):
+        super().__init__(name=name, **kwargs)
         
     def select_action(self, obs, env=None):
         import numpy as np

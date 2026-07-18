@@ -1,63 +1,68 @@
+import sys
+sys.path.append('.')
 import logging
 import random
 from game.regicide import Game
 from game.action_handler import ActionHandler
 
-def play_one_game_with_logs():
-    # Configure the logger to print to console
-    logger = logging.getLogger("regicide")
-    logger.setLevel(logging.INFO)
-    
-    # Create console handler
-    ch = logging.StreamHandler()
-    ch.setLevel(logging.INFO)
-    formatter = logging.Formatter('%(message)s')
-    ch.setFormatter(formatter)
-    logger.addHandler(ch)
+from ml_logger import DashboardLogger
 
-    print("=== Starting 1 Simulated Game ===")
+def play_one_game_with_logs():
+    # Configure the dashboard logger
+    logger = DashboardLogger()
+    logger.start()
     
-    game = Game(num_players=1)
-    handler = ActionHandler(max_hand_size=8)
-    required_defense = 0
-    
-    while not game.game_over:
-        current = game.current_player
-        hand = game.get_player_hand(current)
+    try:
+        logger.info("=== Starting 1 Simulated Game ===")
         
-        if required_defense > 0:
-            actions = handler.get_all_possible_actions(hand, "defense", {'enemy_attack': required_defense})
-            if not actions:
-                logger.info(f"Player {current + 1} cannot defend against {required_defense} damage. Game Over.")
-                game.game_over = True
-                break
-            action = random.choice(actions)
-            indices = handler.mask_to_card_indices(action, len(hand))
-            res = game.defend_with_card_indices(indices)
-            required_defense = 0
-        else:
-            actions = handler.get_all_possible_actions(hand, "attack", game.get_game_state())
-            if not actions:
-                logger.info(f"Player {current + 1} has no valid actions. Game Over.")
-                game.game_over = True
-                break
-            action = random.choice(actions)
-            indices = handler.mask_to_card_indices(action, len(hand))
+        game = Game(num_players=1)
+        handler = ActionHandler(max_hand_size=8)
+        required_defense = 0
+        
+        while not game.game_over:
+            current = game.current_player
+            hand = game.get_player_hand(current)
             
-            if handler.is_yield_action(action):
-                res = game.yield_turn()
+            if required_defense > 0:
+                actions = handler.get_all_possible_actions(hand, "defense", {'enemy_attack': required_defense})
+                if not actions:
+                    logger.info(f"Player {current + 1} cannot defend against {required_defense} damage. Game Over.")
+                    game.game_over = True
+                    break
+                action = random.choice(actions)
+                indices = handler.mask_to_card_indices(action, len(hand))
+                res = game.defend_with_card_indices(indices)
+                required_defense = 0
             else:
-                res = game.play_card(indices)
-            
-            required_defense = res.get("defense_required", 0)
-            
-            if res.get("phase") == "next_player_choice":
-                game.choose_next_player(0)
+                actions = handler.get_all_possible_actions(hand, "attack", game.get_game_state())
+                if not actions:
+                    logger.info(f"Player {current + 1} has no valid actions. Game Over.")
+                    game.game_over = True
+                    break
+                action = random.choice(actions)
+                indices = handler.mask_to_card_indices(action, len(hand))
                 
-    if game.victory:
-        print("\n=== Victory! ===")
-    else:
-        print("\n=== Defeat! ===")
-        
+                if handler.is_yield_action(action):
+                    res = game.yield_turn()
+                else:
+                    res = game.play_card(indices)
+                
+                required_defense = res.get("defense_required", 0)
+                
+                if res.get("phase") == "next_player_choice":
+                    game.choose_next_player(0)
+                    
+        if game.victory:
+            logger.info("\n=== Victory! ===")
+        else:
+            logger.info("\n=== Defeat! ===")
+            
+        logger.log_game_run({
+            "victory": game.victory,
+            "bosses_defeated": 12 - len(game.castle_deck),
+        })
+    finally:
+        logger.stop()
+
 if __name__ == "__main__":
     play_one_game_with_logs()

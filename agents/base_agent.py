@@ -2,7 +2,7 @@ class BaseAgent:
     """
     Abstract base class for all Regicide agents.
     """
-    def __init__(self, name="BaseAgent"):
+    def __init__(self, name="BaseAgent", **kwargs):
         self.name = name
         
     def select_action(self, obs, env=None):

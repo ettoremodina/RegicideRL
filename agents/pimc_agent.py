@@ -41,8 +41,8 @@ class PIMCAgent(BaseAgent):
         name: Agent name for logging.
     """
 
-    def __init__(self, n_determinizations=50, name="PIMCAgent"):
-        super().__init__(name)
+    def __init__(self, n_determinizations=50, name="PIMCAgent", **kwargs):
+        super().__init__(name=name, **kwargs)
         self.n_determinizations = n_determinizations
         self._rollout_agent = HeuristicAgent(name="PIMC_Rollout")
 

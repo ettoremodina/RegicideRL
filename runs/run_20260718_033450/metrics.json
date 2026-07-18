@@ -1,0 +1,38 @@
+[
+  {
+    "win_rate": 0.0,
+    "avg_enemies_defeated": 0.961,
+    "avg_turns": 8.856,
+    "games_per_second": 75.53342470162318,
+    "total_time": 13.239171981811523,
+    "step": 1,
+    "timestamp": 1784338511.6134052
+  },
+  {
+    "win_rate": 0.0,
+    "avg_enemies_defeated": 0.992,
+    "avg_turns": 8.981,
+    "games_per_second": 79.83398019739262,
+    "total_time": 12.525994539260864,
+    "step": 2,
+    "timestamp": 1784338524.2521806
+  },
+  {
+    "win_rate": 0.0,
+    "avg_enemies_defeated": 1.02,
+    "avg_turns": 9.184,
+    "games_per_second": 86.2968178513407,
+    "total_time": 11.587912797927856,
+    "step": 3,
+    "timestamp": 1784338535.93711
+  },
+  {
+    "win_rate": 0.0,
+    "avg_enemies_defeated": 0.966,
+    "avg_turns": 9.065,
+    "games_per_second": 104.11449063170302,
+    "total_time": 9.604810953140259,
+    "step": 4,
+    "timestamp": 1784338545.6290128
+  }
+]

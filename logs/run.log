@@ -1,0 +1,33 @@
+
+==================================================
+--- New Run Started at 2026-07-18 02:59:58 ---
+02:59:58 [INFO] regicide: Castle deck prepared with 12 enemies.
+02:59:58 [INFO] regicide: First enemy revealed: J♣ (HP: 20/20, ATK: 10)
+02:59:58 [ERROR] root: Game 0 stuck! Phase: None, ReqDefense: 0, Hand: [<game.regicide.Card object at 0x00000236D4B09850>, <game.regicide.Card object at 0x00000236D6CB3B90>, <game.regicide.Card object at 0x00000236D6EBF070>, <game.regicide.Card object at 0x00000236D6DA7360>, <game.regicide.Card object at 0x00000236D6EBFB60>, <game.regicide.Card object at 0x00000236D6EAD8C0>, <game.regicide.Card object at 0x00000236D6EBFD90>, <game.regicide.Card object at 0x00000236D6D06D50>]
+
+==================================================
+--- New Run Started at 2026-07-18 03:00:51 ---
+03:00:51 [INFO] root: === Starting 1 Simulated Game ===
+03:00:51 [INFO] regicide: Castle deck prepared with 12 enemies.
+03:00:51 [INFO] regicide: First enemy revealed: J♣ (HP: 20/20, ATK: 10)
+03:00:51 [INFO] regicide: Player 1 plays: 2♦
+03:00:51 [INFO] regicide: Enemy takes 2 damage. (Total HP: 18/20)
+03:00:51 [INFO] regicide: Enemy counter-attacks for 10 damage.
+03:00:51 [INFO] regicide: Player 1 defends with 4♦, 7♦ (value: 11)
+03:00:51 [INFO] regicide: Player 1 plays: 5♦
+03:00:51 [INFO] regicide: Enemy takes 5 damage. (Total HP: 13/20)
+03:00:51 [INFO] regicide: Enemy counter-attacks for 10 damage.
+03:00:51 [INFO] regicide: Player 1 defends with 4♣, 9♠ (value: 13)
+03:00:51 [INFO] regicide: Player 1 plays: 10♥, A♣
+03:00:51 [INFO] regicide: Enemy takes 11 damage. (Total HP: 2/20)
+03:00:51 [INFO] regicide: Enemy counter-attacks for 10 damage.
+03:00:51 [INFO] regicide: Player 1 defends with 6♦, 6♣ (value: 12)
+03:00:51 [INFO] regicide: Player 1 plays: 5♠
+03:00:51 [INFO] regicide: Enemy takes 5 damage. (Total HP: -3/20)
+03:00:51 [INFO] regicide: Enemy defeated! J♣ moves to discard.
+03:00:51 [INFO] regicide: New enemy revealed: J♦ (HP: 20/20, ATK: 10)
+03:00:51 [INFO] regicide: Player 1 plays: 3♣
+03:00:51 [INFO] regicide: Enemy takes 6 damage. (Total HP: 14/20)
+03:00:51 [INFO] regicide: Enemy counter-attacks for 10 damage.
+03:00:51 [INFO] root: 
+=== Defeat! ===

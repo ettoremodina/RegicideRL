@@ -1,0 +1,36 @@
+2026-07-18 04:10:28,614 - Initialized run: run_20260718_041028
+2026-07-18 04:10:28,614 - Run directory: runs\run_20260718_041028
+2026-07-18 04:10:28,615 - Starting run with arguments: {'agent': 'random', 'episodes': 10, 'games_per_episode': 1000, 'jobs': 1, 'iterations': 1000, 'exploration': 10.0}
+2026-07-18 04:10:33,925 - Using Agent: RandomAgent
+2026-07-18 04:10:35,644 - Initialized ParallelSimulator with 1 workers
+2026-07-18 04:10:35,645 - --- Episode 1/10 ---
+2026-07-18 04:10:44,665 - Eval Results:
+2026-07-18 04:10:44,666 -   Win Rate: 0.00%
+2026-07-18 04:10:44,666 -   Avg Enemies Defeated: 0.98 / 12
+2026-07-18 04:10:44,667 -   Avg Turns: 8.9
+2026-07-18 04:10:44,667 -   Speed: 110.86 games/sec
+2026-07-18 04:10:44,677 - --- Episode 2/10 ---
+2026-07-18 04:10:47,183 - Eval Results:
+2026-07-18 04:10:47,184 -   Win Rate: 0.00%
+2026-07-18 04:10:47,184 -   Avg Enemies Defeated: 1.01 / 12
+2026-07-18 04:10:47,185 -   Avg Turns: 9.2
+2026-07-18 04:10:47,185 -   Speed: 399.18 games/sec
+2026-07-18 04:10:47,189 - --- Episode 3/10 ---
+2026-07-18 04:10:49,695 - Eval Results:
+2026-07-18 04:10:49,695 -   Win Rate: 0.00%
+2026-07-18 04:10:49,696 -   Avg Enemies Defeated: 1.06 / 12
+2026-07-18 04:10:49,696 -   Avg Turns: 9.4
+2026-07-18 04:10:49,696 -   Speed: 399.16 games/sec
+2026-07-18 04:10:49,700 - --- Episode 4/10 ---
+2026-07-18 04:10:52,205 - Eval Results:
+2026-07-18 04:10:52,205 -   Win Rate: 0.00%
+2026-07-18 04:10:52,205 -   Avg Enemies Defeated: 0.96 / 12
+2026-07-18 04:10:52,205 -   Avg Turns: 9.0
+2026-07-18 04:10:52,205 -   Speed: 399.32 games/sec
+2026-07-18 04:10:52,209 - --- Episode 5/10 ---
+2026-07-18 04:10:54,715 - Eval Results:
+2026-07-18 04:10:54,715 -   Win Rate: 0.00%
+2026-07-18 04:10:54,716 -   Avg Enemies Defeated: 0.97 / 12
+2026-07-18 04:10:54,716 -   Avg Turns: 9.0
+2026-07-18 04:10:54,716 -   Speed: 399.21 games/sec
+2026-07-18 04:10:54,723 - --- Episode 6/10 ---

@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Information Set Monte Carlo Tree Search (ISMCTS)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=JetBrains+Mono&display=swap" rel="stylesheet">
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script type="module">
+      import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+      mermaid.initialize({ startOnLoad: true, theme: 'dark' });
+    </script>
+    <style>
+        :root {
+            --bg: #0b0f19;
+            --surface: #151b2b;
+            --border: #2a3441;
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+            --primary: #38bdf8;
+            --secondary: #818cf8;
+            --accent: #f43f5e;
+            --math-bg: #0f1422;
+        }
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            line-height: 1.7;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 60px 20px;
+        }
+        h1, h2, h3 {
+            color: var(--primary);
+            font-weight: 700;
+            line-height: 1.2;
+        }
+        h1 {
+            font-size: 3rem;
+            margin-bottom: 0.5rem;
+            background: -webkit-linear-gradient(45deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .subtitle {
+            font-size: 1.2rem;
+            color: var(--text-muted);
+            margin-bottom: 3rem;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 1.5rem;
+        }
+        .paper-ref {
+            background-color: rgba(56, 189, 248, 0.1);
+            border-left: 4px solid var(--primary);
+            padding: 15px 20px;
+            border-radius: 0 8px 8px 0;
+            margin-bottom: 40px;
+            font-size: 1.1rem;
+        }
+        .card {
+            background-color: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 40px;
+            margin-bottom: 40px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            transition: transform 0.3s ease;
+        }
+        .card:hover {
+            transform: translateY(-2px);
+        }
+        .math-container {
+            background-color: var(--math-bg);
+            padding: 25px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            margin: 30px 0;
+            text-align: center;
+            font-size: 1.3rem;
+            box-shadow: inset 0 2px 10px rgba(0,0,0,0.1);
+            overflow-x: auto;
+        }
+        .mermaid-wrapper {
+            background-color: #0b0f19;
+            padding: 30px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            margin: 30px 0;
+            display: flex;
+            justify-content: center;
+        }
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+        @media (max-width: 600px) {
+            .grid-2 {
+                grid-template-columns: 1fr;
+                gap: 15px;
+            }
+        }
+        ul {
+            padding-left: 20px;
+            color: var(--text);
+        }
+        li {
+            margin-bottom: 12px;
+        }
+        code {
+            font-family: 'JetBrains Mono', monospace;
+            background-color: rgba(255,255,255,0.05);
+            padding: 3px 8px;
+            border-radius: 6px;
+            color: var(--secondary);
+            font-size: 0.9em;
+        }
+        .highlight {
+            color: var(--accent);
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>ISMCTS Explained</h1>
+        <div class="subtitle">Information Set Monte Carlo Tree Search for Imperfect Information Games</div>
+
+        <div class="paper-ref">
+            <strong>Reference:</strong> "Information Set Monte Carlo Tree Search" by Peter I. Cowling, Edward J. Powley, and Daniel Whitehouse.<br>
+            <em>IEEE Transactions on Computational Intelligence and AI in Games (Volume: 4, Issue: 2, June 2012)</em>
+        </div>
+
+        <div class="card">
+            <h2>The Problem with Perfect Information</h2>
+            <p>Standard Monte Carlo Tree Search (MCTS) assumes <strong>perfect information</strong>—meaning the entire state of the game (like a chessboard) is known to all players. In games like Regicide or Poker, the game state contains hidden information (e.g., the deck order).</p>
+            <p>A naive approach is <em>Perfect Information Monte Carlo (PIMC)</em>: randomly guess the hidden cards, run standard MCTS, and average the results. However, this fails due to <strong>Strategy Fusion</strong>. PIMC implicitly assumes that the agent will know the randomly guessed cards in the future, allowing it to "fuse" separate strategies that would be impossible to execute in reality (because you don't actually know those cards).</p>
+        </div>
+
+        <div class="card">
+            <h2>The Information Set</h2>
+            <p>Instead of building a tree of absolute game states, ISMCTS builds a tree of <strong>Information Sets</strong>. An Information Set is simply the perspective of the player: it groups together all possible actual game states that are consistent with what the player has observed so far.</p>
+            <p>In Regicide, your Information Set consists of: your hand, the discard pile, the current enemy, and the knowledge of which enemies have been defeated. The unknown variables (Tavern Deck order, Castle Deck tier orders) are randomly <em>determinized</em> for each iteration, but the search tree itself only branches on actions taken from the Information Set.</p>
+        </div>
+
+        <div class="card">
+            <h2>The 4 Phases of ISMCTS</h2>
+            <div class="mermaid-wrapper">
+                <div class="mermaid">
+                    graph TD
+                        classDef root fill:#0f1422,stroke:#38bdf8,stroke-width:2px,color:#fff;
+                        classDef node fill:#151b2b,stroke:#818cf8,stroke-width:2px,color:#fff;
+                        classDef expand fill:#151b2b,stroke:#f43f5e,stroke-width:2px,stroke-dasharray: 5 5,color:#fff;
+                        classDef rollout fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#fff;
+
+                        Root["1. SELECTION<br>Descend tree using ISMCTS UCB1"]:::root
+                        ActionA["Action A"]:::node
+                        ActionB["Action B"]:::node
+                        Root --> ActionA
+                        Root --> ActionB
+
+                        Expand["2. EXPANSION<br>Create node for untried action"]:::expand
+                        ActionB --> Expand
+
+                        Rollout["3. SIMULATION<br>Play to end using Heuristic"]:::rollout
+                        Expand -.-> Rollout
+
+                        Backprop["4. BACKPROPAGATION<br>Update visits, availability, & reward"]:::root
+                        Rollout -.-> Backprop
+                        Backprop -.-> Expand
+                        Backprop -.-> ActionB
+                        Backprop -.-> Root
+                </div>
+            </div>
+            <p>At the start of <em>every</em> iteration, the algorithm samples a random <strong>Determinization</strong> (it shuffles the hidden decks). It then proceeds through the 4 phases using that specific, fixed determinization.</p>
+        </div>
+
+        <div class="card">
+            <h2>The Mathematics: The Subset-Armed Bandit</h2>
+            <p>During the Selection phase, the algorithm must choose which child node to explore. Standard MCTS uses the UCB1 formula.</p>
+            
+            <div class="math-container">
+                $$ \text{Standard UCB1} = \frac{v_i}{n_i} + C \sqrt{\frac{\ln N}{n_i}} $$
+            </div>
+            
+            <p>Where \( N \) is the parent node's visit count, and \( n_i \) is the child node's visit count. However, in ISMCTS, we encounter the <strong>Subset-Armed Bandit Problem</strong>. Because the hidden state is randomized every iteration, an action \( i \) might be legal in one determinization but illegal in another.</p>
+            <p>If we use standard UCB1, actions that are rarely legal will have a low \( n_i \). As the parent visit count \( N \) grows, the exploration term \( \sqrt{\ln N / n_i} \) will explode to infinity, forcing the algorithm to aggressively try to select an illegal action.</p>
+            
+            <h3>The ISMCTS UCB1 Adaptation</h3>
+            <p>Cowling et al. solved this by replacing the parent's total visit count \( N \) with the action's <strong>Availability Count</strong> \( A_i \). This tracks how many times action \( i \) was actually <em>legal</em> when the parent node was visited.</p>
+
+            <div class="math-container">
+                $$ \text{ISMCTS UCB1} = \frac{v_i}{n_i} + C \sqrt{\frac{\ln A_i}{n_i}} $$
+            </div>
+
+            <div class="grid-2">
+                <div>
+                    <ul>
+                        <li>\( v_i \): The total reward accumulated by action \( i \).</li>
+                        <li>\( n_i \): The number of times action \( i \) was <em>selected</em>.</li>
+                    </ul>
+                </div>
+                <div>
+                    <ul>
+                        <li>\( A_i \): The number of times action \( i \) was <em>available</em> (legal) in the sampled determinization.</li>
+                        <li>\( C \): The exploration constant (tuning parameter).</li>
+                    </ul>
+                </div>
+            </div>
+            <p>By using \( A_i \), the exploration term only grows when the action is actually legal but ignored, correctly balancing exploration and exploitation without breaking the math on illegal moves.</p>
+        </div>
+
+        <div class="card">
+            <h2>Why This Ensures Your Agent Isn't Cheating</h2>
+            <p>Your agent uses a Single-Observer ISMCTS (SO-ISMCTS). Because it completely shuffles the Tavern Deck and Castle Deck tiers <em>before</em> running the 4 phases on each iteration, the MCTS tree is being built over an aggregate of hundreds of randomly shuffled universes. The algorithm mathematically converges on the play that has the highest probability of success across <em>all</em> possible deck configurations, completely blind to the actual true order of the cards.</p>
+        </div>
+
+    </div>
+</body>
+</html>

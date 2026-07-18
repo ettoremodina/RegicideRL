@@ -2,23 +2,28 @@ import sys
 sys.path.append('.')
 from game.regicide import Game
 from game.action_handler import ActionHandler
+from ml_logger import DashboardLogger
 import random
 
-handler = ActionHandler()
-for game_num in range(100):
-    game = Game(num_players=1)
-    res = {}
-    required_defense = 0
-    turns = 0
+logger = DashboardLogger()
+logger.start()
 
-    while not game.game_over:
-        turns += 1
-        current = game.current_player
-        hand = game.get_player_hand(current)
-        
-        if turns > 1000:
-            print(f'Game {game_num} stuck! Phase: {res.get("phase")}, ReqDefense: {required_defense}, Hand: {hand}')
-            sys.exit(1)
+try:
+    handler = ActionHandler()
+    for game_num in range(100):
+        game = Game(num_players=1)
+        res = {}
+        required_defense = 0
+        turns = 0
+    
+        while not game.game_over:
+            turns += 1
+            current = game.current_player
+            hand = game.get_player_hand(current)
+            
+            if turns > 1000:
+                logger.error(f'Game {game_num} stuck! Phase: {res.get("phase")}, ReqDefense: {required_defense}, Hand: {hand}')
+                sys.exit(1)
             
         if required_defense > 0:
             actions = handler.get_all_possible_actions(hand, 'defense', {'enemy_attack': required_defense})
@@ -49,4 +54,6 @@ for game_num in range(100):
             
             if res.get("phase") == "next_player_choice":
                 res = game.choose_next_player(1)
-print('Finished without getting stuck!')
+    logger.info('Finished without getting stuck!')
+finally:
+    logger.stop()
