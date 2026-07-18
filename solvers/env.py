@@ -1,10 +1,13 @@
 import gymnasium as gym
 from gymnasium import spaces
 import numpy as np
+import secrets
 
 from game.action_space import GLOBAL_ACTION_SPACE_SIZE, MAX_HAND_SIZE
 from game.regicide import Game
 from game.action_handler import ActionHandler
+from ml_logger.recording import GameRecorder
+from ml_logger.serialization import serialize_game
 
 class RegicideEnv(gym.Env):
     """
@@ -14,9 +17,10 @@ class RegicideEnv(gym.Env):
     """
     metadata = {"render_modes": ["human"]}
 
-    def __init__(self, num_players=1):
+    def __init__(self, num_players=1, recorder: GameRecorder | None = None):
         super().__init__()
         self.num_players = num_players
+        self.recorder = recorder
         self.handler = ActionHandler(max_hand_size=MAX_HAND_SIZE)
         self.game = None
         self.required_defense = 0
@@ -47,6 +51,7 @@ class RegicideEnv(gym.Env):
         """
         new_env = object.__new__(RegicideEnv)
         new_env.num_players = self.num_players
+        new_env.recorder = None
         new_env.handler = self.handler  # ActionHandler is stateless, safe to share
         new_env.required_defense = self.required_defense
         new_env.action_space = self.action_space
@@ -55,7 +60,11 @@ class RegicideEnv(gym.Env):
         return new_env
         
     def reset(self, seed=None, options=None):
+        if seed is None and self.recorder and self.recorder.enabled:
+            seed = secrets.randbits(63)
         super().reset(seed=seed)
+        if self.recorder and self.recorder.active:
+            self.recorder.abort("environment_reset")
         if seed is not None:
             # If the game engine supports seeding, apply it here
             import random
@@ -63,6 +72,12 @@ class RegicideEnv(gym.Env):
             
         self.game = Game(num_players=self.num_players)
         self.required_defense = 0
+        if self.recorder and self.recorder.enabled:
+            self.recorder.begin_game(
+                self.game,
+                seed=seed,
+                metadata={"source": "RegicideEnv"},
+            )
         
         return self._get_obs(), {}
         
@@ -88,6 +103,25 @@ class RegicideEnv(gym.Env):
         }
         
     def step(self, action):
+        """Execute and persist one real environment transition."""
+        recording_enabled = bool(self.recorder and self.recorder.enabled)
+        state_before = serialize_game(self.game) if recording_enabled else None
+        action_record = self._describe_action(action)
+        transition = self._step_impl(action)
+        observation, _, terminated, truncated, result = transition
+        if recording_enabled:
+            self.recorder.record_event(
+                action_record,
+                result,
+                self.game,
+                state_before=state_before,
+            )
+            if terminated or truncated or self.game.game_over:
+                reason = result.get("message") if isinstance(result, dict) else None
+                self.recorder.finish(self.game, reason=reason)
+        return observation, transition[1], terminated, truncated, result
+
+    def _step_impl(self, action):
         """
         Takes an action index (0-541) OR a list mask (backward compatibility).
         Returns: next_obs, reward, terminated, truncated, info
@@ -177,6 +211,35 @@ class RegicideEnv(gym.Env):
                 reward = -1.0
                 
         return self._get_obs(), reward, terminated, truncated, res
+
+    def _describe_action(self, action):
+        hand = self.game.get_player_hand(self.game.current_player)
+        description = {
+            "action_id": int(action) if isinstance(action, (int, np.integer)) else None,
+            "raw_action": action,
+            "player": self.game.current_player,
+            "phase": "defense" if self.required_defense > 0 else "attack",
+        }
+        try:
+            if isinstance(action, (int, np.integer)):
+                indices = self.handler.global_action_to_hand_indices(int(action), hand)
+            else:
+                indices = self.handler.mask_to_card_indices(action, len(hand))
+            description["card_indices"] = indices
+            description["cards"] = [
+                str(hand[index]) for index in indices if 0 <= index < len(hand)
+            ]
+            description["kind"] = self._action_kind(indices)
+        except (IndexError, TypeError, ValueError):
+            description["kind"] = "invalid"
+        return description
+
+    def _action_kind(self, indices):
+        if indices == [-1]:
+            return "solo_jester"
+        if not indices and self.required_defense == 0:
+            return "yield"
+        return "defend" if self.required_defense > 0 else "play"
 
     def _end_if_defense_is_impossible(self):
         """End a forced-defense state when no card play or jester can save it."""

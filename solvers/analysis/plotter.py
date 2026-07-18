@@ -1,6 +1,9 @@
 import matplotlib.pyplot as plt
 import seaborn as sns
 from collections import Counter
+from ml_logger import get_logger
+
+logger = get_logger(__name__)
 
 def plot_dashboard(probe_results, tb_data, output_dir):
     """
@@ -60,4 +63,5 @@ def plot_dashboard(probe_results, tb_data, output_dir):
     save_path = f"{output_dir}/comprehensive_policy_analysis.png"
     plt.savefig(save_path, dpi=300)
     plt.close()
-    print(f"Dashboard saved to {save_path}")
+    logger.info("Dashboard saved to %s", save_path)
+    return save_path

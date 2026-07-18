@@ -2,6 +2,9 @@ import json
 import numpy as np
 from collections import Counter
 from datetime import datetime
+from ml_logger import get_logger
+
+logger = get_logger(__name__)
 
 def generate_reports(probe_results, output_dir):
     """
@@ -71,4 +74,5 @@ Wasted Face Cards (No attack/defense required): {summary['scenarios']['wasted_fa
     with open(f"{output_dir}/analysis_report.txt", 'w') as f:
         f.write(report)
         
-    print(f"Reports saved to {output_dir}")
+    logger.info("Reports saved to %s", output_dir)
+    return summary

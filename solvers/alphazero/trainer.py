@@ -16,15 +16,15 @@ Where:
 """
 
 import os
-import logging
 
 import torch
 import torch.nn.functional as F
 
+from ml_logger import get_logger
 from solvers.alphazero.network import RegicideNet
 from solvers.alphazero.config import AlphaZeroConfig
 
-logger = logging.getLogger("alphazero.trainer")
+logger = get_logger(__name__)
 
 
 class AlphaZeroTrainer:

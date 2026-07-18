@@ -1,6 +1,9 @@
 import time
 from typing import List, Optional, Set
+from ml_logger import get_logger
 from solvers.env import RegicideEnv
+
+logger = get_logger(__name__)
 
 class GameStateHasher:
     @staticmethod
@@ -75,7 +78,9 @@ class PerfectSolver:
         # Ensure the environment is running in deterministic mode
         if not initial_env.game.deterministic_hearts:
             if self.verbose:
-                print("WARNING: deterministic_hearts is False. The solver assumes a deterministic game.")
+                logger.warning(
+                    "deterministic_hearts is False; the solver assumes a deterministic game"
+                )
                 
         result = self._dfs(initial_env)
         
@@ -85,8 +90,12 @@ class PerfectSolver:
             
         elapsed = time.time() - start_time
         if self.verbose:
-            print(f"PerfectSolver finished in {elapsed:.2f}s. Evaluated {self.nodes_evaluated} nodes.")
-            print(f"Unique states visited (Transposition Table size): {len(self.visited)}")
+            logger.info(
+                "PerfectSolver finished in %.2fs; evaluated %d nodes",
+                elapsed,
+                self.nodes_evaluated,
+            )
+            logger.info("Unique states visited: %d", len(self.visited))
             
         return result
         

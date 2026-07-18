@@ -6,16 +6,16 @@ measure current strength.  Used by the orchestrator after each training
 iteration.
 """
 
-import logging
 import numpy as np
 
+from ml_logger import get_logger
 from solvers.env import RegicideEnv
 from solvers.alphazero.mcts import run_mcts
 
-logger = logging.getLogger("alphazero.eval")
+logger = get_logger(__name__)
 
 
-def evaluate_network(network, config, device, n_games=None):
+def evaluate_network(network, config, device, n_games=None, recorder=None):
     """Play games using greedy MCTS (τ→0) and return performance stats.
 
     Args:
@@ -34,7 +34,7 @@ def evaluate_network(network, config, device, n_games=None):
     total_moves = 0
 
     for _ in range(n_games):
-        env = RegicideEnv(num_players=1)
+        env = RegicideEnv(num_players=1, recorder=recorder)
         obs, _ = env.reset()
         moves = 0
 

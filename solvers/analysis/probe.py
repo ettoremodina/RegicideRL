@@ -4,19 +4,22 @@ from solvers.env import RegicideEnv
 from solvers.wrappers import NumericObsWrapper
 from sb3_contrib.ppo_mask import MaskablePPO
 from game.action_handler import ActionHandler
+from ml_logger import get_logger
 
-def probe_policy(model_path, num_games=50):
-    print(f"Probing model: {model_path} for {num_games} games...")
+logger = get_logger(__name__)
+
+def probe_policy(model_path, num_games=50, recorder=None):
+    logger.info("Probing model %s for %d games", model_path, num_games)
     
     # Initialize environment
-    raw_env = RegicideEnv(num_players=1)
+    raw_env = RegicideEnv(num_players=1, recorder=recorder)
     env = NumericObsWrapper(raw_env)
     
     # Load model
     try:
         model = MaskablePPO.load(model_path)
-    except Exception as e:
-        print(f"Failed to load model at {model_path}: {e}")
+    except Exception:
+        logger.exception("Failed to load model at %s", model_path)
         return None
         
     handler = ActionHandler()
@@ -108,7 +111,10 @@ def probe_policy(model_path, num_games=50):
             if reward == -1.0: # Invalid action was taken
                 invalid_count += 1
                 if invalid_count > 10:
-                    print(f"Game {game_idx} stuck in infinite loop of invalid actions! Breaking...")
+                    logger.error(
+                        "Game %d exceeded the invalid-action limit",
+                        game_idx,
+                    )
                     break
             else:
                 invalid_count = 0

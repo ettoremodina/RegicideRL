@@ -1,51 +1,79 @@
-import os
-import shutil
-import argparse
-from datetime import datetime
-import subprocess
+"""Run PPO training followed by analysis under canonical artifact storage."""
 
-from solvers.config import load_config
+import argparse
+import subprocess
+import sys
+from pathlib import Path
+
+from ml_logger import RunCatalog, get_logger, start_run
 from solvers.analysis.run_analysis import run_analysis_pipeline
-from solvers.analysis.tb_extractor import find_latest_run
+from solvers.config import load_config
+
+logger = get_logger(__name__)
+
 
 def run_experiment(config_path="config.yaml"):
-    # 1. Create a timestamped experiment folder
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    experiment_dir = os.path.join("experiments", f"run_{timestamp}")
-    os.makedirs(experiment_dir, exist_ok=True)
-    print(f"Starting new experiment: {experiment_dir}")
-    
-    # 2. Backup config
-    shutil.copy(config_path, os.path.join(experiment_dir, "config.yaml"))
-    
     config = load_config(config_path)
-    model_name = config["training"]["model_name"]
-    save_dir = config["training"]["save_dir"]
-    model_path = os.path.join(save_dir, f"{model_name}.zip")
-
-    # 3. Run training
-    print("\n--- Phase 1: Training ---")
-    try:
-        # Run training as a subprocess to keep memory clean or just import and run
-        subprocess.run(["python", "-m", "solvers.train_rl", "--config", config_path], check=True)
-    except subprocess.CalledProcessError as e:
-        print(f"Training failed: {e}")
-        return
-        
-    # 4. Run Analysis
-    print("\n--- Phase 2: Analysis ---")
-    latest_tb = find_latest_run(config["training"]["log_dir"])
-    run_analysis_pipeline(
-        model_path=model_path,
-        num_games=100, # Hardcoded evaluation amount or can be in config
-        logdir=latest_tb,
-        out_dir=experiment_dir
+    context = start_run(
+        "experiment",
+        name="ppo-training-and-analysis",
+        config=config,
     )
-    
-    print(f"\nExperiment finished successfully. All artifacts saved to: {experiment_dir}")
+    catalog = RunCatalog(context.root_dir / "catalog.sqlite")
+    known_runs = {row["run_id"] for row in catalog.list_runs(100_000)}
+    try:
+        logger.info("Starting PPO training phase")
+        subprocess.run(
+            [sys.executable, "-m", "solvers.train_rl", "--config", config_path],
+            check=True,
+        )
+        training_run = _find_new_training_run(catalog, known_runs)
+        model_path = _find_model(training_run)
+        logger.info("Starting analysis phase for %s", model_path)
+        success = run_analysis_pipeline(
+            model_path=str(model_path),
+            num_games=100,
+            out_dir=context.run_dir / "analysis",
+            run_context=context,
+        )
+        if not success:
+            raise RuntimeError("Policy analysis failed")
+        context.complete(
+            {
+                "training_run_id": training_run["run_id"],
+                "model_path": str(model_path),
+            }
+        )
+        logger.info("Experiment completed in %s", context.run_dir)
+        return context
+    except Exception as error:
+        context.fail(error)
+        logger.exception("Experiment failed")
+        raise
+
+
+def _find_new_training_run(catalog, known_runs):
+    candidates = [
+        row
+        for row in catalog.list_runs(100_000)
+        if row["run_id"] not in known_runs and row["run_type"] == "ppo-training"
+    ]
+    if not candidates:
+        raise RuntimeError("Training completed without registering a PPO run")
+    return candidates[0]
+
+
+def _find_model(training_run):
+    models = sorted(Path(training_run["path"]).glob("models/*.zip"))
+    if not models:
+        raise FileNotFoundError(
+            f"No trained model found in run {training_run['run_id']}"
+        )
+    return models[-1]
+
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Run an end-to-end RL experiment pipeline.")
-    parser.add_argument("--config", type=str, default="config.yaml", help="Path to config.yaml")
-    args = parser.parse_args()
-    run_experiment(args.config)
+    parser = argparse.ArgumentParser(description="Run the PPO experiment pipeline")
+    parser.add_argument("--config", default="config.yaml")
+    arguments = parser.parse_args()
+    run_experiment(arguments.config)

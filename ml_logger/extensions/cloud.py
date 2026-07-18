@@ -1,5 +1,8 @@
 from typing import Any, Dict
 from ..core.plugins import LoggerPlugin
+from ..runtime import get_logger
+
+logger = get_logger(__name__)
 
 class WandbPlugin(LoggerPlugin):
     """An extension that syncs metrics to Weights & Biases."""
@@ -15,7 +18,7 @@ class WandbPlugin(LoggerPlugin):
                 self._wandb = wandb
             except ImportError:
                 self.enabled = False
-                print("Warning: 'wandb' package not found. Cloud syncing disabled.")
+                logger.warning("'wandb' package not found; cloud syncing disabled")
 
     def on_startup(self, config: Dict[str, Any]):
         if self.enabled and self._wandb:

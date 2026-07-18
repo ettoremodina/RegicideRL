@@ -19,8 +19,6 @@ training:
   total_timesteps: 100000
   checkpoint_freq: 20000
   model_name: "ppo_regicide_tuned"
-  log_dir: "runs/rl_logs"
-  save_dir: "models"
 
 tuning:
   n_trials: 1

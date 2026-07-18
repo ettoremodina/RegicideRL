@@ -11,7 +11,10 @@ htmlcov/
 .vscode/
 .idea/
 
-# Ignore outputs and legacy files
+# Canonical generated artifacts
+artifacts/
+
+# Pre-migration legacy outputs
 outputs/
 archive/
 logs/

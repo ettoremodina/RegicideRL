@@ -16,12 +16,12 @@ independently and implicitly assumes it can make different future choices for
 different determinizations. ISMCTS fixes this.
 """
 
-import logging
 from agents.base_agent import BaseAgent
 from agents.heuristic_agent import HeuristicAgent
 from agents.determinize import determinize_env
+from ml_logger import get_logger
 
-logger = logging.getLogger("pimc_agent")
+logger = get_logger(__name__)
 
 
 class PIMCAgent(BaseAgent):
@@ -144,4 +144,3 @@ class PIMCAgent(BaseAgent):
         if env.game.victory:
             return progress + 1.0
         return progress
-

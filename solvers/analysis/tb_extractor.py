@@ -2,6 +2,9 @@ import os
 import glob
 import pandas as pd
 from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
+from ml_logger import get_logger
+
+logger = get_logger(__name__)
 
 def find_latest_run(logdir_base="runs/rl_logs"):
     """Finds the most recently modified PPO run directory."""
@@ -17,10 +20,10 @@ def extract_tb_logs(logdir):
     Returns a dictionary of Pandas DataFrames.
     """
     if not logdir or not os.path.exists(logdir):
-        print(f"Log directory not found: {logdir}")
+        logger.warning("Log directory not found: %s", logdir)
         return {}
         
-    print(f"Extracting logs from: {logdir}")
+    logger.info("Extracting logs from %s", logdir)
     # Load events
     event_acc = EventAccumulator(logdir)
     event_acc.Reload()
@@ -42,6 +45,6 @@ def extract_tb_logs(logdir):
             df = pd.DataFrame([(e.step, e.value) for e in events], columns=['step', 'value'])
             dfs[name] = df
         else:
-            print(f"Warning: Tag {tag} not found in logs.")
+            logger.warning("Tag %s not found in logs", tag)
             
     return dfs

@@ -1,3 +1,0 @@
-2026-07-18 03:25:46,679 - Initialized run: run_20260718_032546
-2026-07-18 03:25:46,680 - Run directory: runs\run_20260718_032546
-2026-07-18 03:25:46,680 - Starting run with arguments: {'agent': 'random', 'episodes': 10, 'games_per_episode': 1000, 'jobs': 1, 'iterations': 1000, 'exploration': 10.0}

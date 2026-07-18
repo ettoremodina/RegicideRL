@@ -1,6 +1,8 @@
 import time
 import random
 import argparse
+from ml_logger import GameRecorder, get_logger, start_run
+from ml_logger.serialization import serialize_game
 from game.regicide import Game
 from game.action_handler import ActionHandler
 from solvers.parallel import ParallelSimulator
@@ -8,8 +10,11 @@ from agents.random_agent import RandomAgent
 from solvers.env import RegicideEnv
 from solvers.wrappers import NumericObsWrapper
 
-def simulate_normal(num_games=1000):
-    print("\n--- Normal (Single-Thread) Benchmark ---", flush=True)
+logger = get_logger(__name__)
+
+
+def simulate_normal(num_games=1000, recorder=None):
+    logger.info("Starting normal single-thread benchmark")
     start_time = time.time()
     
     handler = ActionHandler(max_hand_size=8)
@@ -19,10 +24,13 @@ def simulate_normal(num_games=1000):
     
     for i in range(num_games):
         game = Game(num_players=1)
+        if recorder:
+            recorder.begin_game(game, metadata={"benchmark": "normal", "index": i})
         res = {}
         required_defense = 0
         
         while not game.game_over:
+            state_before = serialize_game(game) if recorder else None
             current = game.current_player
             hand = game.get_player_hand(current)
             
@@ -32,10 +40,23 @@ def simulate_normal(num_games=1000):
                 if not actions:
                     # Auto defeat if cannot defend
                     game.game_over = True
+                    if recorder:
+                        recorder.record_event(
+                            {"kind": "no_defense", "phase": "defense"},
+                            {"message": "No valid defense"},
+                            game,
+                            state_before,
+                        )
                     break
                 action = random.choice(actions)
                 indices = handler.mask_to_card_indices(action, len(hand))
                 res = game.defend_with_card_indices(indices)
+                action_record = {
+                    "kind": "defend",
+                    "phase": "defense",
+                    "card_indices": indices,
+                    "cards": res.get("cards_discarded", []),
+                }
                 required_defense = res.get("defense_required", 0)
             else:
                 state_info = {
@@ -45,6 +66,13 @@ def simulate_normal(num_games=1000):
                 actions = handler.get_all_possible_actions(hand, "attack", state_info)
                 if not actions:
                     game.game_over = True
+                    if recorder:
+                        recorder.record_event(
+                            {"kind": "no_action", "phase": "attack"},
+                            {"message": "No valid attack"},
+                            game,
+                            state_before,
+                        )
                     break
                 action = random.choice(actions)
                 
@@ -52,18 +80,28 @@ def simulate_normal(num_games=1000):
                 
                 if is_solo_jester:
                     res = game.use_solo_jester("step1")
+                    action_record = {"kind": "solo_jester", "phase": "attack"}
                 else:
                     indices = handler.mask_to_card_indices(action, len(hand))
                     if handler.is_yield_action(action):
                         res = game.yield_turn()
+                        action_record = {"kind": "yield", "phase": "attack"}
                     else:
                         res = game.play_card(indices)
+                        action_record = {
+                            "kind": "play",
+                            "phase": "attack",
+                            "card_indices": indices,
+                            "cards": res.get("cards_played", []),
+                        }
                 
                 required_defense = res.get("defense_required", 0)
                 
                 # Handle Jester choice (solo mode defaults back to player 1)
                 if res.get("phase") == "next_player_choice":
                     game.choose_next_player(0)
+            if recorder:
+                recorder.record_event(action_record, res, game, state_before)
                     
             total_turns += 1
             
@@ -73,21 +111,24 @@ def simulate_normal(num_games=1000):
         # 12 enemies total
         enemies_left = len(game.castle_deck) + (1 if game.current_enemy and not game.victory else 0)
         enemies_defeated += (12 - enemies_left)
+        if recorder:
+            recorder.finish(game)
 
     elapsed = time.time() - start_time
     fps = num_games / elapsed
     
-    print(f"Games played: {num_games}")
-    print(f"Time taken: {elapsed:.2f} seconds")
-    print(f"Speed: {fps:.2f} games/second")
-    print(f"Avg turns per game: {total_turns / num_games:.1f}")
-    print(f"Win rate: {victories / num_games * 100:.2f}%")
-    print(f"Avg enemies defeated: {enemies_defeated / num_games:.2f} / 12")
+    logger.info(
+        "Normal benchmark: %d games, %.2fs, %.2f games/s, %.2f%% wins",
+        num_games,
+        elapsed,
+        fps,
+        victories / num_games * 100,
+    )
     return fps
 
-def simulate_parallel(num_games=1000, jobs=None):
-    print(f"\n--- Parallel Benchmark (Jobs: {jobs or 'Max'}) ---", flush=True)
-    simulator = ParallelSimulator(n_jobs=jobs)
+def simulate_parallel(num_games=1000, jobs=None, context=None):
+    logger.info("Starting parallel benchmark with jobs=%s", jobs or "max")
+    simulator = ParallelSimulator(n_jobs=jobs, run_context=context)
     
     metrics = simulator.run_eval(
         agent_cls=RandomAgent, 
@@ -96,20 +137,22 @@ def simulate_parallel(num_games=1000, jobs=None):
     )
     
     fps = metrics['games_per_second']
-    print(f"Games played: {num_games}")
-    print(f"Time taken: {metrics['total_time']:.2f} seconds")
-    print(f"Speed: {fps:.2f} games/second")
-    print(f"Avg turns per game: {metrics['avg_turns']:.1f}")
-    print(f"Win rate: {metrics['win_rate'] * 100:.2f}%")
-    print(f"Avg enemies defeated: {metrics['avg_enemies_defeated']:.2f} / 12")
+    logger.info(
+        "Parallel benchmark: %d games, %.2fs, %.2f games/s, %.2f%% wins",
+        num_games,
+        metrics["total_time"],
+        fps,
+        metrics["win_rate"] * 100,
+    )
+    simulator.close()
     return fps
 
-def simulate_training(device, steps=10000):
-    print(f"\n--- Training Benchmark ({device.upper()}) ---", flush=True)
+def simulate_training(device, steps=10000, recorder=None):
+    logger.info("Starting training benchmark on %s", device.upper())
     import torch
     from sb3_contrib.ppo_mask import MaskablePPO
     
-    raw_env = RegicideEnv(num_players=1)
+    raw_env = RegicideEnv(num_players=1, recorder=recorder)
     env = NumericObsWrapper(raw_env)
     
     model = MaskablePPO(
@@ -129,17 +172,20 @@ def simulate_training(device, steps=10000):
     elapsed = end_time - start_time
     fps = steps / elapsed
     
-    print(f"Device: {device.upper()}")
-    print(f"Steps: {steps}")
-    print(f"Time Elapsed: {elapsed:.2f} seconds")
-    print(f"Speed: {fps:.2f} steps/second")
+    logger.info(
+        "Training benchmark: device=%s, steps=%d, elapsed=%.2fs, speed=%.2f steps/s",
+        device.upper(),
+        steps,
+        elapsed,
+        fps,
+    )
     return fps
 
-def simulate_env(num_games=1000):
-    print("\n--- Env Benchmark ---", flush=True)
+def simulate_env(num_games=1000, recorder=None):
+    logger.info("Starting environment benchmark")
     start_time = time.time()
     
-    env = RegicideEnv(num_players=1)
+    env = RegicideEnv(num_players=1, recorder=recorder)
     victories = 0
     total_turns = 0
     
@@ -163,14 +209,16 @@ def simulate_env(num_games=1000):
     elapsed = time.time() - start_time
     fps = num_games / elapsed
     
-    print(f"Games played: {num_games}")
-    print(f"Time taken: {elapsed:.2f} seconds")
-    print(f"Speed: {fps:.2f} games/second")
-    print(f"Avg turns per game: {total_turns / num_games:.1f}")
-    print(f"Win rate: {victories / num_games * 100:.2f}%")
+    logger.info(
+        "Environment benchmark: %d games, %.2fs, %.2f games/s, %.2f%% wins",
+        num_games,
+        elapsed,
+        fps,
+        victories / num_games * 100,
+    )
     return fps
 
-def main():
+def build_parser():
     parser = argparse.ArgumentParser(description="Regicide Benchmarking Utility")
     parser.add_argument(
         "--mode",
@@ -186,48 +234,73 @@ def main():
     parser.add_argument("--jobs", type=int, default=None, 
                         help="Number of workers for parallel benchmark (default: max cores)")
     
-    args = parser.parse_args()
-    
-    modes_to_run = []
-    if args.mode == "all":
+    return parser
+
+
+def main():
+    args = build_parser().parse_args()
+    context = start_run("benchmark", config=vars(args))
+    recorder = GameRecorder(context) if context.game_recording_enabled else None
+    try:
+        modes_to_run = select_modes(args.mode)
+        results = run_benchmarks(args, modes_to_run, recorder, context)
+        output = context.save_result("benchmark.json", results)
+        context.complete({"result": str(output)})
+    except Exception as error:
+        context.fail(error)
+        logger.exception("Benchmark failed")
+        raise
+
+
+def select_modes(requested_mode):
+    if requested_mode == "all":
         modes_to_run = ["normal", "env", "parallel", "cpu"]
         import torch
 
         if torch.cuda.is_available():
             modes_to_run.append("gpu")
         else:
-            print("\nCUDA is not available. Skipping GPU benchmark in 'all' mode.")
+            logger.warning("CUDA is unavailable; skipping GPU benchmark")
     else:
-        modes_to_run = [args.mode]
+        modes_to_run = [requested_mode]
 
-    if args.mode == "gpu":
+    if requested_mode == "gpu":
         import torch
 
         if not torch.cuda.is_available():
-            print("\nCUDA is not available on this machine. Cannot benchmark GPU.")
-            return
-        
+            raise RuntimeError("CUDA is unavailable; cannot benchmark GPU")
+    return modes_to_run
+
+
+def run_benchmarks(args, modes_to_run, recorder, context):
     results = {}
-    
     if "normal" in modes_to_run:
-        results["Normal   (Games/sec)"] = simulate_normal(args.games)
-        
+        results["Normal   (Games/sec)"] = simulate_normal(args.games, recorder)
     if "env" in modes_to_run:
-        results["Env      (Games/sec)"] = simulate_env(args.games)
-        
+        results["Env      (Games/sec)"] = simulate_env(args.games, recorder)
     if "parallel" in modes_to_run:
-        results["Parallel (Games/sec)"] = simulate_parallel(args.games, args.jobs)
-        
+        results["Parallel (Games/sec)"] = simulate_parallel(
+            args.games,
+            args.jobs,
+            context,
+        )
     if "cpu" in modes_to_run:
-        results["Train CPU (Steps/sec)"] = simulate_training("cpu", args.steps)
-        
+        results["Train CPU (Steps/sec)"] = simulate_training(
+            "cpu",
+            args.steps,
+            recorder,
+        )
     if "gpu" in modes_to_run:
-        results["Train GPU (Steps/sec)"] = simulate_training("cuda", args.steps)
-            
+        results["Train GPU (Steps/sec)"] = simulate_training(
+            "cuda",
+            args.steps,
+            recorder,
+        )
     if len(results) > 1:
-        print("\n=== Summary ===")
+        logger.info("Benchmark summary")
         for name, fps in results.items():
-            print(f"{name}: {fps:.2f}")
+            logger.info("%s: %.2f", name, fps)
+    return results
 
 if __name__ == "__main__":
     main()

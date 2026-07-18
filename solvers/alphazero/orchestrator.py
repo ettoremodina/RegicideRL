@@ -11,7 +11,6 @@ Runs the synchronous Expert Iteration loop:
 
 import os
 import time
-import logging
 
 
 from solvers.alphazero.config import AlphaZeroConfig
@@ -19,9 +18,9 @@ from solvers.alphazero.trainer import AlphaZeroTrainer
 from solvers.alphazero.replay_buffer import ReplayBuffer
 from solvers.alphazero.self_play import generate_self_play_data
 from solvers.alphazero.eval import evaluate_network
-from solvers.logger import RunLogger
+from ml_logger import GameRecorder, RunContext, RunLogger, get_logger
 
-logger = logging.getLogger("alphazero.orchestrator")
+logger = get_logger(__name__)
 
 
 class AlphaZeroOrchestrator:
@@ -32,14 +31,21 @@ class AlphaZeroOrchestrator:
         resume_path: Optional checkpoint path to resume from.
     """
 
-    def __init__(self, config: AlphaZeroConfig, resume_path: str = None):
+    def __init__(
+        self,
+        config: AlphaZeroConfig,
+        resume_path: str = None,
+        run_context: RunContext | None = None,
+    ):
         self.config = config
         self.trainer = AlphaZeroTrainer(config)
         self.replay_buffer = ReplayBuffer(max_size=config.buffer_size)
         self.run_logger = RunLogger(
+            context=run_context,
+            run_type="alphazero",
             run_name="alphazero",
-            base_dir=config.save_dir,
         )
+        self.game_recorder = GameRecorder(self.run_logger.context)
 
         if resume_path:
             self.trainer.load_checkpoint(resume_path)
@@ -65,7 +71,10 @@ class AlphaZeroOrchestrator:
             sp_start = time.time()
             logger.info("Phase 1: Self-Play")
             game_data, sp_stats = generate_self_play_data(
-                self.trainer.network, self.config, device
+                self.trainer.network,
+                self.config,
+                device,
+                recorder=self.game_recorder,
             )
             self.replay_buffer.add_game(game_data)
             sp_time = time.time() - sp_start
@@ -101,7 +110,10 @@ class AlphaZeroOrchestrator:
             ev_start = time.time()
             logger.info("Phase 3: Evaluation")
             eval_stats = evaluate_network(
-                self.trainer.network, self.config, device
+                self.trainer.network,
+                self.config,
+                device,
+                recorder=self.game_recorder,
             )
             ev_time = time.time() - ev_start
             logger.info(

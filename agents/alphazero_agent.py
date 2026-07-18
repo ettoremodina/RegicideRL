@@ -5,17 +5,16 @@ Loads a checkpoint and uses MCTS with PUCT for action selection, making it
 compatible with the existing benchmark / evaluation infrastructure.
 """
 
-import logging
-
 import numpy as np
 import torch
 
 from agents.base_agent import BaseAgent
+from ml_logger import get_logger
 from solvers.alphazero.config import AlphaZeroConfig
 from solvers.alphazero.network import RegicideNet
 from solvers.alphazero.mcts import run_mcts
 
-logger = logging.getLogger("alphazero_agent")
+logger = get_logger(__name__)
 
 
 class AlphaZeroAgent(BaseAgent):

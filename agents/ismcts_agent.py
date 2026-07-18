@@ -22,12 +22,12 @@ Key differences from standard UCT:
 """
 
 import math
-import logging
 from agents.base_agent import BaseAgent
 from agents.heuristic_agent import HeuristicAgent
 from agents.determinize import determinize_env
+from ml_logger import get_logger
 
-logger = logging.getLogger("ismcts_agent")
+logger = get_logger(__name__)
 
 
 class ISMCTSNode:

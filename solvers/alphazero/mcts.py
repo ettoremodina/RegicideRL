@@ -13,16 +13,16 @@ The core ISMCTS mechanisms are preserved:
 """
 
 import math
-import logging
 
 import numpy as np
 import torch
 
 from agents.determinize import determinize_env
 from game.action_space import GLOBAL_ACTION_SPACE_SIZE
+from ml_logger import get_logger
 from solvers.alphazero.featurizer import encode_state
 
-logger = logging.getLogger("alphazero.mcts")
+logger = get_logger(__name__)
 
 
 class PUCTNode:

@@ -14,14 +14,12 @@ ppo:
   ent_coef: 0.002266137838935706
   device: "cpu"
   net_arch: [256, 256]
-  pretrained_model_path: "models/ppo_bc_pretrained"
+  pretrained_model_path: "artifacts/promoted_models/ppo_bc_pretrained"
 
 training:
   total_timesteps: 500000
   checkpoint_freq: 20000
   model_name: "ppo_regicide_tuned"
-  log_dir: "runs/rl_logs"
-  save_dir: "models"
 
 tuning:
   n_trials: 5
@@ -52,4 +50,3 @@ alphazero:
   max_iterations: 100
   checkpoint_freq: 5
   device: "cpu"
-  save_dir: "runs/alphazero"

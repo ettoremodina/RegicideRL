@@ -46,9 +46,75 @@ python benchmark.py --mode all
 
 ## Analyzing Results
 
-To analyze all games played by the AI and calculate metrics like win-rate:
+Every command creates an isolated run under `artifacts/runs/<date>/<run_id>`.
+To analyze recorded games and persist the aggregate result:
 ```bash
 python -m scripts.analyze_runs
+```
+
+To inspect the catalog or replay the recorded action sequence:
+```bash
+python -m scripts.runs list
+python -m scripts.runs games <run_id>
+python -m scripts.runs replay <game_id>
+```
+
+## Logging and artifacts
+
+`ml_logger` is the only application logging and persistence entry point.
+Modules acquire a logger with `get_logger(__name__)`; executable commands
+create a `RunContext` with `start_run(...)`. Application code must not use
+`print()` or write directly to `stdout`.
+
+Before every run, `ml_logger` reads [`logger_config.yaml`](logger_config.yaml).
+The main switches are:
+
+- `logging.enabled`, `console`, `file`, and `level`;
+- `terminal.colors`, `timezone`, visibility, and traceback rendering;
+- `saving.enabled`, `metrics`, `results`, and `telemetry`;
+- `games.enabled` and `recording_level`;
+- `run_type_overrides` for high-volume commands.
+
+`benchmark`, PPO, AlphaZero, tuning, and BC data generation disable individual
+game recording by default. To record benchmark games, change:
+
+```yaml
+run_type_overrides:
+  benchmark:
+    games:
+      enabled: true
+```
+
+`recording_level` accepts `summary`, `actions`, or `full`. A different
+configuration file can be selected without editing the repository by setting
+the `ML_LOGGER_CONFIG` environment variable. A minimal manifest and catalog
+entry are always retained; `saving.enabled` controls optional logger-managed
+artifacts, not explicitly requested outputs such as trained models.
+
+Generated data is organized as follows:
+
+```text
+artifacts/
+├── catalog.sqlite
+├── runs/<date>/<run_id>/
+│   ├── manifest.json
+│   ├── logs/run.log
+│   ├── metrics/
+│   ├── games/
+│   ├── datasets/
+│   ├── models/
+│   ├── checkpoints/
+│   └── analysis/
+├── datasets/
+├── promoted_models/
+└── legacy/
+```
+
+To migrate old `runs`, `logs`, `models`, `outputs`, `experiments`, and
+`archive` directories without deleting their contents:
+
+```bash
+python -m scripts.migrate_artifacts
 ```
 
 ## Generating Documentation
@@ -75,7 +141,7 @@ python -m solvers.train --help
 - `scripts/`: Diagnostic tools, game runners, and documentation generators (run them with `python -m scripts.<name>`).
 - `tests/`: Comprehensive test suite (`pytest`).
 - `rules/`: Text files containing reference rulebooks.
-- `logs/`, `runs/`, and `experiments/`: Generated runtime and experiment artifacts, excluded from new commits.
+- `artifacts/`: Canonical generated runs, games, models, datasets, analyses, and legacy outputs.
 
 ## Future Work
 - Implementing a multi-agent cooperative version of ISMCTS for 2-4 player scaling.

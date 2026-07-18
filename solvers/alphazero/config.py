@@ -51,8 +51,7 @@ class AlphaZeroConfig:
     max_iterations: int = 100  # Total outer-loop iterations
     checkpoint_freq: int = 5  # Save checkpoint every N iterations
 
-    # --- Paths ---
-    save_dir: str = "runs/alphazero"
+    # --- Artifact naming ---
     checkpoint_name: str = "alphazero_latest"
 
     # --- Device ---

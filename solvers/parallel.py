@@ -1,13 +1,17 @@
 import multiprocessing as mp
 import time
+from ml_logger import GameRecorder, RunContext, get_logger
 from .env import RegicideEnv
+
+logger = get_logger(__name__)
+
 
 def _worker_simulate(args):
     """
     Worker function to simulate games.
     We instantiate the agent and environment inside the worker to avoid pickling issues.
     """
-    agent_cls, agent_kwargs, num_games, worker_id = args
+    agent_cls, agent_kwargs, num_games, worker_id, recording = args
     
     status_dict = agent_kwargs.pop('status_dict', None)
     
@@ -16,7 +20,13 @@ def _worker_simulate(args):
     
     # Instantiate agent inside worker
     agent = agent_cls(**agent_kwargs)
-    env = RegicideEnv(num_players=1)
+    recorder = None
+    if recording:
+        recorder = GameRecorder.from_descriptor(
+            recording["context"],
+            recording["level"],
+        )
+    env = RegicideEnv(num_players=1, recorder=recorder)
     
     results = {
         'victories': 0,
@@ -42,6 +52,8 @@ def _worker_simulate(args):
             action = agent.select_action(obs, env=env)
                 
             if action is None:
+                if recorder and recorder.active:
+                    recorder.finish(env.game, reason="agent_returned_no_action")
                 break
                 
             obs, reward, terminated, truncated, info = env.step(action)
@@ -65,11 +77,22 @@ class ParallelSimulator:
     Simulates thousands of games across multiple CPU cores.
     Uses a persistent pool to avoid massive spawn overhead on Windows.
     """
-    def __init__(self, n_jobs=None):
+    def __init__(
+        self,
+        n_jobs=None,
+        run_context: RunContext | None = None,
+        recording_level=None,
+    ):
         if n_jobs is None:
             self.n_jobs = max(1, mp.cpu_count() - 1)
         else:
             self.n_jobs = max(1, n_jobs)
+        self.recording = None
+        if run_context and run_context.game_recording_enabled:
+            self.recording = {
+                "context": run_context.descriptor(),
+                "level": recording_level or run_context.game_recording_level,
+            }
 
         self.manager = None
         self.status_dict = None
@@ -95,7 +118,13 @@ class ParallelSimulator:
         start_time = time.time()
 
         if self.n_jobs == 1:
-            worker_args = (agent_cls, dict(agent_kwargs), total_games, 1)
+            worker_args = (
+                agent_cls,
+                dict(agent_kwargs),
+                total_games,
+                1,
+                self.recording,
+            )
             results_list = [_worker_simulate(worker_args)]
             return self._aggregate_results(results_list, total_games, start_time)
         
@@ -112,25 +141,21 @@ class ParallelSimulator:
             if n_games > 0:
                 w_kwargs = dict(agent_kwargs)
                 w_kwargs['status_dict'] = self.status_dict
-                worker_args.append((agent_cls, w_kwargs, n_games, i + 1))
+                worker_args.append(
+                    (agent_cls, w_kwargs, n_games, i + 1, self.recording)
+                )
                 
         if not worker_args:
             return None
             
-        import sys
-        print("\n" * self.n_jobs)  # Pre-allocate lines for the dashboard
-        
         result = self.pool.starmap_async(_worker_simulate, [(args,) for args in worker_args])
         
         while not result.ready():
-            # Move cursor up and print worker states
-            sys.stdout.write(f"\033[{self.n_jobs}F")
-            for i in range(1, self.n_jobs + 1):
-                # Clear line and print
-                sys.stdout.write("\033[K")
-                status = self.status_dict.get(i, "Idle")
-                print(f"Worker {i}: {status}")
-            sys.stdout.flush()
+            statuses = [
+                f"{worker_id}:{self.status_dict.get(worker_id, 'Idle')}"
+                for worker_id in range(1, self.n_jobs + 1)
+            ]
+            logger.debug("Worker status: %s", " | ".join(statuses))
             time.sleep(0.5)
             
         results_list = result.get()

@@ -1,7 +1,7 @@
 import argparse
 from dataclasses import fields
 
-from .logger import RunLogger
+from ml_logger import RunLogger, start_run
 from .parallel import ParallelSimulator
 from .metrics import plot_metrics
 
@@ -39,11 +39,16 @@ def main():
 
 
 def run_evaluation(args):
-    logger = RunLogger()
+    context = start_run(
+        "evaluation",
+        name=f"{args.agent}-evaluation",
+        config=vars(args),
+    )
+    logger = RunLogger(context=context, run_name="solver.evaluation")
     logger.log(f"Starting run with arguments: {vars(args)}")
     agent_cls = get_agent_class(args.agent)
     logger.log(f"Using Agent: {agent_cls.__name__}")
-    simulator = ParallelSimulator(n_jobs=args.jobs)
+    simulator = ParallelSimulator(n_jobs=args.jobs, run_context=context)
     logger.log(f"Initialized ParallelSimulator with {simulator.n_jobs} workers")
     episodes = args.episodes or DEFAULT_EPISODES
     games_per_episode = args.games_per_episode or DEFAULT_GAMES_PER_EPISODE
@@ -61,12 +66,16 @@ def run_evaluation(args):
             logger.log(f"  Avg Turns: {metrics['avg_turns']:.1f}")
             logger.log(f"  Speed: {metrics['games_per_second']:.2f} games/sec")
             logger.log_metrics(step=episode, metrics_dict=metrics)
+    except Exception as error:
+        context.fail(error)
+        raise
     finally:
         simulator.close()
 
     logger.log("Run completed. Generating plots...")
     plot_metrics(logger.get_run_dir())
     logger.log(f"Plots saved in {logger.get_run_dir()}")
+    context.complete({"episodes": episodes, "games_per_episode": games_per_episode})
 
 
 def get_agent_class(name):
@@ -117,7 +126,21 @@ def train_alphazero(args):
     for name, value in overrides.items():
         if value is not None:
             setattr(config, name, value)
-    AlphaZeroOrchestrator(config, resume_path=args.resume).run()
+    context = start_run(
+        "alphazero",
+        name="alphazero-training",
+        config=config_data,
+    )
+    try:
+        AlphaZeroOrchestrator(
+            config,
+            resume_path=args.resume,
+            run_context=context,
+        ).run()
+        context.complete()
+    except Exception as error:
+        context.fail(error)
+        raise
 
 
 if __name__ == "__main__":

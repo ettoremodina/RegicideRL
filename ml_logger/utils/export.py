@@ -1,11 +1,14 @@
 import json
 import csv
 from pathlib import Path
+from ..runtime import get_logger
+
+logger = get_logger(__name__)
 
 def jsonl_to_csv(jsonl_path: Path, csv_path: Path):
     """Converts a JSONL file to a CSV file."""
     if not jsonl_path.exists():
-        print(f"Warning: {jsonl_path} does not exist.")
+        logger.warning("%s does not exist", jsonl_path)
         return
 
     data = []
@@ -23,7 +26,7 @@ def jsonl_to_csv(jsonl_path: Path, csv_path: Path):
                 pass
 
     if not data:
-        print(f"No valid data found in {jsonl_path}.")
+        logger.warning("No valid data found in %s", jsonl_path)
         return
 
     # Ensure consistent column ordering (timestamp first if exists)
@@ -37,7 +40,7 @@ def jsonl_to_csv(jsonl_path: Path, csv_path: Path):
         writer.writeheader()
         writer.writerows(data)
         
-    print(f"Successfully exported {len(data)} rows to {csv_path}")
+    logger.info("Exported %d rows to %s", len(data), csv_path)
 
 def export_run_to_csv(save_dir: str):
     """Finds telemetry and metrics JSONL files and exports them to CSV."""

@@ -2,9 +2,9 @@ from enum import Enum
 from typing import List, Optional, Dict
 import random
 import logging
+from ml_logger import get_logger
 
-logger = logging.getLogger("regicide")
-logger.addHandler(logging.NullHandler())
+logger = get_logger(__name__)
 
 class Suit(Enum):
     HEARTS = "♥"
@@ -176,7 +176,7 @@ class Game:
         random.shuffle(kings)
         
         self.castle_deck = jacks + queens + kings
-        logger.info(f"Castle deck prepared with 12 enemies.")
+        logger.debug("Castle deck prepared with 12 enemies")
         
         # Create tavern deck
         for suit in Suit:
@@ -206,7 +206,7 @@ class Game:
         # Reveal first enemy
         if self.castle_deck:
             self.current_enemy = Enemy(self.castle_deck.pop(0))
-            logger.info(f"First enemy revealed: {self.current_enemy}")
+            logger.debug("First enemy revealed: %s", self.current_enemy)
         # Reset any lingering attack buffer at start
         self.attack_cards_buffer = []
     
@@ -329,9 +329,13 @@ class Game:
         for i in sorted(card_indices, reverse=True):
             player_hand.pop(i)
         
-        if logger.isEnabledFor(logging.INFO):
+        if logger.isEnabledFor(logging.DEBUG):
             cards_played_str = [str(card) for card in cards_to_play]
-            logger.info(f"Player {self.current_player + 1} plays: {', '.join(cards_played_str)}")
+            logger.debug(
+                "Player %d plays: %s",
+                self.current_player + 1,
+                ", ".join(cards_played_str),
+            )
         else:
             cards_played_str = []
 
@@ -370,8 +374,13 @@ class Game:
         initial_damage = self.current_enemy.damage_taken
         self.current_enemy.damage_taken += total_attack
         actual_damage = self.current_enemy.damage_taken - initial_damage
-        if logger.isEnabledFor(logging.INFO):
-            logger.info(f"Enemy takes {actual_damage} damage. (Total HP: {self.current_enemy.health - self.current_enemy.damage_taken}/{self.current_enemy.health})")
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(
+                "Enemy takes %d damage; HP=%d/%d",
+                actual_damage,
+                self.current_enemy.health - self.current_enemy.damage_taken,
+                self.current_enemy.health,
+            )
         
         # Check if enemy defeated
         if self.current_enemy.is_defeated():
@@ -402,8 +411,8 @@ class Game:
         else:
             # Enemy attacks - check if defense is needed
             enemy_attack = self.current_enemy.get_effective_attack()
-            if logger.isEnabledFor(logging.INFO):
-                logger.info(f"Enemy counter-attacks for {enemy_attack} damage.")
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug("Enemy counter-attacks for %d damage", enemy_attack)
             if enemy_attack == 0:
                 self._next_player()
                 return {
@@ -563,15 +572,21 @@ class Game:
         # Exact kill -> enemy card goes to TOP of tavern deck (end of list)
         if self.current_enemy.damage_taken == self.current_enemy.health:
             self.tavern_deck.append(self.current_enemy.card)
-            logger.info(f"Enemy exactly defeated! {self.current_enemy.card} joins the Tavern.")
+            logger.debug(
+                "Enemy exactly defeated; %s joins the Tavern",
+                self.current_enemy.card,
+            )
         else:
             self.discard_pile.append(self.current_enemy.card)
-            logger.info(f"Enemy defeated! {self.current_enemy.card} moves to discard.")
+            logger.debug(
+                "Enemy defeated; %s moves to discard",
+                self.current_enemy.card,
+            )
 
         # Reset for next enemy
         if self.castle_deck:
             self.current_enemy = Enemy(self.castle_deck.pop(0))
-            logger.info(f"New enemy revealed: {self.current_enemy}")
+            logger.debug("New enemy revealed: %s", self.current_enemy)
             self.jester_immunity_cancelled = False
             self.attack_cards_buffer = []
             self.blocked_spade_value = 0
@@ -621,9 +636,14 @@ class Game:
         
         # Calculate total defense value
         defense_value = sum(card.get_discard_value() for card in cards_to_discard)
-        if logger.isEnabledFor(logging.INFO):
+        if logger.isEnabledFor(logging.DEBUG):
             cards_discarded_str = [str(card) for card in cards_to_discard]
-            logger.info(f"Player {self.current_player + 1} defends with {', '.join(cards_discarded_str)} (value: {defense_value})")
+            logger.debug(
+                "Player %d defends with %s (value=%d)",
+                self.current_player + 1,
+                ", ".join(cards_discarded_str),
+                defense_value,
+            )
         else:
             cards_discarded_str = []
         
@@ -745,13 +765,13 @@ class Game:
         
         # Mark current player as yielded
         self.players_yielded_this_round[self.current_player] = True
-        if logger.isEnabledFor(logging.INFO):
-            logger.info(f"Player {self.current_player + 1} yields their turn.")
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug("Player %d yields", self.current_player + 1)
         
         # Enemy attacks
         enemy_damage = self.current_enemy.get_effective_attack()
-        if logger.isEnabledFor(logging.INFO):
-            logger.info(f"Enemy counter-attacks for {enemy_damage} damage.")
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug("Enemy counter-attacks for %d damage", enemy_damage)
         if enemy_damage == 0:
             self._next_player()
             return {

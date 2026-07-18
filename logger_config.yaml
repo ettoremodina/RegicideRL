@@ -1,13 +1,14 @@
+# Central runtime switches read before every ml_logger run.
 version: 1
 
 artifacts:
   root_dir: artifacts
 
 logging:
-  enabled: true
-  level: INFO
-  console: true
-  file: true
+  enabled: true       # Master switch for application log messages.
+  level: INFO         # DEBUG, INFO, WARNING, ERROR, or CRITICAL.
+  console: true       # Show log messages in the terminal.
+  file: true          # Save logs/run.log inside the run directory.
 
 terminal:
   colors: true
@@ -19,22 +20,22 @@ terminal:
   rich_tracebacks: true
 
 saving:
-  enabled: true
-  metrics: true
-  results: true
-  telemetry: false
+  enabled: true       # Master switch for optional logger-managed artifacts.
+  metrics: true       # Save metrics/metrics.jsonl.
+  results: true       # Save JSON results produced through RunContext.
+  telemetry: false    # Save hardware telemetry when using the dashboard.
 
 games:
-  enabled: true
-  recording_level: actions
+  enabled: true       # Save real game histories unless overridden below.
+  recording_level: actions  # summary, actions, or full.
 
 dashboard:
   refresh_rate: 4
   max_log_lines: 50
   telemetry_interval_sec: 10
 
-# High-volume workflows are fast by default. Remove an override or set its
-# games.enabled flag to true when individual game histories are required.
+# Per-run settings are merged over the global flags. These defaults prevent
+# game-by-game disk I/O in high-volume workflows.
 run_type_overrides:
   benchmark:
     games:

@@ -10,8 +10,9 @@ from rich.panel import Panel
 from ..configs.config_loader import load_config
 from ..utils.system import get_cpu_usage, get_ram_usage, get_gpu_usage
 from ..utils.formatting import Highlighter
-from ..utils.file_io import FileWriter
 from ..utils.export import export_run_to_csv
+from ..runtime import configure_logging
+from ..storage import RunContext
 from .handler import DashboardLogHandler
 from .layout import (
     create_command_center_layout, 
@@ -22,15 +23,22 @@ from .layout import (
 from .progress import ProgressManager
 
 class DashboardLogger:
-    def __init__(self, config_path: str = None):
+    def __init__(
+        self,
+        config_path: str = None,
+        run_context: RunContext | None = None,
+    ):
         # Load unified configuration
-        self.config = load_config(config_path)
+        self.config = load_config(config_path, run_type="dashboard")
         
-        self.refresh_rate = self.config.get('settings', {}).get('refresh_rate', 4)
-        max_log_lines = self.config.get('settings', {}).get('max_log_lines', 50)
+        dashboard_config = self.config.get("dashboard", {})
+        self.refresh_rate = dashboard_config.get("refresh_rate", 4)
+        max_log_lines = dashboard_config.get("max_log_lines", 50)
         
         # Telemetry
-        self.telemetry_interval = self.config.get('saving', {}).get('telemetry_interval_sec', 10)
+        self.telemetry_interval = dashboard_config.get(
+            "telemetry_interval_sec", 10
+        )
         self._last_telemetry_time = 0
         
         # Internal state
@@ -42,23 +50,31 @@ class DashboardLogger:
         self._layout = create_command_center_layout()
         self._plugins = []
         
+        self.run_context = run_context or RunContext.create(
+            "dashboard",
+            settings=self.config,
+        )
+        self._owns_context = run_context is None
+        self._metric_step = 0
+
         # Utilities
-        self.file_writer = FileWriter(self.config.get('saving', {}))
         self.highlighter = Highlighter(self.config.get('highlights', []))
         self.progress_manager = ProgressManager()
         
-        # Setup Root Logger Interception
+        # Setup root logger interception without removing third-party handlers.
+        configure_logging(self.run_context, console=False)
         self.root_logger = logging.getLogger()
         self.root_logger.setLevel(logging.INFO)
         
         formatter = logging.Formatter("[dim]%(asctime)s[/dim] [%(levelname)s] %(name)s: %(message)s", datefmt="%H:%M:%S")
-        self.handler = DashboardLogHandler(self.log_queue, self.lock, self.highlighter, self.file_writer)
+        self.handler = DashboardLogHandler(
+            self.log_queue,
+            self.lock,
+            self.highlighter,
+        )
         self.handler.setFormatter(formatter)
         
-        # Remove existing handlers to avoid duplicates
-        for h in self.root_logger.handlers[:]:
-            self.root_logger.removeHandler(h)
-        
+        setattr(self.handler, "_ml_logger_managed", True)
         self.root_logger.addHandler(self.handler)
 
     def add_plugin(self, plugin):
@@ -93,8 +109,11 @@ class DashboardLogger:
                 self.metrics[category] = {}
             self.metrics[category][name] = value
         
-        # Save locally
-        self.file_writer.log_metric(category, name, value)
+        self._metric_step += 1
+        self.run_context.log_metrics(
+            self._metric_step,
+            {"category": category, "metric": name, "value": value},
+        )
         
         # Broadcast to plugins
         for plugin in self._plugins:
@@ -102,15 +121,23 @@ class DashboardLogger:
 
     def log_metadata(self, info_dict: dict):
         """Saves static information (model architecture, configs) to JSON."""
-        self.file_writer.log_metadata(info_dict)
+        self.run_context.save_result(
+            "dashboard_metadata.json",
+            info_dict,
+            category="analysis",
+        )
 
     def log_game_run(self, run_data: dict):
         """Saves a complete game run record (e.g. states, actions, outcome)."""
-        self.file_writer.log_game_run(run_data)
+        self.run_context.save_result(
+            f"legacy_game_{time.time_ns()}.json",
+            run_data,
+            category="games",
+        )
         
     def export_to_csv(self):
         """Exports all saved JSONL metrics and telemetry to CSV files."""
-        save_dir = self.config.get('saving', {}).get('save_dir', './logs')
+        save_dir = self.run_context.run_dir / "metrics"
         export_run_to_csv(save_dir)
 
     # --- Layout Rendering ---
@@ -140,7 +167,9 @@ class DashboardLogger:
         # 4. Save Telemetry periodically
         current_time = time.time()
         if current_time - self._last_telemetry_time >= self.telemetry_interval:
-            self.file_writer.log_telemetry(cpu, ram, gpus)
+            self.run_context.log_telemetry(
+                {"cpu_percent": cpu, "ram_percent": ram, "gpus": gpus}
+            )
             self._last_telemetry_time = current_time
         
         # 5. Update Progress Bar
@@ -167,3 +196,5 @@ class DashboardLogger:
             
         for plugin in self._plugins:
             plugin.on_shutdown()
+        if self._owns_context and self.run_context.manifest["status"] == "running":
+            self.run_context.complete()

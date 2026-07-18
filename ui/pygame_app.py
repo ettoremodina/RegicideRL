@@ -1,15 +1,17 @@
 import pygame
-import sys
 from typing import Optional
 
 from game.regicide import Game
 from game.action_handler import ActionHandler
+from ml_logger import GameRecorder, RunContext, get_logger, start_run
+from ml_logger.serialization import serialize_game
 from .theme import DARK_THEME
 from .ui_elements import Button, HealthBar, draw_card
 from .sound import play_thud, play_draw, play_shimmer, play_clang, play_victory, play_defeat
 
 # Font utilities
 pygame.font.init()
+logger = get_logger(__name__)
 
 def get_font(name: str, size: int, bold=False):
     # Fallbacks if specific fonts aren't available
@@ -26,7 +28,9 @@ def get_font(name: str, size: int, bold=False):
         return pygame.font.Font(None, size)
 
 class RegicideApp:
-    def __init__(self):
+    def __init__(self, run_context: RunContext | None = None):
+        self.run_context = run_context or start_run("ui-session")
+        self.recorder = GameRecorder(self.run_context)
         pygame.init()
         infoObject = pygame.display.Info()
         self.width, self.height = infoObject.current_w, infoObject.current_h
@@ -84,12 +88,12 @@ class RegicideApp:
         self.action_scroll_y = 0
         self.action_handler = ActionHandler(max_hand_size=self.game.get_max_hand_size())
         self._build_game_ui()
-        
-        # Clear log file on new game
-        with open("ui_game_log.txt", "w", encoding="utf-8") as f:
-            f.write("--- New Game Started ---\n")
-            
+        self.recorder.begin_game(
+            self.game,
+            metadata={"source": "pygame", "num_players": n},
+        )
         self.action_log = ["Game started!"]
+        logger.info("Started %d-player UI game", n)
 
     def _build_game_ui(self):
         # Action Buttons
@@ -104,29 +108,35 @@ class RegicideApp:
         self.action_log.append(text)
         if len(self.action_log) > 8:
             self.action_log.pop(0)
-            
-        try:
-            with open("ui_game_log.txt", "a", encoding="utf-8") as f:
-                f.write(text + "\n")
-        except Exception:
-            pass
+        logger.info("%s", text)
 
     # --- Actions ---
     def _on_play(self):
         if not self.selected_indices or self.state != "GAME": return
-        res = self.game.play_card(sorted(self.selected_indices))
+        indices = sorted(self.selected_indices)
+        cards = [str(self.game.get_current_player_hand()[index]) for index in indices]
+        res = self._record_action(
+            {"kind": "play", "phase": "attack", "card_indices": indices, "cards": cards},
+            lambda: self.game.play_card(indices),
+        )
         self.selected_indices = []
         self._handle_result(res)
 
     def _on_yield(self):
         if self.state != "GAME": return
-        res = self.game.yield_turn()
+        res = self._record_action(
+            {"kind": "yield", "phase": "attack"},
+            self.game.yield_turn,
+        )
         self._handle_result(res)
 
     def _on_jester(self):
         if self.state not in ("GAME", "DEFENSE"): return
         timing = "step1" if self.state == "GAME" else "step4"
-        res = self.game.use_solo_jester(timing)
+        res = self._record_action(
+            {"kind": "solo_jester", "phase": self.state.lower(), "timing": timing},
+            lambda: self.game.use_solo_jester(timing),
+        )
         if res.get("success"):
             self.selected_indices = []
             self.log("Used Solo Jester! Refilled hand.")
@@ -135,10 +145,16 @@ class RegicideApp:
                 self.state = "GAME_OVER"
                 self.game_over_msg = "Defeat... No possible defense."
                 play_defeat()
+                self._finish_recording("no_possible_defense")
 
     def _on_defend(self):
         if self.state != "DEFENSE": return
-        res = self.game.defend_with_card_indices(sorted(self.selected_indices))
+        indices = sorted(self.selected_indices)
+        cards = [str(self.game.get_current_player_hand()[index]) for index in indices]
+        res = self._record_action(
+            {"kind": "defend", "phase": "defense", "card_indices": indices, "cards": cards},
+            lambda: self.game.defend_with_card_indices(indices),
+        )
         self.selected_indices = []
         self.log(res.get("message", "Defense resolved."))
         
@@ -147,6 +163,23 @@ class RegicideApp:
             self.game_over_msg = "Defeat... The party has fallen."
         else:
             self.state = "GAME"
+        self._finish_recording_if_over(res)
+
+    def _record_action(self, action, operation):
+        if not self.recorder.enabled:
+            return operation()
+        state_before = serialize_game(self.game)
+        result = operation()
+        self.recorder.record_event(action, result, self.game, state_before)
+        return result
+
+    def _finish_recording_if_over(self, result):
+        if self.game.game_over and self.recorder.active:
+            self._finish_recording(result.get("message"))
+
+    def _finish_recording(self, reason):
+        if self.recorder.active:
+            self.recorder.finish(self.game, reason=reason)
 
     def _handle_result(self, res: dict):
         if not res: return
@@ -191,6 +224,7 @@ class RegicideApp:
             else:
                 self.game_over_msg = "Defeat... The party has fallen."
                 play_defeat()
+        self._finish_recording_if_over(res)
 
     # --- Updates ---
     def _update_ui_state(self):
@@ -253,7 +287,18 @@ class RegicideApp:
                         for i in range(self.game.num_players):
                             rect = pygame.Rect(self.width//2 - 100 + i*60, self.height//2, 50, 40)
                             if rect.collidepoint(px, py):
-                                if self.game.choose_next_player(i):
+                                result = self._record_action(
+                                    {
+                                        "kind": "choose_next_player",
+                                        "phase": "jester_choice",
+                                        "chosen_player": i,
+                                    },
+                                    lambda: {
+                                        "success": self.game.choose_next_player(i),
+                                        "message": f"Chose player {i + 1}",
+                                    },
+                                )
+                                if result["success"]:
                                     self.log(f"Jester chose Player {i+1}")
                                     self.jester_active = False
                                     self.selected_indices = []
@@ -489,14 +534,22 @@ class RegicideApp:
         self.screen.blit(msg, msg.get_rect(center=(self.width//2, 300)))
 
     def run(self):
-        running = True
-        while running:
-            running = self.handle_events()
-            self.draw()
-            self.clock.tick(60)
-        
-        pygame.quit()
-        sys.exit()
+        try:
+            running = True
+            while running:
+                running = self.handle_events()
+                self.draw()
+                self.clock.tick(60)
+        except Exception as error:
+            self.run_context.fail(error)
+            logger.exception("UI session failed")
+            raise
+        finally:
+            if self.recorder.active:
+                self.recorder.abort("ui_closed")
+            if self.run_context.manifest["status"] == "running":
+                self.run_context.complete()
+            pygame.quit()
 
 if __name__ == "__main__":
     app = RegicideApp()

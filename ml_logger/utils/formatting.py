@@ -11,6 +11,11 @@ class Highlighter:
     def apply(self, text: str) -> Text:
         """Applies highlighting rules and returns a Rich Text object."""
         text_obj = Text.from_markup(text)
+        return self(text_obj)
+
+    def __call__(self, text: Text) -> Text:
+        """Apply configured styles to a Rich log message."""
+        text_obj = text.copy()
         for pattern, style in self.highlight_rules:
             for match in pattern.finditer(text_obj.plain):
                 text_obj.stylize(style, match.start(), match.end())

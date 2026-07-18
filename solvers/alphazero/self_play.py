@@ -7,18 +7,17 @@ Plays full games using MCTS + the neural network, recording
 retroactively to all states in the game.
 """
 
-import logging
-
 import numpy as np
 
+from ml_logger import get_logger
 from solvers.env import RegicideEnv
 from solvers.alphazero.featurizer import encode_state
 from solvers.alphazero.mcts import run_mcts
 
-logger = logging.getLogger("alphazero.self_play")
+logger = get_logger(__name__)
 
 
-def run_self_play_game(network, config, device):
+def run_self_play_game(network, config, device, recorder=None):
     """Play one full game via MCTS+Network and return training data.
 
     Args:
@@ -32,7 +31,7 @@ def run_self_play_game(network, config, device):
             every state in the game.
         game_info: Dict with game-level stats (enemies_defeated, victory).
     """
-    env = RegicideEnv(num_players=1)
+    env = RegicideEnv(num_players=1, recorder=recorder)
     obs, _ = env.reset()
 
     history = []  # [(state_vector, policy_vector), ...]
@@ -98,7 +97,7 @@ def run_self_play_game(network, config, device):
     return game_data, game_info
 
 
-def generate_self_play_data(network, config, device):
+def generate_self_play_data(network, config, device, recorder=None):
     """Run multiple self-play games and aggregate results.
 
     Args:
@@ -115,7 +114,12 @@ def generate_self_play_data(network, config, device):
     victories = 0
 
     for game_i in range(config.games_per_iteration):
-        game_data, game_info = run_self_play_game(network, config, device)
+        game_data, game_info = run_self_play_game(
+            network,
+            config,
+            device,
+            recorder=recorder,
+        )
         all_data.extend(game_data)
         total_enemies += game_info["enemies_defeated"]
         victories += int(game_info["victory"])
