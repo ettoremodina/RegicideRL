@@ -50,3 +50,67 @@ alphazero:
   max_iterations: 100
   checkpoint_freq: 5
   device: "cpu"
+
+experimental_report:
+  protocol:
+    games_per_agent: 100
+    base_seed: 20260718
+    max_decisions_per_game: 500
+    confidence_level: 0.95
+    bootstrap_samples: 5000
+  agents:
+    random:
+      enabled: true
+      class_path: "agents.random_agent.RandomAgent"
+      label: "Random"
+      family: "Baseline"
+      description: "Seleziona uniformemente una delle azioni valide."
+      kwargs:
+        name: "Random"
+    heuristic:
+      enabled: true
+      class_path: "agents.heuristic_agent.HeuristicAgent"
+      label: "Heuristic"
+      family: "Rule-based"
+      description: "Valuta le azioni con regole strategiche su difesa, danno, semi e conservazione delle carte."
+      kwargs:
+        name: "Heuristic"
+    pimc:
+      enabled: true
+      class_path: "agents.pimc_agent.PIMCAgent"
+      label: "PIMC"
+      family: "Search"
+      description: "Campiona stati nascosti, esegue rollout euristici e sceglie l'azione con rendimento medio maggiore."
+      kwargs:
+        name: "PIMC"
+        n_determinizations: 10
+    ismcts:
+      enabled: true
+      class_path: "agents.ismcts_agent.ISMCTSAgent"
+      label: "ISMCTS"
+      family: "Search"
+      description: "Costruisce un albero condiviso tra determinizzazioni e usa UCB1 corretto per la disponibilità delle azioni."
+      kwargs:
+        name: "ISMCTS"
+        n_iterations: 50
+        exploration_constant: 14.14
+    ppo:
+      enabled: false
+      class_path: "agents.ppo_agent.PPOAgent"
+      label: "PPO"
+      family: "Reinforcement learning"
+      description: "Politica MaskablePPO addestrata su osservazioni numeriche e vincoli di validità delle azioni."
+      kwargs:
+        name: "PPO"
+        model_path: "artifacts/promoted_models/ppo_regicide.zip"
+    alphazero:
+      enabled: false
+      class_path: "agents.alphazero_agent.AlphaZeroAgent"
+      label: "AlphaZero"
+      family: "Neural tree search"
+      description: "Combina una rete policy-value con Monte Carlo Tree Search guidata da PUCT."
+      kwargs:
+        name: "AlphaZero"
+        checkpoint_path: "artifacts/promoted_models/alphazero"
+        n_simulations: 50
+        device: "cpu"

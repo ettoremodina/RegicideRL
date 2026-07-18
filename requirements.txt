@@ -13,3 +13,4 @@ seaborn
 optuna
 psutil
 tqdm
+scipy

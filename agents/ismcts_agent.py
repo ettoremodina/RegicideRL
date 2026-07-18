@@ -139,6 +139,9 @@ class ISMCTSAgent(BaseAgent):
         if not valid_actions:
             return None
         if len(valid_actions) == 1:
+            # A forced move was not searched, so the retained root cannot be
+            # advanced reliably to the following information set.
+            self.root = None
             return valid_actions[0]
 
         # Use existing tree or build a new one
@@ -171,16 +174,29 @@ class ISMCTSAgent(BaseAgent):
             # 2-5. Select → Expand → Rollout → Backpropagate
             self._run_iteration(root, sim_env)
 
-        # Pick action with highest visit count (most robust choice)
-        best_action = max(
-            root.children.keys(),
-            key=lambda a: root.children[a].visit_count
-        )
+        # A retained tree can contain children produced under a previous
+        # determinization. New observations (especially drawn cards) can make
+        # those actions illegal in the real hand, so only current legal actions
+        # may participate in the final choice.
+        best_action = self._best_root_action(root, valid_actions)
         
         # Advance the root for the next turn
         self.root = root.children.get(best_action, None)
 
         return best_action
+
+    @staticmethod
+    def _best_root_action(root, valid_actions):
+        """Return the most visited root child that is legal right now."""
+        candidates = [
+            action for action in valid_actions if action in root.children
+        ]
+        if not candidates:
+            raise RuntimeError("ISMCTS search produced no currently legal root action")
+        return max(
+            candidates,
+            key=lambda action: root.children[action].visit_count,
+        )
 
     def _run_iteration(self, root, sim_env):
         """Run one full ISMCTS iteration: select → expand → rollout → backprop.

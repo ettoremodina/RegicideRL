@@ -59,6 +59,32 @@ python -m scripts.runs games <run_id>
 python -m scripts.runs replay <game_id>
 ```
 
+### Experimental comparison report
+
+The reproducible comparison pipeline evaluates every enabled agent on the same
+seeds and generates CSV/Markdown/LaTeX tables, statistical tests, plots, and an
+Italian report:
+
+```bash
+python -m scripts.experimental_report.orchestrator
+```
+
+For a quick smoke run or a selected subset:
+
+```bash
+python -m scripts.experimental_report.orchestrator \
+  --agents random heuristic \
+  --games 10 \
+  --base-seed 42
+```
+
+Agent classes, model paths, search budgets, sample size, seed, confidence level,
+and bootstrap count are configured centrally under `experimental_report` in
+[`config.yaml`](config.yaml). PPO and AlphaZero are present but disabled until
+valid promoted-model paths are configured. See
+[`docs/experimental_report.md`](docs/experimental_report.md) for the output
+layout and analysis protocol.
+
 ## Logging and artifacts
 
 `ml_logger` is the only application logging and persistence entry point.
