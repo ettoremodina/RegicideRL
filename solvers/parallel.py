@@ -67,7 +67,7 @@ class ParallelSimulator:
     """
     def __init__(self, n_jobs=None):
         if n_jobs is None:
-            self.n_jobs = max(1, mp.cpu_count() - 1)
+            self.n_jobs = 6
         else:
             self.n_jobs = n_jobs
             
