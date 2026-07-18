@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import argparse
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from dataclasses import dataclass, field
 import json
 import random
+import sys
 import time
 from pathlib import Path
 from typing import Any
@@ -45,14 +48,31 @@ GAME_COLUMNS = (
 )
 
 
+@dataclass
+class EvaluationStore:
+    """Parent-process state for durable experimental results."""
+
+    context: RunContext
+    rows: list[dict[str, Any]]
+    output_path: Path
+    completed: set[tuple[str, int]] = field(init=False)
+
+    def __post_init__(self):
+        self.completed = {
+            (row["agent"], int(row["seed"])) for row in self.rows
+        }
+
+
 def run_comparison(
     config_path: str | Path = "config.yaml",
     requested_agents: list[str] | None = None,
     games: int | None = None,
     base_seed: int | None = None,
     run_context: RunContext | None = None,
+    jobs: int = 1,
 ) -> tuple[pd.DataFrame, RunContext]:
     """Evaluate agents on identical seeds and persist one row per game."""
+    jobs = _normalize_jobs(jobs)
     report_config = apply_protocol_overrides(
         load_report_config(config_path),
         games=games,
@@ -74,14 +94,14 @@ def run_comparison(
         if rows:
             logger.info("Recovered %d completed games from checkpoint", len(rows))
             _save_checkpoint(rows, output_path)
-        rows = _evaluate_agents(
+        store = EvaluationStore(context, rows, output_path)
+        _evaluate_agents(
             agents,
             report_config["protocol"],
-            context,
-            rows,
-            output_path,
+            store,
+            jobs,
         )
-        results = pd.DataFrame(rows)
+        results = pd.DataFrame(store.rows)
         if owns_context:
             context.complete({"games_csv": str(output_path)})
         return results, context
@@ -94,39 +114,130 @@ def run_comparison(
 def _evaluate_agents(
     agents: dict[str, dict[str, Any]],
     protocol: dict[str, Any],
-    context: RunContext,
-    rows: list[dict[str, Any]],
-    output_path: Path,
-) -> list[dict[str, Any]]:
+    store: EvaluationStore,
+    jobs: int,
+) -> None:
     seeds = _paired_seeds(protocol)
-    completed = {(row["agent"], int(row["seed"])) for row in rows}
     for agent_key, specification in agents.items():
         pending_seeds = [
-            seed for seed in seeds if (agent_key, seed) not in completed
+            seed for seed in seeds if (agent_key, seed) not in store.completed
         ]
         if not pending_seeds:
             logger.info("Skipping %s; all games are already complete", agent_key)
             continue
-        logger.info("Evaluating %s on %d games", agent_key, len(seeds))
-        agent = build_agent(specification)
-        for game_index, seed in enumerate(seeds):
-            if (agent_key, seed) in completed:
-                continue
-            row = _play_game(agent_key, specification, agent, seed, protocol)
-            rows.append(row)
-            context.log_metrics(len(rows), row)
-            _save_checkpoint(rows, output_path)
-            completed.add((agent_key, seed))
-            logger.info(
-                "%s game %d/%d: win=%s, bosses=%d, time=%.3fs",
-                specification["label"],
-                game_index + 1,
-                len(seeds),
-                row["victory"],
-                row["bosses_defeated"],
-                row["duration_seconds"],
-            )
-    return rows
+        logger.info(
+            "Evaluating %s: %d/%d games pending with %d job(s)",
+            agent_key,
+            len(pending_seeds),
+            len(seeds),
+            jobs,
+        )
+        _evaluate_agent(
+            agent_key,
+            specification,
+            seeds,
+            protocol,
+            store,
+            jobs,
+        )
+
+
+def _evaluate_agent(
+    agent_key: str,
+    specification: dict[str, Any],
+    seeds: list[int],
+    protocol: dict[str, Any],
+    store: EvaluationStore,
+    jobs: int,
+) -> None:
+    if jobs == 1:
+        _evaluate_agent_sequentially(
+            agent_key,
+            specification,
+            seeds,
+            protocol,
+            store,
+        )
+        return
+    _evaluate_agent_in_parallel(
+        agent_key,
+        specification,
+        seeds,
+        protocol,
+        store,
+        jobs,
+    )
+
+
+def _evaluate_agent_sequentially(
+    agent_key,
+    specification,
+    seeds,
+    protocol,
+    store,
+) -> None:
+    agent = build_agent(specification)
+    pending = [seed for seed in seeds if (agent_key, seed) not in store.completed]
+    game_numbers = {seed: index + 1 for index, seed in enumerate(seeds)}
+    for seed in pending:
+        row = _play_game(agent_key, specification, agent, seed, protocol)
+        _record_result(row, game_numbers[seed], len(seeds), store)
+
+
+def _evaluate_agent_in_parallel(
+    agent_key,
+    specification,
+    seeds,
+    protocol,
+    store,
+    jobs,
+) -> None:
+    pending = [seed for seed in seeds if (agent_key, seed) not in store.completed]
+    game_numbers = {seed: index + 1 for index, seed in enumerate(seeds)}
+    executor = ProcessPoolExecutor(max_workers=jobs)
+    futures = {
+        executor.submit(
+            _play_game_worker,
+            agent_key,
+            specification,
+            seed,
+            protocol,
+        ): seed
+        for seed in pending
+    }
+    try:
+        for future in as_completed(futures):
+            seed = futures[future]
+            row = future.result()
+            _record_result(row, game_numbers[seed], len(seeds), store)
+    except BaseException:
+        for future in futures:
+            future.cancel()
+        executor.shutdown(wait=True, cancel_futures=True)
+        raise
+    executor.shutdown(wait=True)
+
+
+def _play_game_worker(agent_key, specification, seed, protocol):
+    """Build an isolated agent and evaluate one game in a worker process."""
+    agent = build_agent(specification)
+    return _play_game(agent_key, specification, agent, seed, protocol)
+
+
+def _record_result(row, game_number, total_games, store):
+    store.rows.append(row)
+    store.context.log_metrics(len(store.rows), row)
+    _save_checkpoint(store.rows, store.output_path)
+    store.completed.add((row["agent"], int(row["seed"])))
+    logger.info(
+        "%s game %d/%d: win=%s, bosses=%d, time=%.3fs",
+        row["label"],
+        game_number,
+        total_games,
+        row["victory"],
+        row["bosses_defeated"],
+        row["duration_seconds"],
+    )
 
 
 def _load_checkpoint(run_dir: Path) -> list[dict[str, Any]]:
@@ -283,17 +394,22 @@ def _paired_seeds(protocol: dict[str, Any]) -> list[int]:
     return [base_seed + offset for offset in range(games)]
 
 
+def _normalize_jobs(jobs: int) -> int:
+    jobs = int(jobs)
+    if jobs < 1:
+        raise ValueError("--jobs must be at least 1")
+    return jobs
+
+
 def _seed_everything(seed: int) -> None:
     random.seed(seed)
     np.random.seed(seed % (2**32 - 1))
-    try:
+    if "torch" in sys.modules:
         import torch
 
         torch.manual_seed(seed)
         if torch.cuda.is_available():
             torch.cuda.manual_seed_all(seed)
-    except ImportError:
-        return
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -302,6 +418,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--agents", nargs="+")
     parser.add_argument("--games", type=int)
     parser.add_argument("--base-seed", type=int)
+    parser.add_argument("--jobs", type=int, default=1)
     return parser
 
 
@@ -313,6 +430,7 @@ def main() -> None:
         requested_agents=arguments.agents,
         games=arguments.games,
         base_seed=arguments.base_seed,
+        jobs=arguments.jobs,
     )
 
 

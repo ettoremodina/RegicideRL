@@ -9,7 +9,7 @@ ppo:
   learning_rate: 0.000499320956710208
   n_steps: 4096
   batch_size: 128
-  n_epochs: 6
+  n_epochs: 100
   gamma: 0.9325316491322991
   ent_coef: 0.002266137838935706
   device: "cpu"
@@ -64,7 +64,7 @@ experimental_report:
       class_path: "agents.random_agent.RandomAgent"
       label: "Random"
       family: "Baseline"
-      description: "Seleziona uniformemente una delle azioni valide."
+      description: "Selects uniformly from the valid actions."
       kwargs:
         name: "Random"
     heuristic:
@@ -72,7 +72,7 @@ experimental_report:
       class_path: "agents.heuristic_agent.HeuristicAgent"
       label: "Heuristic"
       family: "Rule-based"
-      description: "Valuta le azioni con regole strategiche su difesa, danno, semi e conservazione delle carte."
+      description: "Scores actions using strategic rules for defense, damage, suits, and card conservation."
       kwargs:
         name: "Heuristic"
     pimc:
@@ -80,26 +80,26 @@ experimental_report:
       class_path: "agents.pimc_agent.PIMCAgent"
       label: "PIMC"
       family: "Search"
-      description: "Campiona stati nascosti, esegue rollout euristici e sceglie l'azione con rendimento medio maggiore."
+      description: "Samples hidden states, runs heuristic rollouts, and selects the action with the highest mean return."
       kwargs:
         name: "PIMC"
-        n_determinizations: 10
+        rollout_budget: 3000
     ismcts:
       enabled: true
       class_path: "agents.ismcts_agent.ISMCTSAgent"
       label: "ISMCTS"
       family: "Search"
-      description: "Costruisce un albero condiviso tra determinizzazioni e usa UCB1 corretto per la disponibilità delle azioni."
+      description: "Builds a tree shared across determinizations and uses UCB1 adjusted for action availability."
       kwargs:
         name: "ISMCTS"
-        n_iterations: 50
+        n_iterations: 3000
         exploration_constant: 14.14
     ppo:
-      enabled: false
+      enabled: true
       class_path: "agents.ppo_agent.PPOAgent"
       label: "PPO"
       family: "Reinforcement learning"
-      description: "Politica MaskablePPO addestrata su osservazioni numeriche e vincoli di validità delle azioni."
+      description: "A MaskablePPO policy trained on numeric observations and action-validity constraints."
       kwargs:
         name: "PPO"
         model_path: "artifacts/promoted_models/ppo_regicide.zip"
@@ -108,7 +108,7 @@ experimental_report:
       class_path: "agents.alphazero_agent.AlphaZeroAgent"
       label: "AlphaZero"
       family: "Neural tree search"
-      description: "Combina una rete policy-value con Monte Carlo Tree Search guidata da PUCT."
+      description: "Combines a policy-value network with PUCT-guided Monte Carlo Tree Search."
       kwargs:
         name: "AlphaZero"
         checkpoint_path: "artifacts/promoted_models/alphazero"

@@ -2,9 +2,23 @@
 
 from __future__ import annotations
 
-import pandas as pd
+import json
 
+import numpy as np
+import pandas as pd
+import pytest
+
+from agents.ismcts_agent import ISMCTSAgent, ISMCTSNode
+from agents.pimc_agent import PIMCAgent
 from scripts.experimental_report.analysis import analyze_experiment
+from scripts.experimental_report.runner import (
+    EvaluationStore,
+    GAME_COLUMNS,
+    _evaluate_agent_in_parallel,
+    _load_checkpoint,
+    _normalize_jobs,
+    _save_checkpoint,
+)
 from scripts.experimental_report.statistics import compare_pairs, summarize_results
 
 
@@ -35,6 +49,102 @@ def test_zero_win_rate_interval_never_exceeds_observed_rate():
     assert (summary["win_ci_high"] >= summary["win_rate"]).all()
 
 
+def test_ismcts_final_choice_excludes_stale_illegal_children():
+    root = ISMCTSNode()
+    legal_child = ISMCTSNode(action=7, parent=root)
+    legal_child.visit_count = 3
+    stale_child = ISMCTSNode(action=99, parent=root)
+    stale_child.visit_count = 1000
+    root.children = {7: legal_child, 99: stale_child}
+
+    selected = ISMCTSAgent._best_root_action(root, valid_actions=[7])
+
+    assert selected == 7
+
+
+def test_ismcts_forced_action_discards_unadvanced_tree():
+    agent = ISMCTSAgent(n_iterations=1)
+    agent.root = ISMCTSNode()
+    action_mask = np.zeros(543, dtype=np.int8)
+    action_mask[12] = 1
+
+    selected = agent.select_action({"action_mask": action_mask}, env=object())
+
+    assert selected == 12
+    assert agent.root is None
+
+
+def test_pimc_distributes_total_rollout_budget_across_actions():
+    agent = PIMCAgent(rollout_budget=3000)
+
+    allocations = agent._allocate_rollouts(action_count=7)
+
+    assert sum(allocations) == 3000
+    assert max(allocations) - min(allocations) <= 1
+
+
+def test_pimc_rejects_budget_smaller_than_legal_action_count():
+    agent = PIMCAgent(rollout_budget=2)
+
+    with pytest.raises(ValueError, match="at least"):
+        agent._allocate_rollouts(action_count=3)
+
+
+def test_checkpoint_recovers_game_rows_from_metrics(tmp_path):
+    run_dir = tmp_path / "run"
+    metrics_dir = run_dir / "metrics"
+    metrics_dir.mkdir(parents=True)
+    rows = _synthetic_games().to_dict(orient="records")
+    with (metrics_dir / "metrics.jsonl").open("w", encoding="utf-8") as stream:
+        for step, row in enumerate(rows, start=1):
+            stream.write(json.dumps({"step": step, **row}) + "\n")
+
+    recovered = _load_checkpoint(run_dir)
+    output_path = run_dir / "datasets" / "games.csv"
+    _save_checkpoint(recovered, output_path)
+
+    assert len(recovered) == len(rows)
+    assert list(pd.read_csv(output_path).columns) == list(GAME_COLUMNS)
+
+
+def test_parallel_workers_return_results_to_parent_checkpoint(tmp_path):
+    from ml_logger import RunContext
+
+    context = RunContext.create(
+        "test-experimental-parallel",
+        root_dir=tmp_path / "artifacts",
+    )
+    output_path = context.run_dir / "datasets" / "games.csv"
+    store = EvaluationStore(context, [], output_path)
+    specification = {
+        "class_path": "agents.random_agent.RandomAgent",
+        "label": "Random",
+        "family": "Baseline",
+        "description": "Test",
+        "kwargs": {"name": "Random"},
+    }
+    protocol = {"max_decisions_per_game": 100}
+
+    _evaluate_agent_in_parallel(
+        "random",
+        specification,
+        [10, 11],
+        protocol,
+        store,
+        jobs=2,
+    )
+
+    assert len(store.rows) == 2
+    assert output_path.exists()
+    assert {int(row["seed"]) for row in store.rows} == {10, 11}
+
+
+def test_parallel_job_count_must_be_positive():
+    assert _normalize_jobs(4) == 4
+    with pytest.raises(ValueError, match="at least 1"):
+        _normalize_jobs(0)
+
+
 def test_analysis_generates_report_tables_and_plots(tmp_path):
     run_dir = tmp_path / "run"
     datasets_dir = run_dir / "datasets"
@@ -48,7 +158,7 @@ def test_analysis_generates_report_tables_and_plots(tmp_path):
 
     assert all(path.exists() for path in outputs.values())
     report = outputs["report"].read_text(encoding="utf-8")
-    assert "Analisi statistiche" in report
+    assert "Statistical analysis" in report
     assert "comprehensive_dashboard.png" in report
     assert (run_dir / "analysis" / "tables.tex").exists()
     assert (run_dir / "analysis" / "statistics.json").exists()
@@ -100,13 +210,13 @@ def _report_config():
             "baseline": {
                 "label": "Baseline",
                 "family": "Test",
-                "description": "Baseline sintetica.",
+                "description": "Synthetic baseline.",
                 "kwargs": {},
             },
             "search": {
                 "label": "Search",
                 "family": "Test",
-                "description": "Ricerca sintetica.",
+                "description": "Synthetic search agent.",
                 "kwargs": {"budget": 10},
             },
         },

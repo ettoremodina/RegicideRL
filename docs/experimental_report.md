@@ -1,18 +1,17 @@
-# Regicide — protocollo del report sperimentale
+# Regicide — experimental report protocol
 
-La pipeline in `scripts/experimental_report/` confronta gli agenti implementati
-con un protocollo riproducibile e genera automaticamente il materiale del
-report: descrizione dei metodi, dati raw, tabelle, grafici e analisi
-statistiche.
+The pipeline in `scripts/experimental_report/` compares the implemented agents
+with a reproducible protocol and automatically generates the report materials:
+method descriptions, raw data, tables, plots, and statistical analyses.
 
-## Esecuzione completa
+## Full run
 
 ```bash
 python -m scripts.experimental_report.orchestrator
 ```
 
-La configurazione è nella sezione `experimental_report` di `config.yaml`.
-È possibile sovrascrivere da CLI il campione, il seed e gli agenti:
+Configuration lives under `experimental_report` in `config.yaml`. The sample
+size, base seed, and agents can be overridden from the command line:
 
 ```bash
 python -m scripts.experimental_report.orchestrator \
@@ -21,83 +20,120 @@ python -m scripts.experimental_report.orchestrator \
   --base-seed 20260718
 ```
 
-Random, Heuristic, PIMC e ISMCTS sono abilitati inizialmente. PPO e AlphaZero
-sono già registrati, ma restano disabilitati finché i rispettivi checkpoint non
-sono disponibili. Per includerli basta configurare il percorso del modello e
-impostare `enabled: true`.
+Random, Heuristic, PIMC, and ISMCTS are enabled initially. PPO and AlphaZero
+are registered but remain disabled until their checkpoints are available. To
+include them, configure the model path and set `enabled: true`.
 
-## Protocollo
+To compare PIMC and ISMCTS with equal simulation budgets, use the same total
+budget per decision:
 
-Ogni agente gioca con la stessa sequenza di seed. Il confronto è quindi
-appaiato: per ciascun seed i metodi partono dallo stesso ordine iniziale delle
-carte. Ogni partita produce:
+```yaml
+pimc:
+  kwargs:
+    rollout_budget: 3000
+ismcts:
+  kwargs:
+    n_iterations: 3000
+```
 
-- esito e numero di boss sconfitti;
-- numero di decisioni e fasi di difesa;
-- reward cumulativa;
-- yield e azioni invalide;
-- tempo totale;
-- latenza media e 95° percentile delle decisioni;
-- stato di completamento o superamento del limite di decisioni.
+`rollout_budget` is distributed uniformly across PIMC's legal actions. Setting
+`n_determinizations: 3000` instead would allocate 3,000 rollouts to every action
+and favor PIMC with a much higher computational cost.
 
-La pipeline misura i metodi in sequenza sulla stessa macchina. Per confronti
-temporali affidabili è opportuno chiudere applicazioni con carico variabile e
-annotare l'hardware usato.
+## Protocol
 
-## Analisi statistiche
+Every agent plays with the same sequence of seeds. The comparison is therefore
+paired: for each seed, every method starts from the same initial card order.
+Each game records:
 
-- percentuale di vittorie: intervallo di confidenza di Wilson;
-- metriche continue: intervallo bootstrap della media;
-- differenza nelle vittorie tra coppie: test esatto di McNemar;
-- differenza nei boss sconfitti: test di Wilcoxon appaiato;
-- confronti multipli: correzione di Holm;
-- dimensione dell'effetto: Cohen *dz* e probabilità di superiorità.
+- outcome and number of bosses defeated;
+- number of decisions and defense phases;
+- cumulative reward;
+- yields and invalid actions;
+- total time;
+- mean and 95th-percentile decision latency;
+- completion or decision-limit status.
 
-I p-value non vengono interpretati da soli: il report presenta anche intervalli
-di confidenza, dimensione dell'effetto e costo computazionale.
+The pipeline measures methods sequentially on the same machine. For reliable
+timing comparisons, close applications with variable workloads and record the
+hardware used.
+
+## Statistical analysis
+
+- win rate: Wilson confidence interval;
+- continuous metrics: bootstrap interval for the mean;
+- pairwise win difference: exact McNemar test;
+- difference in bosses defeated: paired Wilcoxon test;
+- multiple comparisons: Holm correction;
+- effect size: Cohen *dz* and probability of superiority.
+
+P-values are not interpreted alone: the report also presents confidence
+intervals, effect size, and computational cost.
 
 ## Output
 
-Ogni esecuzione crea una run sotto:
+Each execution creates a run under:
 
 ```text
-artifacts/runs/<data>/experimental-report-<id>/
-├── config.yaml
-├── experimental_report_config.yaml
-├── datasets/
-│   └── games.csv
-├── metrics/
-│   └── metrics.jsonl
-└── analysis/
-    ├── experimental_report.md
-    ├── summary.csv
-    ├── pairwise_tests.csv
-    ├── statistics.json
-    ├── tables.md
-    ├── tables.tex
-    ├── comprehensive_dashboard.png
-    ├── win_rate.png
-    ├── bosses_defeated.png
-    ├── execution_time.png
-    └── quality_cost_tradeoff.png
+artifacts/runs/<date>/experimental-report-<id>/
+|-- config.yaml
+|-- experimental_report_config.yaml
+|-- datasets/
+|   `-- games.csv
+|-- metrics/
+|   `-- metrics.jsonl
+`-- analysis/
+    |-- experimental_report.md
+    |-- summary.csv
+    |-- pairwise_tests.csv
+    |-- statistics.json
+    |-- tables.md
+    |-- tables.tex
+    |-- comprehensive_dashboard.png
+    |-- win_rate.png
+    |-- bosses_defeated.png
+    |-- execution_time.png
+    `-- quality_cost_tradeoff.png
 ```
 
-La copia della configurazione conserva i parametri originali, mentre
-`experimental_report_config.yaml` conserva la configurazione effettiva dopo le
-eventuali opzioni CLI.
+The configuration copy preserves the original parameters, while
+`experimental_report_config.yaml` stores the effective configuration after any
+command-line overrides.
 
-## Rigenerare il report
+## Regenerating the report
 
-Grafici e tabelle possono essere rigenerati dai dati raw senza ripetere le
-partite:
+Plots and tables can be regenerated from the raw data without repeating the
+games:
 
 ```bash
 python -m scripts.experimental_report.analysis \
-  artifacts/runs/<data>/<run_id>
+  artifacts/runs/<date>/<run_id>
 ```
 
-Per produrre soltanto `datasets/games.csv`:
+To produce only `datasets/games.csv`:
 
 ```bash
 python -m scripts.experimental_report.runner --agents random heuristic
 ```
+
+## Resuming an interrupted run
+
+`datasets/games.csv` is updated atomically after every game. If a run is
+interrupted, the pipeline also recovers rows already present in
+`metrics/metrics.jsonl` and skips every completed agent/seed pair:
+
+```bash
+python -m scripts.experimental_report.orchestrator \
+  --resume-run artifacts/runs/<date>/<run_id> \
+  --jobs 4
+```
+
+To preserve reproducibility, `--resume-run` uses the configuration saved with
+the run and cannot be combined with `--agents`, `--games`, or `--base-seed`.
+`--jobs` may still be changed on each resume. Games run in separate processes,
+while only the main process updates metrics and checkpoints, preventing
+concurrent writes.
+
+With multiple workers, per-game timings for slow methods are affected by CPU
+contention. Win rates and bosses defeated remain comparable, but a rigorous
+execution-time benchmark requires `--jobs 1` for every agent.

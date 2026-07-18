@@ -38,12 +38,22 @@ class PIMCAgent(BaseAgent):
 
     Args:
         n_determinizations: Number of random deck shuffles per action (default 50).
+        rollout_budget: Optional total number of rollouts per decision. When set,
+            it is divided as evenly as possible across legal actions and replaces
+            ``n_determinizations``. This enables compute-matched comparisons.
         name: Agent name for logging.
     """
 
-    def __init__(self, n_determinizations=50, name="PIMCAgent", **kwargs):
+    def __init__(
+        self,
+        n_determinizations=50,
+        rollout_budget=None,
+        name="PIMCAgent",
+        **kwargs,
+    ):
         super().__init__(name=name, **kwargs)
         self.n_determinizations = n_determinizations
+        self.rollout_budget = rollout_budget
         self._rollout_agent = HeuristicAgent(name="PIMC_Rollout")
 
     def select_action(self, obs, env=None):
@@ -71,10 +81,11 @@ class PIMCAgent(BaseAgent):
         best_action = None
         best_avg_reward = float('-inf')
 
-        for action in valid_actions:
+        rollout_counts = self._allocate_rollouts(len(valid_actions))
+        for action, rollout_count in zip(valid_actions, rollout_counts):
             total_reward = 0.0
 
-            for _ in range(self.n_determinizations):
+            for _ in range(rollout_count):
                 # Clone → determinize → apply action → rollout
                 sim_env = env.clone()
                 determinize_env(sim_env)
@@ -90,12 +101,26 @@ class PIMCAgent(BaseAgent):
 
                 total_reward += reward
 
-            avg_reward = total_reward / self.n_determinizations
+            avg_reward = total_reward / rollout_count
             if avg_reward > best_avg_reward:
                 best_avg_reward = avg_reward
                 best_action = action
 
         return best_action
+
+    def _allocate_rollouts(self, action_count):
+        """Allocate a total rollout budget or the legacy per-action budget."""
+        if self.rollout_budget is None:
+            return [self.n_determinizations] * action_count
+        if self.rollout_budget < action_count:
+            raise ValueError(
+                "PIMC rollout_budget must be at least the number of legal actions"
+            )
+        base_count, remainder = divmod(self.rollout_budget, action_count)
+        return [
+            base_count + int(index < remainder)
+            for index in range(action_count)
+        ]
 
     def _rollout(self, env, obs):
         """Play the game to completion using the heuristic agent.

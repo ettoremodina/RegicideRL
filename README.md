@@ -78,6 +78,18 @@ python -m scripts.experimental_report.orchestrator \
   --base-seed 42
 ```
 
+Interrupted or failed comparisons are checkpointed after every game. Resume the
+same run without repeating completed agent/seed pairs:
+
+```bash
+python -m scripts.experimental_report.orchestrator \
+  --resume-run artifacts/runs/<date>/<experimental-report-run-id> \
+  --jobs 4
+```
+
+Parallel workers evaluate different games of one agent at a time. The parent
+process remains the only checkpoint writer, so interruption and resume are safe.
+
 Agent classes, model paths, search budgets, sample size, seed, confidence level,
 and bootstrap count are configured centrally under `experimental_report` in
 [`config.yaml`](config.yaml). PPO and AlphaZero are present but disabled until

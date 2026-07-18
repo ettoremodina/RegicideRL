@@ -15,13 +15,13 @@ def generate_report(
     report_config: dict[str, Any],
     output_dir: str | Path,
 ) -> Path:
-    """Render a self-contained Italian experimental report."""
+    """Render a self-contained English experimental report."""
     destination = Path(output_dir)
     report_path = destination / "experimental_report.md"
     protocol = report_config["protocol"]
     content = "\n\n".join(
         [
-            "# Regicide — report sperimentale",
+            "# Regicide — experimental report",
             "",
             _protocol_section(games, protocol),
             _algorithm_section(games, report_config["agents"]),
@@ -51,9 +51,9 @@ def write_tables(
     compact_pairs = _compact_pairwise(pairwise)
     markdown_path = destination / "tables.md"
     markdown_path.write_text(
-        "## Risultati aggregati\n\n"
+        "## Aggregate results\n\n"
         + _as_markdown(compact_summary)
-        + "\n\n## Confronti statistici appaiati\n\n"
+        + "\n\n## Paired statistical comparisons\n\n"
         + _as_markdown(compact_pairs),
         encoding="utf-8",
     )
@@ -70,16 +70,29 @@ def write_tables(
 def _protocol_section(games: pd.DataFrame, protocol: dict[str, Any]) -> str:
     agents = games["agent"].nunique()
     seeds = games["seed"].nunique()
-    return f"""## Protocollo
+    parallel_jobs = int(protocol.get("parallel_jobs", 1))
+    parallel_note = _parallel_timing_note(parallel_jobs)
+    return f"""## Protocol
 
-Il confronto usa {seeds} seed identici per ciascuno dei {agents} agenti
-({len(games)} partite totali). L'abbinamento per seed riduce la variabilità
-dovuta all'ordine iniziale delle carte. Ogni partita è limitata a
-{protocol["max_decisions_per_game"]} decisioni. Tempi e metriche sono misurati
-per singola partita; le run raw sono conservate in `datasets/games.csv`.
+The comparison uses the same {seeds} seeds for each of the {agents} agents
+({len(games)} games in total). Pairing by seed reduces variation caused by the
+initial card order. Each game is limited to
+{protocol["max_decisions_per_game"]} decisions. Timings and metrics are measured
+per game; raw runs are stored in `datasets/games.csv`.
 
-Intervalli di confidenza: {protocol["confidence_level"]:.0%}; campioni bootstrap:
-{protocol["bootstrap_samples"]}."""
+Confidence level: {protocol["confidence_level"]:.0%}; bootstrap samples:
+{protocol["bootstrap_samples"]}. Parallel workers: {parallel_jobs}.
+{parallel_note}"""
+
+
+def _parallel_timing_note(parallel_jobs: int) -> str:
+    if parallel_jobs == 1:
+        return ""
+    return (
+        "Games for agents still awaiting evaluation were distributed across "
+        f"{parallel_jobs} processes. Per-game timings are affected by CPU "
+        "contention and are not directly comparable with agents run sequentially."
+    )
 
 
 def _algorithm_section(
@@ -93,23 +106,23 @@ def _algorithm_section(
         parameters = ", ".join(
             f"`{key}={value}`" for key, value in kwargs.items() if key != "name"
         )
-        suffix = f" Parametri: {parameters}." if parameters else ""
+        suffix = f" Parameters: {parameters}." if parameters else ""
         descriptions.append(
-            f"- **{specification['label']}** ({specification.get('family', 'N/D')}): "
+            f"- **{specification['label']}** "
+            f"({specification.get('family', 'N/A')}): "
             f"{specification['description']}{suffix}"
         )
-    return "## Algoritmi confrontati\n\n" + "\n".join(descriptions)
+    return "## Compared algorithms\n\n" + "\n".join(descriptions)
 
 
 def _results_section(summary: pd.DataFrame) -> str:
     table = _as_markdown(_compact_summary(summary))
-    return f"""## Risultati
+    return f"""## Results
 
 {table}
 
-Le tabelle complete, comprensive di deviazione standard, mediana e intervalli
-di confidenza per tutte le metriche, sono disponibili in `summary.csv` e
-`tables.tex`."""
+Complete tables, including standard deviations, medians, and confidence
+intervals for all metrics, are available in `summary.csv` and `tables.tex`."""
 
 
 def _statistics_section(
@@ -118,33 +131,33 @@ def _statistics_section(
 ) -> str:
     confidence = protocol["confidence_level"]
     if pairwise.empty:
-        table = "È stato valutato un solo agente: i test appaiati non sono applicabili."
+        table = "Only one agent was evaluated, so paired tests do not apply."
     else:
         table = _as_markdown(_compact_pairwise(pairwise))
-    return f"""## Analisi statistiche
+    return f"""## Statistical analysis
 
 {table}
 
-La percentuale di vittorie usa l'intervallo di Wilson. Le metriche continue
-usano intervalli bootstrap al {confidence:.0%}. I confronti sulla vittoria
-usano il test esatto di McNemar; quelli sui boss sconfitti il test di Wilcoxon
-appaiato. I p-value sono corretti con Holm separatamente per ciascuna famiglia
-di test. `Cohen dz` quantifica l'effetto appaiato sui boss; la probabilità di
-superiorità assegna metà peso ai pareggi."""
+Win rates use Wilson intervals. Continuous metrics use {confidence:.0%}
+bootstrap intervals. Win comparisons use the exact McNemar test; comparisons
+of bosses defeated use the paired Wilcoxon test. P-values are corrected with
+Holm's method separately for each test family. `Cohen dz` quantifies the paired
+effect on bosses defeated; probability of superiority assigns half weight to
+ties."""
 
 
 def _visualization_section() -> str:
-    return """## Grafici
+    return """## Plots
 
-![Dashboard complessiva](comprehensive_dashboard.png)
+![Comprehensive dashboard](comprehensive_dashboard.png)
 
-![Percentuale di vittorie](win_rate.png)
+![Win rate](win_rate.png)
 
-![Boss sconfitti](bosses_defeated.png)
+![Bosses defeated](bosses_defeated.png)
 
-![Tempo di esecuzione](execution_time.png)
+![Execution time](execution_time.png)
 
-![Trade-off qualità-costo](quality_cost_tradeoff.png)"""
+![Quality-cost trade-off](quality_cost_tradeoff.png)"""
 
 
 def _interpretation_section(
@@ -157,33 +170,33 @@ def _interpretation_section(
     fastest = summary.sort_values("duration_seconds_mean").iloc[0]
     alpha = 1.0 - float(protocol["confidence_level"])
     significant = _significant_comparisons(pairwise, alpha)
-    return f"""## Lettura dei risultati
+    return f"""## Interpretation
 
-- Migliore percentuale di vittorie osservata: **{best_win['label']}**
+- Best observed win rate: **{best_win['label']}**
   ({best_win['win_rate']:.1%}).
-- Maggiore avanzamento medio: **{best_progress['label']}**
-  ({best_progress['bosses_mean']:.2f} boss su 12).
-- Minore tempo medio per partita: **{fastest['label']}**
+- Greatest mean progress: **{best_progress['label']}**
+  ({best_progress['bosses_mean']:.2f} bosses out of 12).
+- Shortest mean time per game: **{fastest['label']}**
   ({fastest['duration_seconds_mean']:.4f} s).
-- Confronti significativi dopo correzione di Holm: {significant}.
+- Significant comparisons after Holm correction: {significant}.
 
-Queste classifiche descrivono il campione; per concludere che un metodo sia
-superiore occorre considerare congiuntamente intervalli, p-value, dimensione
-dell'effetto e costo computazionale."""
+These rankings describe the sample. A claim that one method is superior should
+consider confidence intervals, p-values, effect size, and computational cost
+together."""
 
 
 def _limitations_section() -> str:
-    return """## Limiti e riproducibilità
+    return """## Limitations and reproducibility
 
-Il protocollo confronta la modalità solitario sulla stessa macchina. I tempi
-non vanno confrontati direttamente con run ottenute su hardware o carichi
-diversi. Un seed condiviso rende uguale lo stato iniziale, ma gli algoritmi
-stocastici possono consumare numeri casuali in modo differente durante la
-partita. Le politiche neurali disabilitate in configurazione non sono incluse
-finché non viene indicato un checkpoint valido.
+The protocol compares solo-mode play on the same machine. Timings should not be
+compared directly with runs collected on different hardware or under different
+system loads. A shared seed gives each agent the same initial state, but
+stochastic algorithms may consume random numbers differently during play.
+Neural policies disabled in the configuration are excluded until a valid
+checkpoint is provided.
 
-La configurazione effettiva e i dati per partita sono salvati insieme al report,
-così tabelle e grafici possono essere rigenerati senza ripetere le simulazioni."""
+The effective configuration and per-game data are saved with the report so
+tables and plots can be regenerated without repeating the simulations."""
 
 
 def _compact_summary(summary: pd.DataFrame) -> pd.DataFrame:
@@ -202,16 +215,16 @@ def _compact_summary(summary: pd.DataFrame) -> pd.DataFrame:
         ]
     ].copy()
     compact.columns = [
-        "Agente",
+        "Agent",
         "N",
         "Win rate",
-        "Win CI low",
-        "Win CI high",
-        "Boss medi",
-        "Boss CI low",
-        "Boss CI high",
-        "Tempo medio (s)",
-        "Decisione media (ms)",
+        "Win CI lower",
+        "Win CI upper",
+        "Mean bosses",
+        "Boss CI lower",
+        "Boss CI upper",
+        "Mean time (s)",
+        "Mean decision (ms)",
     ]
     return compact.round(4)
 
@@ -233,22 +246,22 @@ def _compact_pairwise(pairwise: pd.DataFrame) -> pd.DataFrame:
         ]
     ].copy()
     compact.columns = [
-        "Agente A",
-        "Agente B",
+        "Agent A",
+        "Agent B",
         "N",
         "Δ win rate",
         "p Holm (win)",
-        "Δ boss",
-        "p Holm (boss)",
+        "Δ bosses",
+        "p Holm (bosses)",
         "Cohen dz",
-        "Rapporto tempi A/B",
+        "Time ratio A/B",
     ]
     return compact.round(4)
 
 
 def _as_markdown(table: pd.DataFrame) -> str:
     if table.empty:
-        return "Non applicabile."
+        return "Not applicable."
     headers = [str(column) for column in table.columns]
     rows = [[_markdown_cell(value) for value in row] for row in table.itertuples(False)]
     header_line = "| " + " | ".join(headers) + " |"
@@ -265,7 +278,7 @@ def _markdown_cell(value) -> str:
 
 def _significant_comparisons(pairwise: pd.DataFrame, alpha: float) -> str:
     if pairwise.empty:
-        return "non applicabile"
+        return "not applicable"
     win_count = int((pairwise["win_p_holm"] < alpha).sum())
     boss_count = int((pairwise["bosses_p_holm"] < alpha).sum())
-    return f"{win_count} sulla vittoria e {boss_count} sui boss (α={alpha:.3f})"
+    return f"{win_count} for wins and {boss_count} for bosses (α={alpha:.3f})"
