@@ -1,3 +1,0 @@
-2026-07-17 12:44:43,355 - Initialized run: run_20260717_124443
-2026-07-17 12:44:43,356 - Run directory: runs\run_20260717_124443
-2026-07-17 12:44:43,356 - Starting run with arguments: {'agent': 'ismtcs', 'episodes': 1, 'games_per_episode': 1, 'jobs': 1}

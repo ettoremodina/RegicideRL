@@ -1,6 +1,0 @@
-2026-07-16 11:50:32,923 - Initialized run: run_20260716_115032
-2026-07-16 11:50:32,923 - Run directory: runs\run_20260716_115032
-2026-07-16 11:50:32,923 - Starting run with arguments: {'agent': 'heuristic', 'episodes': 10, 'games_per_episode': 1000, 'jobs': None}
-2026-07-16 11:50:34,710 - Using Agent: HeuristicAgent
-2026-07-16 11:50:34,710 - Initialized ParallelSimulator with 19 workers
-2026-07-16 11:50:34,710 - --- Episode 1/10 ---

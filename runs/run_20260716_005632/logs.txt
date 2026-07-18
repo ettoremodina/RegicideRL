@@ -1,3 +1,0 @@
-2026-07-16 00:56:32,603 - Initialized run: run_20260716_005632
-2026-07-16 00:56:32,603 - Run directory: runs\run_20260716_005632
-2026-07-16 00:56:32,603 - Starting run with arguments: {'agent': 'ppo', 'episodes': 10, 'games_per_episode': 1000, 'jobs': 4}
