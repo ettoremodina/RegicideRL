@@ -1,15 +1,11 @@
 import os
 import argparse
-import yaml
 from stable_baselines3.common.callbacks import CheckpointCallback, CallbackList
 from sb3_contrib.ppo_mask import MaskablePPO
+from solvers.config import load_config
 from solvers.env import RegicideEnv
 from solvers.wrappers import NumericObsWrapper
 from solvers.callbacks import EpisodeLoggerCallback
-
-def load_config(config_path="config.yaml"):
-    with open(config_path, "r") as f:
-        return yaml.safe_load(f)
 
 def main():
     parser = argparse.ArgumentParser(description="Train MaskablePPO on Regicide")

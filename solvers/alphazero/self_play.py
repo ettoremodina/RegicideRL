@@ -10,7 +10,6 @@ retroactively to all states in the game.
 import logging
 
 import numpy as np
-import torch
 
 from solvers.env import RegicideEnv
 from solvers.alphazero.featurizer import encode_state

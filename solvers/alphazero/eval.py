@@ -11,7 +11,6 @@ import numpy as np
 
 from solvers.env import RegicideEnv
 from solvers.alphazero.mcts import run_mcts
-from solvers.alphazero.featurizer import encode_state
 
 logger = logging.getLogger("alphazero.eval")
 

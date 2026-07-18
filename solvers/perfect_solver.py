@@ -1,5 +1,5 @@
 import time
-from typing import Optional, List, Set, Tuple
+from typing import List, Optional, Set
 from solvers.env import RegicideEnv
 
 class GameStateHasher:

@@ -9,7 +9,7 @@ from solvers.env import RegicideEnv
 from solvers.wrappers import NumericObsWrapper
 
 def simulate_normal(num_games=1000):
-    print(f"\n--- Normal (Single-Thread) Benchmark ---")
+    print("\n--- Normal (Single-Thread) Benchmark ---", flush=True)
     start_time = time.time()
     
     handler = ActionHandler(max_hand_size=8)
@@ -86,7 +86,7 @@ def simulate_normal(num_games=1000):
     return fps
 
 def simulate_parallel(num_games=1000, jobs=None):
-    print(f"\n--- Parallel Benchmark (Jobs: {jobs or 'Max'}) ---")
+    print(f"\n--- Parallel Benchmark (Jobs: {jobs or 'Max'}) ---", flush=True)
     simulator = ParallelSimulator(n_jobs=jobs)
     
     metrics = simulator.run_eval(
@@ -105,7 +105,7 @@ def simulate_parallel(num_games=1000, jobs=None):
     return fps
 
 def simulate_training(device, steps=10000):
-    print(f"\n--- Training Benchmark ({device.upper()}) ---")
+    print(f"\n--- Training Benchmark ({device.upper()}) ---", flush=True)
     import torch
     from sb3_contrib.ppo_mask import MaskablePPO
     
@@ -136,7 +136,7 @@ def simulate_training(device, steps=10000):
     return fps
 
 def simulate_env(num_games=1000):
-    print(f"\n--- Env Benchmark ---")
+    print("\n--- Env Benchmark ---", flush=True)
     start_time = time.time()
     
     env = RegicideEnv(num_players=1)
@@ -171,10 +171,14 @@ def simulate_env(num_games=1000):
     return fps
 
 def main():
-    import torch
     parser = argparse.ArgumentParser(description="Regicide Benchmarking Utility")
-    parser.add_argument("--mode", type=str, choices=["all", "normal", "env", "parallel", "cpu", "gpu"], default="all", 
-                        help="Which benchmark to run (default: all)")
+    parser.add_argument(
+        "--mode",
+        type=str,
+        choices=["all", "normal", "env", "parallel", "cpu", "gpu"],
+        default="normal",
+        help="Which benchmark to run (default: normal; use all for the full suite)",
+    )
     parser.add_argument("--games", type=int, default=1000, 
                         help="Number of games to simulate for normal/env/parallel (default: 1000)")
     parser.add_argument("--steps", type=int, default=10000, 
@@ -187,12 +191,21 @@ def main():
     modes_to_run = []
     if args.mode == "all":
         modes_to_run = ["normal", "env", "parallel", "cpu"]
+        import torch
+
         if torch.cuda.is_available():
             modes_to_run.append("gpu")
         else:
             print("\nCUDA is not available. Skipping GPU benchmark in 'all' mode.")
     else:
         modes_to_run = [args.mode]
+
+    if args.mode == "gpu":
+        import torch
+
+        if not torch.cuda.is_available():
+            print("\nCUDA is not available on this machine. Cannot benchmark GPU.")
+            return
         
     results = {}
     
@@ -209,10 +222,7 @@ def main():
         results["Train CPU (Steps/sec)"] = simulate_training("cpu", args.steps)
         
     if "gpu" in modes_to_run:
-        if not torch.cuda.is_available() and args.mode == "gpu":
-            print("\nCUDA is not available on this machine. Cannot benchmark GPU.")
-        else:
-            results["Train GPU (Steps/sec)"] = simulate_training("cuda", args.steps)
+        results["Train GPU (Steps/sec)"] = simulate_training("cuda", args.steps)
             
     if len(results) > 1:
         print("\n=== Summary ===")

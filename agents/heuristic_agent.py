@@ -1,5 +1,7 @@
 import random
 import numpy as np
+
+from game.action_space import SOLO_JESTER_ACTION_ID
 from agents.base_agent import BaseAgent
 
 class HeuristicAgent(BaseAgent):
@@ -45,7 +47,7 @@ class HeuristicAgent(BaseAgent):
         # Base score
         score = 0.0
         
-        if action_id == 542:
+        if action_id == SOLO_JESTER_ACTION_ID:
             # Solo jester has no specific card from hand
             action_cards = []
         elif action_id <= 285:
@@ -102,7 +104,9 @@ class HeuristicAgent(BaseAgent):
         enemy_suit = enemy.card.suit.value
         
         # Check if Jester is played (value 0)
-        has_jester = any(c.value == 0 for c in action_cards) or (action_id == 542)
+        has_jester = any(c.value == 0 for c in action_cards) or (
+            action_id == SOLO_JESTER_ACTION_ID
+        )
         if has_jester:
             # Rule: Play Jester against Kings/Queens to cancel immunities (+300)
             if enemy.card.value >= 12:

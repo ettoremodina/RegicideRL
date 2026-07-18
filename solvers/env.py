@@ -1,6 +1,8 @@
 import gymnasium as gym
 from gymnasium import spaces
 import numpy as np
+
+from game.action_space import GLOBAL_ACTION_SPACE_SIZE, MAX_HAND_SIZE
 from game.regicide import Game
 from game.action_handler import ActionHandler
 
@@ -15,19 +17,22 @@ class RegicideEnv(gym.Env):
     def __init__(self, num_players=1):
         super().__init__()
         self.num_players = num_players
-        # Assuming maximum hand size is 8
-        self.handler = ActionHandler(max_hand_size=8)
+        self.handler = ActionHandler(max_hand_size=MAX_HAND_SIZE)
         self.game = None
         self.required_defense = 0
         
-        # Action space: 286 global attack actions + 256 hand-relative defense actions + 1 Jester action
-        self.action_space = spaces.Discrete(543)
+        self.action_space = spaces.Discrete(GLOBAL_ACTION_SPACE_SIZE)
         
         # Observation space: 
         # For now, we only formally define the action_mask for Gym algorithms.
         # The raw game state and hand are passed as dict elements for custom featurizers.
         self.observation_space = spaces.Dict({
-            "action_mask": spaces.Box(low=0, high=1, shape=(543,), dtype=np.int8)
+            "action_mask": spaces.Box(
+                low=0,
+                high=1,
+                shape=(GLOBAL_ACTION_SPACE_SIZE,),
+                dtype=np.int8,
+            )
         })
     
     def clone(self) -> 'RegicideEnv':
@@ -96,8 +101,8 @@ class RegicideEnv(gym.Env):
         # Convert action integer to mask if necessary
         is_solo_jester = False
         if isinstance(action, (int, np.integer)):
-            if self.action_space.n == 543:
-                # Decode 543-dimensional global action ID
+            if self.action_space.n == GLOBAL_ACTION_SPACE_SIZE:
+                # Decode the global action ID.
                 indices = self.handler.global_action_to_hand_indices(int(action), hand)
                 is_solo_jester = (indices == [-1])
                 # determine if it's a yield by checking if it's attack phase and action == 0

@@ -14,6 +14,13 @@ htmlcov/
 # Ignore outputs and legacy files
 outputs/
 archive/
+logs/
+runs/
+experiments/
+models/
+*.prof
+profile.txt
+bench_output.txt
 
 # Ignore environments
 .env

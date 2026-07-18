@@ -13,17 +13,14 @@ The core ISMCTS mechanisms are preserved:
 """
 
 import math
-import random
 import logging
 
 import numpy as np
 import torch
 
 from agents.determinize import determinize_env
-from solvers.alphazero.featurizer import (
-    encode_state,
-    action_mask_to_global_index,
-)
+from game.action_space import GLOBAL_ACTION_SPACE_SIZE
+from solvers.alphazero.featurizer import encode_state
 
 logger = logging.getLogger("alphazero.mcts")
 
@@ -34,7 +31,7 @@ class PUCTNode:
     Attributes:
         action_tuple: The hand-relative action mask (as tuple) that led here.
             None for the root.
-        global_action_id: The corresponding 542-dim global action index.
+        global_action_id: The corresponding 543-dim global action index.
             -1 for the root.
         parent: Parent PUCTNode (None for root).
         children: Dict mapping action_tuple → child PUCTNode.
@@ -94,14 +91,12 @@ def run_mcts(env, network, config, device):
         device: torch device for network inference.
 
     Returns:
-        policy: np.ndarray of shape ``(542,)`` — normalized visit counts.
+        policy: np.ndarray of shape ``(543,)`` — normalized visit counts.
         root_value: float — the mean value at the root after all sims.
     """
     root = PUCTNode()
     root.noise_added = False
     handler = env.handler
-    is_defense = env.required_defense > 0
-
     for _ in range(config.n_simulations):
         # 1. Clone + determinize
         sim_env = env.clone()
@@ -220,18 +215,18 @@ def _run_simulation(root, sim_env, network, config, device, handler):
 def _get_priors(sim_env, network, device, handler, is_defense):
     """Get the network's prior distribution for a state.
 
-    Returns a full 542-dim numpy array of probabilities.
+    Returns a full 543-dim numpy array of probabilities.
     """
     state = encode_state(sim_env)
     state_t = torch.tensor(state, dtype=torch.float32, device=device)
 
-    # Build the 543-dim action mask
+    # Build the global action mask.
     hand = sim_env.game.get_player_hand(sim_env.game.current_player)
     phase = "defense" if is_defense else "attack"
     raw_state = sim_env.game.get_raw_state()
     game_state = raw_state if phase == "attack" else {"enemy_attack": sim_env.required_defense}
-    mask_543 = handler.get_global_action_mask(hand, phase, game_state)
-    mask_t = torch.tensor(mask_543, dtype=torch.float32, device=device)
+    action_mask = handler.get_global_action_mask(hand, phase, game_state)
+    mask_t = torch.tensor(action_mask, dtype=torch.float32, device=device)
 
     priors, _ = network.predict(state_t, mask_t)
     return priors
@@ -243,7 +238,9 @@ def _evaluate_network(sim_env, network, device):
     state_t = torch.tensor(state, dtype=torch.float32, device=device)
 
     # We only need the value; create a dummy mask
-    mask_t = torch.ones(543, dtype=torch.float32, device=device)
+    mask_t = torch.ones(
+        GLOBAL_ACTION_SPACE_SIZE, dtype=torch.float32, device=device
+    )
 
     _, value = network.predict(state_t, mask_t)
     return value

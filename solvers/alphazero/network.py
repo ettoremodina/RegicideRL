@@ -11,7 +11,7 @@ Architecture
       │
       └─ Value Head:  Linear → ReLU → Linear(1) → tanh
 
-The policy head outputs a probability distribution over all 542 actions.
+    The policy head outputs a probability distribution over all 543 actions.
 The value head outputs a scalar in [-1, +1] estimating the expected game
 outcome (progress-based: ``enemies_defeated / 12 * 2 - 1``).
 """
@@ -19,13 +19,13 @@ outcome (progress-based: ``enemies_defeated / 12 * 2 - 1``).
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import numpy as np
+from game.action_space import GLOBAL_ACTION_SPACE_SIZE
 
 
 class RegicideNet(nn.Module):
     """Dual-headed MLP for Regicide AlphaZero."""
 
-    def __init__(self, state_dim: int = 56, action_dim: int = 543,
+    def __init__(self, state_dim: int = 56, action_dim: int = GLOBAL_ACTION_SPACE_SIZE,
                  hidden_dim: int = 256, num_hidden_layers: int = 2):
         super().__init__()
         self.state_dim = state_dim

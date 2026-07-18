@@ -3,14 +3,10 @@ import shutil
 import argparse
 from datetime import datetime
 import subprocess
-import yaml
 
+from solvers.config import load_config
 from solvers.analysis.run_analysis import run_analysis_pipeline
 from solvers.analysis.tb_extractor import find_latest_run
-
-def load_config(config_path="config.yaml"):
-    with open(config_path, "r") as f:
-        return yaml.safe_load(f)
 
 def run_experiment(config_path="config.yaml"):
     # 1. Create a timestamped experiment folder

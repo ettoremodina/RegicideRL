@@ -1,11 +1,11 @@
 import pygame
 import sys
-from typing import List, Optional
+from typing import Optional
 
-from game.regicide import Game, Card, Suit
+from game.regicide import Game
 from game.action_handler import ActionHandler
-from .theme import DARK_THEME, SUIT_COLORS
-from .ui_elements import Button, Label, HealthBar, draw_card
+from .theme import DARK_THEME
+from .ui_elements import Button, HealthBar, draw_card
 from .sound import play_thud, play_draw, play_shimmer, play_clang, play_victory, play_defeat
 
 # Font utilities

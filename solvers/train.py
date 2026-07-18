@@ -1,5 +1,4 @@
 import argparse
-import importlib
 from .logger import RunLogger
 from .parallel import ParallelSimulator
 from .metrics import plot_metrics

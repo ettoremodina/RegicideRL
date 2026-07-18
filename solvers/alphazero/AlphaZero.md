@@ -12,8 +12,8 @@ Implemented Phase 5 of the [expert_iteration_plan.md](file:///c:/Users/modin/Des
 |---|---|
 | [\_\_init\_\_.py](file:///c:/Users/modin/Desktop/programming/GAMES/Regicide/solvers/alphazero/__init__.py) | Module init |
 | [config.py](file:///c:/Users/modin/Desktop/programming/GAMES/Regicide/solvers/alphazero/config.py) | `AlphaZeroConfig` dataclass — all hyperparameters in one place |
-| [featurizer.py](file:///c:/Users/modin/Desktop/programming/GAMES/Regicide/solvers/alphazero/featurizer.py) | `encode_state(env) → 56-dim vector` + action index converters for the 542 action space |
-| [network.py](file:///c:/Users/modin/Desktop/programming/GAMES/Regicide/solvers/alphazero/network.py) | `RegicideNet` — dual-headed MLP (542-logit policy head + tanh value head) |
+| [featurizer.py](file:///c:/Users/modin/Desktop/programming/GAMES/Regicide/solvers/alphazero/featurizer.py) | `encode_state(env) → 56-dim vector` + action index converters for the 543 action space |
+| [network.py](file:///c:/Users/modin/Desktop/programming/GAMES/Regicide/solvers/alphazero/network.py) | `RegicideNet` — dual-headed MLP (543-logit policy head + tanh value head) |
 | [mcts.py](file:///c:/Users/modin/Desktop/programming/GAMES/Regicide/solvers/alphazero/mcts.py) | `PUCTNode` + `run_mcts()` — ISMCTS with PUCT formula, network leaf eval, Dirichlet noise |
 | [replay_buffer.py](file:///c:/Users/modin/Desktop/programming/GAMES/Regicide/solvers/alphazero/replay_buffer.py) | `ReplayBuffer` — fixed-size circular buffer with random batch sampling |
 | [self_play.py](file:///c:/Users/modin/Desktop/programming/GAMES/Regicide/solvers/alphazero/self_play.py) | `run_self_play_game()` — plays games with MCTS+Network, records `(state, π, z)` |
@@ -47,15 +47,15 @@ graph TD
     F -->|"greedy MCTS"| E
     A -->|"4. Log + Save"| G["RunLogger + Checkpoints"]
 
-    subgraph "RegicideNet (56→542+1)"
-        H["Shared Trunk: 56→256→256"] --> I["Policy Head: 256→542"]
+    subgraph "RegicideNet (56→543+1)"
+        H["Shared Trunk: 56→256→256"] --> I["Policy Head: 256→543"]
         H --> J["Value Head: 256→1 (tanh)"]
     end
 ```
 
 ## Key Design Decisions
 
-- **542-action space**: Respects the new global action representation (286 attack + 256 defense)
+- **543-action space**: Respects the global action representation (286 attack + 256 defense + 1 solo Jester)
 - **Flat 56-dim features**: Fast for MCTS inference, no embeddings (upgradeable later)
 - **PUCT with availability counts**: Preserves the ISMCTS subset-armed-bandit mechanism
 - **Network leaf evaluation (no rollouts)**: Pure Option B from the plan

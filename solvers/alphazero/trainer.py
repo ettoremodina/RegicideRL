@@ -19,9 +19,7 @@ import os
 import logging
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
-import numpy as np
 
 from solvers.alphazero.network import RegicideNet
 from solvers.alphazero.config import AlphaZeroConfig

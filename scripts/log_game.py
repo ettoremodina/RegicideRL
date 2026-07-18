@@ -1,6 +1,3 @@
-import sys
-sys.path.append('.')
-import logging
 import random
 from game.regicide import Game
 from game.action_handler import ActionHandler

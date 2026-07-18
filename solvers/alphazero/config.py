@@ -5,7 +5,9 @@ All tuneable knobs live in a single dataclass so they can be easily
 serialized to / deserialized from YAML and logged alongside each run.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+
+from game.action_space import GLOBAL_ACTION_SPACE_SIZE
 
 
 @dataclass
@@ -13,7 +15,7 @@ class AlphaZeroConfig:
     """All hyperparameters for the AlphaZero Expert Iteration loop."""
 
     # --- Action space ---
-    action_space_size: int = 543  # 286 global attack + 256 defense + 1 solo jester
+    action_space_size: int = GLOBAL_ACTION_SPACE_SIZE
 
     # --- State featurizer ---
     state_dim: int = 56  # Flat feature vector size (see featurizer.py)

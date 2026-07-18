@@ -6,12 +6,17 @@ the neural network. Operates directly on ``env.game`` for speed — this
 runs inside the MCTS loop thousands of times per decision, so we avoid
 Gymnasium wrappers and string allocations.
 
-Also provides bidirectional helpers between the 542-dimensional global
+Also provides bidirectional helpers between the 543-dimensional global
 action index and the 8-element hand-relative action mask used internally
 by the ISMCTS tree.
 """
 
 import numpy as np
+from game.action_space import (
+    DEFENSE_ACTION_OFFSET,
+    MAX_HAND_SIZE,
+    SOLO_JESTER_ACTION_ID,
+)
 from game.regicide import Suit
 
 # Canonical suit ordering used for one-hot encoding.
@@ -40,7 +45,7 @@ def encode_state(env) -> np.ndarray:
     features = []
 
     # --- Hand cards (8 slots × 5 features = 40) ---
-    for i in range(8):
+    for i in range(MAX_HAND_SIZE):
         if i < len(hand):
             card = hand[i]
             # Normalized card value (0-13 → 0.0-1.0)
@@ -74,7 +79,7 @@ def encode_state(env) -> np.ndarray:
     features.append(len(game.tavern_deck) / 40.0)
     features.append(len(game.discard_pile) / 52.0)
     features.append(len(game.castle_deck) / 12.0)
-    features.append(len(hand) / 8.0)
+    features.append(len(hand) / MAX_HAND_SIZE)
     features.append(1.0 if game.can_yield() else 0.0)
     features.append(game.solo_jesters_remaining / 2.0)
 
@@ -86,7 +91,7 @@ def encode_state(env) -> np.ndarray:
 # ---------------------------------------------------------------------------
 
 def action_mask_to_global_index(action_mask, hand, handler, is_defense):
-    """Convert a hand-relative action mask to a global action index (0-541).
+    """Convert a hand-relative action mask to a global action index (0-542).
 
     During MCTS we work with hand-relative masks (the ``valid_actions``
     list). This converts one such mask into the global index that the
@@ -102,15 +107,15 @@ def action_mask_to_global_index(action_mask, hand, handler, is_defense):
             int: Global action index 0-542.
     """
     if len(action_mask) == 9 and action_mask[8] == 1:
-        return 542
+        return SOLO_JESTER_ACTION_ID
         
     if is_defense:
-        # Defense actions use the bitmask encoding in indices 286-541.
+        # Defense actions use the bitmask encoding after attack actions.
         val = 0
         for i, bit in enumerate(action_mask):
             if bit:
                 val += (1 << i)
-        return 286 + val
+        return DEFENSE_ACTION_OFFSET + val
     else:
         # Attack actions: match the played cards against the global table.
         if handler.is_yield_action(action_mask):
@@ -132,7 +137,7 @@ def action_mask_to_global_index(action_mask, hand, handler, is_defense):
 
 
 def global_index_to_action_mask(global_index, hand, handler):
-    """Convert a global action index (0-541) back to a hand-relative mask.
+    """Convert a global action index (0-542) back to a hand-relative mask.
 
     This is the inverse of ``action_mask_to_global_index``.  Used when the
     network picks an action and we need to execute it in the environment.

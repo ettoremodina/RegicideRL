@@ -1,5 +1,5 @@
 import pygame
-from typing import Callable, Tuple
+from typing import Callable
 from .theme import DARK_THEME, SUIT_COLORS
 
 class Button:

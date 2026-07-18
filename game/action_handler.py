@@ -3,10 +3,18 @@ Action Handler for Regicide Game
 Generates all possible valid actions for attack and defense phases
 """
 
-from typing import List, Dict, Tuple, Optional
-from game.regicide import Card, Game, Enemy, Suit
 import itertools
+from typing import Dict, List, Optional
+
 import numpy as np
+
+from game.action_space import (
+    DEFENSE_ACTION_OFFSET,
+    GLOBAL_ACTION_SPACE_SIZE,
+    MAX_HAND_SIZE,
+    SOLO_JESTER_ACTION_ID,
+)
+from game.regicide import Card, Suit
 
 
 class ActionHandler:
@@ -15,7 +23,7 @@ class ActionHandler:
     Returns action masks for all possible valid card combinations
     """
     
-    def __init__(self, max_hand_size: int = 8):
+    def __init__(self, max_hand_size: int = MAX_HAND_SIZE):
         """
         Initialize the action handler
         
@@ -28,14 +36,6 @@ class ActionHandler:
             action["sorted_cards"]: i for i, action in enumerate(self._global_attack_actions)
         }
         
-        # Precompute signatures for fast attack generation
-        self._attack_action_signatures = []
-        for action in self._global_attack_actions:
-            counts = {}
-            for card in action["cards"]:
-                counts[card] = counts.get(card, 0) + 1
-            self._attack_action_signatures.append(counts)
-            
     def _generate_global_attack_actions(self) -> List[Dict]:
         """
         Generates all 286 possible unique attack actions in Regicide,
@@ -93,22 +93,24 @@ class ActionHandler:
             
         return actions
 
-    def get_global_action_mask(self, hand: List[Card], phase: str, game_state: Optional[Dict] = None, valid_local_masks: Optional[List[List[int]]] = None) -> List[int]:
+    def get_global_action_mask(
+        self,
+        hand: List[Card],
+        phase: str,
+        game_state: Optional[Dict] = None,
+    ) -> List[int]:
         """
         Get a 543-length binary array representing all valid actions globally.
         Indices 0-285: Attack Actions (Global combinations)
         Indices 286-541: Defense Actions (Hand-relative subsets)
         Index 542: Use Solo Jester
         """
-        mask = np.zeros(543, dtype=bool)
+        mask = np.zeros(GLOBAL_ACTION_SPACE_SIZE, dtype=bool)
         
         hand_size = len(hand)
-        hand_counts = {}
-        for c in hand:
-            hand_counts[c] = hand_counts.get(c, 0) + 1
             
         if phase == "attack":
-            allow_yield = game_state.get('can_yield', True) if game_state else True
+            allow_yield = self._allow_yield(game_state)
             if allow_yield:
                 mask[0] = 1
                 
@@ -227,7 +229,7 @@ class ActionHandler:
                         mask[i] = 1
                         
         elif phase == "defense":
-            offset = len(self._global_attack_actions)
+            offset = DEFENSE_ACTION_OFFSET
             req = game_state.get('enemy_attack', 0) if game_state else 0
             hand_vals = [c.get_discard_value() for c in hand]
             
@@ -259,7 +261,7 @@ class ActionHandler:
                     mask[0] = 1
 
         if game_state and game_state.get('can_use_solo_jester', False):
-            mask[542] = 1
+            mask[SOLO_JESTER_ACTION_ID] = 1
             
         # Fallback: MaskablePPO fails drastically if the mask is all zeros
         if sum(mask) == 0:
@@ -267,7 +269,12 @@ class ActionHandler:
             
         return mask.tolist()
 
-    def get_all_possible_actions(self, hand: List[Card], phase: str, game_state: Optional[Dict] = None) -> List[List[int]]:
+    def get_all_possible_actions(
+        self,
+        hand: List[Card],
+        phase: str,
+        game_state: Optional[Dict] = None,
+    ) -> List[List[int]]:
         """
         Get all possible actions for the current phase
         Direct computation for fast local mask generation.
@@ -283,7 +290,7 @@ class ActionHandler:
             return m
             
         if phase == "attack":
-            allow_yield = game_state.get('can_yield', True) if game_state else True
+            allow_yield = self._allow_yield(game_state)
             if allow_yield:
                 local_masks.append([0] * self.max_hand_size)
                 
@@ -390,6 +397,10 @@ class ActionHandler:
                         
         elif phase == "defense":
             req = game_state.get('enemy_attack', 0) if game_state else 0
+            if req <= 0:
+                local_masks.append([0] * self.max_hand_size)
+                return local_masks
+
             hand_vals = [c.get_discard_value() for c in hand]
             
             sums = [0] * (1 << hand_size)
@@ -399,7 +410,6 @@ class ActionHandler:
                 for b in range(bit):
                     sums[b | bit] = sums[b] + val
             
-            has_defense = False
             for b in range(1, 1 << hand_size):
                 defense = sums[b]
                 if defense >= req:
@@ -414,23 +424,29 @@ class ActionHandler:
                             if b & (1 << i):
                                 m[i] = 1
                         local_masks.append(m)
-                        has_defense = True
                         
-            if not has_defense:
-                if hand_size > 0:
-                    for b in range(1, 1 << hand_size):
-                        m = [0] * self.max_hand_size
-                        for i in range(hand_size):
-                            if b & (1 << i):
-                                m[i] = 1
-                        local_masks.append(m)
-                else:
-                    local_masks.append([0] * self.max_hand_size)
-
         if game_state and game_state.get('can_use_solo_jester', False):
-            local_masks.append([0, 0, 0, 0, 0, 0, 0, 0, 1])
+            local_masks.append([0] * self.max_hand_size + [1])
             
         return local_masks
+
+    @staticmethod
+    def _allow_yield(game_state: Optional[Dict]) -> bool:
+        """Read the current yield flag, including the legacy key name."""
+        if not game_state:
+            return True
+        if "can_yield" in game_state:
+            return game_state["can_yield"]
+        return game_state.get("allow_yield", True)
+
+    def get_action_count(
+        self,
+        hand: List[Card],
+        phase: str,
+        game_state: Optional[Dict] = None,
+    ) -> int:
+        """Return the number of currently available local actions."""
+        return len(self.get_all_possible_actions(hand, phase, game_state))
 
     def is_yield_action(self, action_mask: List[int]) -> bool:
         """Check if an action mask represents a yield action (all zeros)"""
@@ -454,15 +470,15 @@ class ActionHandler:
 
     def global_action_to_hand_indices(self, action_id: int, hand: List[Card]) -> List[int]:
         """
-        Decodes a global action ID (0-541) into a list of hand indices to pass to the env.
+        Decodes a global action ID (0-542) into a list of hand indices to pass to the env.
         """
-        if action_id == 542:
+        if action_id == SOLO_JESTER_ACTION_ID:
             return [-1]
             
-        if action_id < 0 or action_id >= 543:
+        if action_id < 0 or action_id >= GLOBAL_ACTION_SPACE_SIZE:
             raise ValueError(f"Invalid global action id: {action_id}")
             
-        offset = len(self._global_attack_actions)
+        offset = DEFENSE_ACTION_OFFSET
             
         if action_id < offset:
             if action_id == 0:
@@ -495,10 +511,3 @@ class ActionHandler:
                     indices.append(i)
             # Ensure indices don't exceed current hand size
             return [idx for idx in indices if idx < len(hand)]
-
-
-def main():
-    pass
-
-if __name__ == "__main__":
-    main()

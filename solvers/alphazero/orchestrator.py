@@ -13,7 +13,6 @@ import os
 import time
 import logging
 
-import numpy as np
 
 from solvers.alphazero.config import AlphaZeroConfig
 from solvers.alphazero.trainer import AlphaZeroTrainer

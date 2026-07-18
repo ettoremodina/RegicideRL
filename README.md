@@ -31,22 +31,31 @@ python -m ui
 
 To simulate a game played autonomously by the ISMCTS agent:
 ```bash
-python scripts/log_game.py
+python -m scripts.log_game
 ```
 This script will leverage the `ml_logger` dashboard to provide real-time updates on game state, agent actions, and memory consumption.
+
+To run the quick benchmark:
+```bash
+python benchmark.py
+```
+The complete suite, including training benchmarks, is opt-in:
+```bash
+python benchmark.py --mode all
+```
 
 ## Analyzing Results
 
 To analyze all games played by the AI and calculate metrics like win-rate:
 ```bash
-python scripts/analyze_runs.py
+python -m scripts.analyze_runs
 ```
 
 ## Generating Documentation
 
 We use `pdoc` to generate the HTML documentation from docstrings automatically. To build it:
 ```bash
-python scripts/generate_docs.py
+python -m scripts.generate_docs
 ```
 This will place the documentation in the `docs/` folder.
 
@@ -61,12 +70,12 @@ python -m solvers.train --help
 - `game/`: The core mechanics engine (`regicide.py`, `action_handler.py`).
 - `agents/`: Core interfaces and heuristic bots (e.g., Random, ISMCTS, PIMC).
 - `solvers/`: Advanced RL training loops, AlphaZero networks, self-play logic, and TensorBoard logging.
-- `ui/`: PyQt6-based graphical interface.
+- `ui/`: Pygame-based graphical interface.
 - `ml_logger/`: Custom Rich-based telemetry, dashboard, and metrics tracker.
-- `scripts/`: Diagnostic tools, game runners, and documentation generators.
+- `scripts/`: Diagnostic tools, game runners, and documentation generators (run them with `python -m scripts.<name>`).
 - `tests/`: Comprehensive test suite (`pytest`).
 - `rules/`: Text files containing reference rulebooks.
-- `archive/`: Legacy experiments from 2025 (PPO, etc).
+- `logs/`, `runs/`, and `experiments/`: Generated runtime and experiment artifacts, excluded from new commits.
 
 ## Future Work
 - Implementing a multi-agent cooperative version of ISMCTS for 2-4 player scaling.

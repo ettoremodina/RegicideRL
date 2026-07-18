@@ -7,5 +7,9 @@ matplotlib
 pygame
 pdoc
 rich
-pyaml
+PyYAML
 pandas
+seaborn
+optuna
+psutil
+tqdm

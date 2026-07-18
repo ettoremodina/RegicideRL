@@ -1,18 +1,13 @@
 import os
 import optuna
-import yaml
 import numpy as np
-from stable_baselines3.common.callbacks import CallbackList
 from sb3_contrib.ppo_mask import MaskablePPO
 
 from solvers.env import RegicideEnv
+from solvers.config import load_config
 from solvers.wrappers import NumericObsWrapper
 from solvers.callbacks import EpisodeLoggerCallback
 from solvers.analysis.probe import probe_policy
-
-def load_config(config_path="config.yaml"):
-    with open(config_path, "r") as f:
-        return yaml.safe_load(f)
 
 def objective(trial, config):
     # 1. Suggest Hyperparameters

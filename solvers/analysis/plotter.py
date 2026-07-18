@@ -1,6 +1,5 @@
 import matplotlib.pyplot as plt
 import seaborn as sns
-import pandas as pd
 from collections import Counter
 
 def plot_dashboard(probe_results, tb_data, output_dir):

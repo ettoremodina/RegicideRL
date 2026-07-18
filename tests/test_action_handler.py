@@ -5,6 +5,10 @@ Tests for ActionHandler — attack action generation and defense action generati
 import pytest
 from game.regicide import Game, Card, Suit
 from game.action_handler import ActionHandler
+from game.action_space import (
+    DEFENSE_ACTION_OFFSET,
+    GLOBAL_ACTION_SPACE_SIZE,
+)
 
 
 @pytest.fixture
@@ -188,15 +192,14 @@ class TestActionHandlerUtilities:
         assert count == 3
 
 class TestGlobalActionSpace:
-    """Test global 542-dimensional action space."""
+    """Test the global 543-dimensional action space."""
 
     def test_get_global_action_mask_attack(self, handler):
         """Check attack mask is correctly mapped."""
         hand = [Card(2, Suit.HEARTS)]
         mask = handler.get_global_action_mask(hand, "attack", {'can_yield': False})
         
-        # 542 dimensions
-        assert len(mask) == 542
+        assert len(mask) == GLOBAL_ACTION_SPACE_SIZE
         
         # Only 1 action (Play 2 of Hearts) should be 1
         # No yield because can_yield is False
@@ -206,7 +209,7 @@ class TestGlobalActionSpace:
         active_idx = mask.index(1)
         
         # Assert the active index is in the attack range
-        assert 0 <= active_idx < 286
+        assert 0 <= active_idx < DEFENSE_ACTION_OFFSET
 
     def test_get_global_action_mask_defense(self, handler):
         """Check defense mask is correctly mapped."""
@@ -214,7 +217,7 @@ class TestGlobalActionSpace:
         game_state = {'enemy_attack': 5}
         mask = handler.get_global_action_mask(hand, "defense", game_state)
         
-        assert len(mask) == 542
+        assert len(mask) == GLOBAL_ACTION_SPACE_SIZE
         
         # 10 is enough to defend against 5. 
         # Only the minimal set (the single 10) should be available.
@@ -223,11 +226,10 @@ class TestGlobalActionSpace:
         active_idx = mask.index(1)
         
         # Assert the active index is in the defense range
-        assert 286 <= active_idx < 542
+        assert DEFENSE_ACTION_OFFSET <= active_idx < GLOBAL_ACTION_SPACE_SIZE - 1
         
         # It should correspond to masking index 0 (which is 1)
-        # 286 + 1 = 287
-        assert active_idx == 287
+        assert active_idx == DEFENSE_ACTION_OFFSET + 1
 
     def test_global_action_to_hand_indices(self, handler):
         """Decode global action to local indices."""

@@ -2,6 +2,8 @@ import gymnasium as gym
 from gymnasium import spaces
 import numpy as np
 
+from game.action_space import GLOBAL_ACTION_SPACE_SIZE, MAX_HAND_SIZE
+
 class NumericObsWrapper(gym.ObservationWrapper):
     """
     Converts the raw Regicide game state into strict NumPy arrays 
@@ -12,11 +14,20 @@ class NumericObsWrapper(gym.ObservationWrapper):
         
         # Max hand size is 8. Card values 0-13, Suits 0-4
         self.observation_space = spaces.Dict({
-            'hand_values': spaces.Box(low=0, high=13, shape=(8,), dtype=np.int8),
-            'hand_suits': spaces.Box(low=0, high=4, shape=(8,), dtype=np.int8),
+            'hand_values': spaces.Box(
+                low=0, high=13, shape=(MAX_HAND_SIZE,), dtype=np.int8
+            ),
+            'hand_suits': spaces.Box(
+                low=0, high=4, shape=(MAX_HAND_SIZE,), dtype=np.int8
+            ),
             'enemy_stats': spaces.Box(low=0, high=100, shape=(3,), dtype=np.int8), # health, attack, suit
             'flags': spaces.Box(low=0, high=50, shape=(2,), dtype=np.int8), # defense_phase (0/1), required_defense
-            'action_mask': spaces.Box(low=0, high=1, shape=(543,), dtype=np.int8)
+            'action_mask': spaces.Box(
+                low=0,
+                high=1,
+                shape=(GLOBAL_ACTION_SPACE_SIZE,),
+                dtype=np.int8,
+            )
         })
         
         self._last_action_mask = None
@@ -25,12 +36,12 @@ class NumericObsWrapper(gym.ObservationWrapper):
         hand = obs['hand']
         
         # Parse Hand
-        hand_values = np.zeros(8, dtype=np.int8)
-        hand_suits = np.zeros(8, dtype=np.int8)
+        hand_values = np.zeros(MAX_HAND_SIZE, dtype=np.int8)
+        hand_suits = np.zeros(MAX_HAND_SIZE, dtype=np.int8)
         
         suit_map = {"♥": 1, "♦": 2, "♣": 3, "♠": 4}
         for i, card in enumerate(hand):
-            if i < 8:
+            if i < MAX_HAND_SIZE:
                 hand_values[i] = card.value
                 hand_suits[i] = suit_map.get(card.suit.value, 0)
                 
