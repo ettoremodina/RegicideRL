@@ -33,20 +33,9 @@ Obiettivi:
 
 ## 3. Sistema di logging
 
-Realizzare un sistema di logging centralizzato e standardizzato.
-
-Dovrà essere in grado di registrare:
-
-* l'esecuzione delle funzioni;
-* le sessioni di training;
-* le partite giocate;
-* eventuali errori, warning e informazioni utili.
-
-### Nota importante
-
-Attualmente manca uno standard per le `print` presenti nel progetto.
-
-Vorrei sostituirle con un sistema di logging uniforme.
+adatta ogni script per comunicare tramite il logger (ml_logger, remove others if present)
+you can adapt the logger to fit this repo
+Never use prints, always use the logger and save the results
 
 Inoltre, desidero progettare separatamente un sistema che permetta di:
 
@@ -54,7 +43,8 @@ Inoltre, desidero progettare separatamente un sistema che permetta di:
 * storicizzare i risultati;
 * poter analizzare una partita anche in un secondo momento.
 
-Preparare quindi **un piano dedicato** esclusivamente a questa funzionalità.
+è già presente qualcosa di simile ma è confuso e scritto male
+crea un piano d'azione, discutiamo su come implementarlo e che feature inserire
 
 ---
 
@@ -75,6 +65,8 @@ Tra le metriche da considerare:
 * percentuale di vittorie;
 * numero di boss sconfitti;
 * altre metriche significative emerse durante gli esperimenti.
+
+Per fare questo creeremo una cartella con gli script per runnare i modelli e gli agenti necessari, ci saranno script con funzioni di plotting e script di analisi per comparare i modelli e creare questi report
 
 ---
 
@@ -121,7 +113,7 @@ Per ogni ticket includi:
 * priorità;
 * stima qualitativa dell'impegno (Piccolo / Medio / Grande).
 
-Prima di generare questo piano, crea una **skill riutilizzabile** che definisca un processo standard per trasformare qualsiasi progetto software completato in un progetto pronto per la pubblicazione.
+crea una **skill riutilizzabile** che definisca un processo standard per trasformare qualsiasi progetto software completato in un progetto pronto per la pubblicazione.
 
 La skill deve essere completamente generica e non fare riferimento al progetto attuale. Deve descrivere un workflow riutilizzabile che comprenda, ad esempio:
 
@@ -133,5 +125,3 @@ La skill deve essere completamente generica e non fare riferimento al progetto a
 * miglioramento della qualità del codice;
 * predisposizione di test, logging e reportistica;
 * preparazione del repository per la distribuzione.
-
-Solo dopo aver definito questa skill, applicala al progetto corrente e genera il piano operativo dettagliato.

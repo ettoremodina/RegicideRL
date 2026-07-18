@@ -1,5 +1,6 @@
 import numpy as np
 import argparse
+from pathlib import Path
 from tqdm import tqdm
 from solvers.env import RegicideEnv
 from solvers.wrappers import NumericObsWrapper
@@ -21,13 +22,10 @@ def generate_data(num_games=1000, save_path="bc_data.npz"):
         
         while not done:
             raw_obs = raw_env._get_obs()
-            action_mask = agent.select_action(raw_obs, env=raw_env)
+            action = agent.select_action(raw_obs, env=raw_env)
             
-            if action_mask is None:
+            if action is None:
                 break
-                
-            # Convert binary list mask to integer index (0-255)
-            action_int = sum(val * (1 << i) for i, val in enumerate(action_mask))
             
             observations_list.append({
                 'hand_values': obs['hand_values'].copy(),
@@ -36,13 +34,15 @@ def generate_data(num_games=1000, save_path="bc_data.npz"):
                 'flags': obs['flags'].copy(),
                 'action_mask': obs['action_mask'].copy()
             })
-            actions_list.append(action_int)
+            actions_list.append(action)
             
-            obs, reward, terminated, truncated, info = env.step(action_int)
+            obs, reward, terminated, truncated, info = env.step(action)
             done = terminated or truncated
             
     num_samples = len(actions_list)
     print(f"Generated {num_samples} state-action pairs.")
+    if num_samples == 0:
+        raise RuntimeError("The teacher generated no state-action pairs.")
     
     hand_values_arr = np.stack([o['hand_values'] for o in observations_list])
     hand_suits_arr = np.stack([o['hand_suits'] for o in observations_list])
@@ -51,6 +51,7 @@ def generate_data(num_games=1000, save_path="bc_data.npz"):
     action_masks_arr = np.stack([o['action_mask'] for o in observations_list])
     actions_arr = np.array(actions_list, dtype=np.int64)
     
+    Path(save_path).parent.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(
         save_path,
         hand_values=hand_values_arr,

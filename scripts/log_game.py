@@ -1,6 +1,7 @@
 import random
 from game.regicide import Game
 from game.action_handler import ActionHandler
+from game.action_space import MAX_HAND_SIZE
 
 from ml_logger import DashboardLogger
 
@@ -13,7 +14,7 @@ def play_one_game_with_logs():
         logger.info("=== Starting 1 Simulated Game ===")
         
         game = Game(num_players=1)
-        handler = ActionHandler(max_hand_size=8)
+        handler = ActionHandler(max_hand_size=MAX_HAND_SIZE)
         required_defense = 0
         
         while not game.game_over:
@@ -37,9 +38,12 @@ def play_one_game_with_logs():
                     game.game_over = True
                     break
                 action = random.choice(actions)
+                is_solo_jester = len(action) > MAX_HAND_SIZE and action[MAX_HAND_SIZE] == 1
                 indices = handler.mask_to_card_indices(action, len(hand))
-                
-                if handler.is_yield_action(action):
+
+                if is_solo_jester:
+                    res = game.use_solo_jester("step1")
+                elif handler.is_yield_action(action):
                     res = game.yield_turn()
                 else:
                     res = game.play_card(indices)

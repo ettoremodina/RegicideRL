@@ -70,10 +70,9 @@ class RegicideEnv(gym.Env):
         current = self.game.current_player
         hand = self.game.get_player_hand(current)
         
-        state_info = {
-            'enemy_attack': self.game.current_enemy.attack if self.game.current_enemy else 0,
-            'can_use_solo_jester': self.game.can_use_solo_jester()
-        }
+        state_info = self.game.get_raw_state()
+        if self.required_defense > 0:
+            state_info["enemy_attack"] = self.required_defense
         
         # Create global action mask for Gymnasium
         phase = "defense" if self.required_defense > 0 else "attack"
@@ -126,8 +125,10 @@ class RegicideEnv(gym.Env):
             res = self.game.use_solo_jester(phase_str)
             if not res.get('success', False):
                 return self._get_obs(), -1.0, True, False, res
-            # Standard transition reward
-            self.required_defense = res.get("defense_required", self.required_defense)
+            if self._end_if_defense_is_impossible():
+                res["message"] += " The new hand cannot defend against the attack."
+                res["game_over"] = True
+                return self._get_obs(), -1.0, True, False, res
             return self._get_obs(), 0.0, self.game.game_over, False, res
             
         if self.required_defense > 0:
@@ -151,6 +152,9 @@ class RegicideEnv(gym.Env):
                 return self._get_obs(), -1.0, True, False, res
                 
             self.required_defense = res.get("defense_required", 0)
+            if self._end_if_defense_is_impossible():
+                res["message"] += " No legal defense is available."
+                res["game_over"] = True
             
             # If it's a multi-player game and Jester was played
             if res.get("phase") == "next_player_choice":
@@ -173,3 +177,12 @@ class RegicideEnv(gym.Env):
                 reward = -1.0
                 
         return self._get_obs(), reward, terminated, truncated, res
+
+    def _end_if_defense_is_impossible(self):
+        """End a forced-defense state when no card play or jester can save it."""
+        if self.required_defense <= 0:
+            return False
+        if self.game.can_defend() or self.game.can_use_solo_jester():
+            return False
+        self.game.game_over = True
+        return True

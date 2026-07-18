@@ -73,7 +73,7 @@ def train_bc(data_path="bc_data.npz", config_path="config.yaml", epochs=10, batc
             b_hand_s = b_hand_s.to(model.device)
             b_enemy = b_enemy.to(model.device)
             b_flags = b_flags.to(model.device)
-            b_acts = b_acts.to(model.device).squeeze()
+            b_acts = b_acts.to(model.device).flatten()
             
             obs_dict = {
                 'hand_values': b_hand_v,

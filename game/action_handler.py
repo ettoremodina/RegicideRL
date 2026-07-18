@@ -253,13 +253,6 @@ class ActionHandler:
                         mask[offset + b] = 1
                         has_defense = True
                         
-            if not has_defense:
-                if hand_size > 0:
-                    for b in range(1, 1 << hand_size):
-                        mask[offset + b] = 1
-                else:
-                    mask[0] = 1
-
         if game_state and game_state.get('can_use_solo_jester', False):
             mask[SOLO_JESTER_ACTION_ID] = 1
             

@@ -130,6 +130,11 @@ class RegicideApp:
         if res.get("success"):
             self.selected_indices = []
             self.log("Used Solo Jester! Refilled hand.")
+            if self.state == "DEFENSE" and not self.game.can_defend():
+                self.game.game_over = True
+                self.state = "GAME_OVER"
+                self.game_over_msg = "Defeat... No possible defense."
+                play_defeat()
 
     def _on_defend(self):
         if self.state != "DEFENSE": return
@@ -237,6 +242,8 @@ class RegicideApp:
                             self.jester_btn.handle_event(event)
                 else:
                     self.defend_btn.handle_event(event)
+                    if not self.jester_btn.is_disabled:
+                        self.jester_btn.handle_event(event)
                 
                 # Card clicks
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -471,6 +478,8 @@ class RegicideApp:
             self.screen.blit(total_lbl, (self.width//2 - total_lbl.get_width()//2, self.height//2 + 20))
             
             self.defend_btn.draw(self.screen)
+            if not self.jester_btn.is_disabled:
+                self.jester_btn.draw(self.screen)
 
     def draw_game_over(self):
         title = self.title_font.render(self.game_over_msg, True, DARK_THEME["danger"] if "Defeat" in self.game_over_msg else DARK_THEME["success"])

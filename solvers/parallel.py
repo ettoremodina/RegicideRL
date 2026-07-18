@@ -67,23 +67,37 @@ class ParallelSimulator:
     """
     def __init__(self, n_jobs=None):
         if n_jobs is None:
-            self.n_jobs = 6
+            self.n_jobs = max(1, mp.cpu_count() - 1)
         else:
-            self.n_jobs = n_jobs
-            
-        self.manager = mp.Manager()
-        self.status_dict = self.manager.dict()
-        self.pool = mp.Pool(self.n_jobs)
+            self.n_jobs = max(1, n_jobs)
+
+        self.manager = None
+        self.status_dict = None
+        self.pool = None
+        if self.n_jobs > 1:
+            self.manager = mp.Manager()
+            self.status_dict = self.manager.dict()
+            self.pool = mp.Pool(self.n_jobs)
         
     def close(self):
-        self.pool.close()
-        self.pool.join()
+        if self.pool is not None:
+            self.pool.close()
+            self.pool.join()
+            self.pool = None
+        if self.manager is not None:
+            self.manager.shutdown()
+            self.manager = None
             
     def run_eval(self, agent_cls, agent_kwargs, total_games):
         """
         Runs `total_games` games in parallel and returns aggregated metrics.
         """
         start_time = time.time()
+
+        if self.n_jobs == 1:
+            worker_args = (agent_cls, dict(agent_kwargs), total_games, 1)
+            results_list = [_worker_simulate(worker_args)]
+            return self._aggregate_results(results_list, total_games, start_time)
         
         for i in range(1, self.n_jobs + 1):
             self.status_dict[i] = "Starting..."
@@ -121,9 +135,11 @@ class ParallelSimulator:
             
         results_list = result.get()
             
+        return self._aggregate_results(results_list, total_games, start_time)
+
+    @staticmethod
+    def _aggregate_results(results_list, total_games, start_time):
         elapsed = time.time() - start_time
-        
-        # Aggregate results
         total_victories = sum(r['victories'] for r in results_list)
         all_enemies = []
         all_turns = []
