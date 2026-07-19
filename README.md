@@ -107,8 +107,10 @@ dashboard, structured telemetry, and a portable HTML report.
 
 Regicide-specific game recording is kept outside the generic package in
 [`integrations/regicide_logging.py`](integrations/regicide_logging.py).
-See [`docs/ml_logger.md`](docs/ml_logger.md) for the standalone guide, complete
-configuration reference, multiprocessing contract, and adapter examples.
+See [`ml_logger/README.md`](ml_logger/README.md) for the reference guide and
+[`ml_logger/docs/ml_logger_guide.html`](ml_logger/docs/ml_logger_guide.html)
+for the visual, tabbed walkthrough of the API, features, configuration, and
+adapter pattern.
 
 Before every run, `ml_logger` reads [`logger_config.yaml`](logger_config.yaml).
 The main switches are:

@@ -1,27 +1,54 @@
 """Rich renderables composing the command-center dashboard."""
 
+from rich import box
+from rich.console import Console, ConsoleOptions, RenderResult
 from rich.layout import Layout
 from rich.panel import Panel
 from rich.table import Table
-from rich import box
 from rich.text import Text
 
+
+class LogStreamPanel:
+    """Render the newest wrapped log rows inside the available panel height."""
+
+    def __init__(self, logs: list[Text]):
+        self.logs = logs
+
+    def __rich_console__(
+        self,
+        console: Console,
+        options: ConsoleOptions,
+    ) -> RenderResult:
+        inner_width = max(1, options.max_width - 2)
+        panel_height = options.height or console.height
+        inner_height = max(1, panel_height - 2)
+        content = Text("\n").join(self.logs)
+        wrapped_lines = content.wrap(console, inner_width)
+        visible_lines = wrapped_lines[-inner_height:]
+        yield Panel(
+            Text("\n").join(visible_lines),
+            title="Log Stream",
+            border_style="white",
+        )
+
+
 def create_command_center_layout() -> Layout:
-    """Creates the Layout 2: Command Center architecture."""
+    """Create the command-center layout."""
     layout = Layout()
     layout.split_column(
         Layout(name="main_split"),
-        Layout(name="footer", size=3, visible=False)
+        Layout(name="footer", size=3, visible=False),
     )
     layout["main_split"].split_row(
         Layout(name="logs", ratio=2),
-        Layout(name="sidebar", ratio=1)
+        Layout(name="sidebar", ratio=1),
     )
     layout["main_split"]["sidebar"].split_column(
         Layout(name="metrics", ratio=3),
-        Layout(name="hardware", ratio=2)
+        Layout(name="hardware", ratio=2),
     )
     return layout
+
 
 def render_metrics_table(metrics: dict) -> Table:
     """Render a flat metric mapping into a Rich table."""
@@ -43,10 +70,10 @@ def render_hardware_table(telemetry: dict) -> Table:
         table.add_row(_telemetry_label(name), _telemetry_value(name, value))
     return table
 
-def render_logs_panel(log_queue: list) -> Panel:
-    """Renders the queued log strings into a Panel."""
-    content = Text("\n").join(log_queue)
-    return Panel(content, title="Log Stream", border_style="white")
+
+def render_logs_panel(log_queue: list[Text]) -> LogStreamPanel:
+    """Create a height-aware panel that follows the tail of the log stream."""
+    return LogStreamPanel(log_queue)
 
 
 def _telemetry_label(name: str) -> str:

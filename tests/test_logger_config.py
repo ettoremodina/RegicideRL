@@ -3,6 +3,7 @@ from pathlib import Path
 from integrations.regicide_logging import GameRecorder
 from ml_logger import configure_logging, start_run
 from ml_logger.configs.config_loader import load_config
+from ml_logger.views.selection import matches_metric
 from solvers.env import RegicideEnv
 
 
@@ -17,6 +18,14 @@ def test_project_config_disables_game_recording_for_benchmark(tmp_path):
     assert recorder.enabled is False
     context.complete()
     configure_logging()
+
+
+def test_project_dashboard_includes_live_alphazero_metrics():
+    filters = load_config(run_type="alphazero")["dashboard"]["metrics"]
+
+    assert matches_metric("self_play/games_completed", filters)
+    assert matches_metric("train/total_loss", filters)
+    assert matches_metric("eval/win_rate", filters)
 
 
 def test_disabled_optional_artifacts_are_not_written(tmp_path):

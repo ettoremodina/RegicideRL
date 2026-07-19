@@ -7,6 +7,9 @@ Plays full games using MCTS + the neural network, recording
 retroactively to all states in the game.
 """
 
+from collections.abc import Callable
+from typing import Any
+
 import numpy as np
 
 from ml_logger import get_logger
@@ -16,6 +19,8 @@ from solvers.alphazero.mcts import run_mcts
 from solvers.alphazero.outcomes import enemies_defeated, terminal_value
 
 logger = get_logger(__name__)
+
+SelfPlayProgressCallback = Callable[[int, int, dict[str, Any]], None]
 
 
 def run_self_play_game(
@@ -113,6 +118,7 @@ def generate_self_play_data(
     device,
     recorder=None,
     use_heuristic_guidance=False,
+    progress_callback: SelfPlayProgressCallback | None = None,
 ):
     """Run multiple self-play games and aggregate results.
 
@@ -120,6 +126,8 @@ def generate_self_play_data(
         network: RegicideNet.
         config: AlphaZeroConfig.
         device: torch device.
+        progress_callback: Optional observer called after each reporting batch
+            with completed games, total games, and aggregate statistics so far.
 
     Returns:
         all_data: List of ``(state, policy, value)`` tuples.
@@ -141,19 +149,51 @@ def generate_self_play_data(
         total_enemies += game_info["enemies_defeated"]
         victories += int(game_info["victory"])
 
-        if (game_i + 1) % 10 == 0:
+        completed_games = game_i + 1
+        should_report = (
+            completed_games % 10 == 0
+            or completed_games == config.games_per_iteration
+        )
+        if should_report:
             logger.info(
-                f"  Self-play game {game_i + 1}/{config.games_per_iteration} "
+                f"  Self-play game {completed_games}/{config.games_per_iteration} "
                 f"— defeated {game_info['enemies_defeated']}/12"
             )
+            if progress_callback is not None:
+                progress_callback(
+                    completed_games,
+                    config.games_per_iteration,
+                    _aggregate_stats(
+                        completed_games,
+                        len(all_data),
+                        total_enemies,
+                        victories,
+                    ),
+                )
 
-    stats = {
-        "total_games": config.games_per_iteration,
-        "total_samples": len(all_data),
-        "avg_enemies_defeated": total_enemies / max(1, config.games_per_iteration),
-        "win_rate": victories / max(1, config.games_per_iteration),
-    }
+    stats = _aggregate_stats(
+        config.games_per_iteration,
+        len(all_data),
+        total_enemies,
+        victories,
+    )
     return all_data, stats
+
+
+def _aggregate_stats(
+    total_games: int,
+    total_samples: int,
+    total_enemies: int,
+    victories: int,
+) -> dict[str, Any]:
+    """Build cumulative self-play statistics for storage and live views."""
+    denominator = max(1, total_games)
+    return {
+        "total_games": total_games,
+        "total_samples": total_samples,
+        "avg_enemies_defeated": total_enemies / denominator,
+        "win_rate": victories / denominator,
+    }
 
 
 def _sample_from_policy(policy):

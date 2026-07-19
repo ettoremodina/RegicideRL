@@ -11,7 +11,7 @@ Runs the synchronous Expert Iteration loop:
 
 import os
 import time
-
+from functools import partial
 
 from solvers.alphazero.config import AlphaZeroConfig
 from solvers.alphazero.trainer import AlphaZeroTrainer
@@ -84,16 +84,40 @@ class AlphaZeroOrchestrator:
                 else "network priors"
             )
             logger.info("Phase 1: Self-Play (%s)", leaf_evaluator)
+            self._publish_self_play_progress(
+                iteration,
+                completed=0,
+                total=self.config.games_per_iteration,
+                stats={
+                    "total_games": 0,
+                    "total_samples": 0,
+                    "avg_enemies_defeated": 0.0,
+                    "win_rate": 0.0,
+                },
+            )
             game_data, sp_stats = generate_self_play_data(
                 self.trainer.network,
                 self.config,
                 device,
                 recorder=self.game_recorder,
                 use_heuristic_guidance=use_heuristic_guidance,
+                progress_callback=partial(
+                    self._publish_self_play_progress,
+                    iteration,
+                ),
             )
             self.replay_buffer.add_game(game_data)
             self.trainer.training_iteration = iteration
             sp_time = time.time() - sp_start
+            self.run_logger.log_metrics(
+                iteration,
+                {
+                    "run/iteration": iteration,
+                    "buffer/size": len(self.replay_buffer),
+                    "timing/self_play_seconds": sp_time,
+                    **_prefixed_metrics("self_play", sp_stats),
+                },
+            )
             logger.info(
                 f"  Generated {sp_stats['total_samples']} samples from "
                 f"{sp_stats['total_games']} games in {sp_time:.1f}s"
@@ -141,15 +165,15 @@ class AlphaZeroOrchestrator:
             # --- 4. Logging ---
             iter_time = time.time() - iter_start
             metrics = {
-                "iteration": iteration,
-                "buffer_size": len(self.replay_buffer),
-                "self_play_time": sp_time,
-                "train_time": tr_time,
-                "eval_time": ev_time,
-                "total_time": iter_time,
-                **{f"sp_{k}": v for k, v in sp_stats.items()},
-                **{f"train_{k}": v for k, v in losses.items()},
-                **{f"eval_{k}": v for k, v in eval_stats.items()},
+                "run/iteration": iteration,
+                "buffer/size": len(self.replay_buffer),
+                "timing/self_play_seconds": sp_time,
+                "timing/train_seconds": tr_time,
+                "timing/eval_seconds": ev_time,
+                "timing/iteration_seconds": iter_time,
+                **_prefixed_metrics("self_play", sp_stats),
+                **_prefixed_metrics("train", losses),
+                **_prefixed_metrics("eval", eval_stats),
             }
             self.run_logger.log_metrics(iteration, metrics)
             logger.info(f"  Total iteration time: {iter_time:.1f}s")
@@ -171,3 +195,29 @@ class AlphaZeroOrchestrator:
         )
         self.trainer.save_checkpoint(final_path)
         logger.info("\nTraining complete!")
+
+    def _publish_self_play_progress(
+        self,
+        iteration: int,
+        completed: int,
+        total: int,
+        stats: dict,
+    ) -> None:
+        """Send current self-play state to both metrics and progress views."""
+        metrics = {
+            "run/iteration": iteration,
+            "self_play/games_completed": completed,
+            "self_play/games_total": total,
+            **_prefixed_metrics("self_play", stats),
+        }
+        self.run_logger.log_metrics(iteration, metrics)
+        self.run_logger.context.log_progress(
+            completed=completed,
+            total=total,
+            description=f"Self-play · iteration {iteration}",
+        )
+
+
+def _prefixed_metrics(prefix: str, values: dict) -> dict:
+    """Namespace metric keys using the logger's hierarchical convention."""
+    return {f"{prefix}/{name}": value for name, value in values.items()}

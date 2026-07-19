@@ -53,7 +53,16 @@ dashboard:
   max_metrics: 16
   screen: true
   metrics:
-    include: ["train/*", "eval/*", "loss", "win_rate", "trial_score"]
+    include:
+      - "run/*"
+      - "buffer/*"
+      - "self_play/*"
+      - "train/*"
+      - "eval/*"
+      - "timing/*"
+      - "loss"
+      - "win_rate"
+      - "trial_score"
     exclude: ["debug/*"]
 
 telemetry:

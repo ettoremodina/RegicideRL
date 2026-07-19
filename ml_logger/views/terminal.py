@@ -106,7 +106,7 @@ class LiveDashboard:
             total=int(payload["total"]),
             description=str(payload["description"]),
         )
-        self._layout["footer"].visible = True
+        self._layout["footer"].visible = self.progress.is_active
 
     def _render(self):
         """Refresh Rich panels from short lock-protected snapshots."""

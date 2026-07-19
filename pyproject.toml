@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "modin-ml-logger"
 version = "0.3.0"
 description = "Local-first, configurable experiment logging for ML workflows"
-readme = "docs/ml_logger.md"
+readme = "ml_logger/README.md"
 requires-python = ">=3.10"
 dependencies = [
   "psutil>=5.9",
@@ -21,4 +21,4 @@ dev = ["pytest>=8"]
 include = ["ml_logger*"]
 
 [tool.setuptools.package-data]
-ml_logger = ["configs/*.yaml"]
+ml_logger = ["configs/*.yaml", "docs/*.html"]

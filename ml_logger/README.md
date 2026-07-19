@@ -4,6 +4,10 @@
 logging Python, metriche, parametri, artifact, telemetria, dashboard terminale
 e report HTML sotto il lifecycle di una singola run.
 
+Per una panoramica visuale e navigabile, aprire
+[`docs/ml_logger_guide.html`](docs/ml_logger_guide.html) direttamente in un
+browser.
+
 Il core non contiene concetti del progetto che lo utilizza. In questa
 repository, la registrazione delle partite è implementata separatamente in
 `integrations/regicide_logging.py`.
@@ -45,11 +49,11 @@ with run(
         accuracy = evaluate()
 
         experiment.log_metrics(
+            epoch,
             {
                 "train/loss": loss,
                 "eval/accuracy": accuracy,
             },
-            step=epoch,
         )
         experiment.log_progress(epoch + 1, 10, "Training")
 
@@ -213,6 +217,11 @@ singole categorie.
 
 `dashboard.metrics` stabilisce quali metriche persistite vengono mostrate.
 Nascondere una metrica nella dashboard non ne impedisce il salvataggio.
+Il pannello `Log Stream` conserva fino a `max_log_lines` messaggi e mostra
+sempre le ultime righe che entrano nello spazio disponibile del terminale.
+Una metrica appare nella dashboard non appena il codice chiama `log_metrics`:
+per fasi lunghe conviene pubblicare valori intermedi, non soltanto il riepilogo
+finale.
 
 `report.visualization` accetta:
 
