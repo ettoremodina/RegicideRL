@@ -8,8 +8,7 @@ import secrets
 from game.action_space import GLOBAL_ACTION_SPACE_SIZE, MAX_HAND_SIZE
 from game.regicide import Game
 from game.action_handler import ActionHandler
-from ml_logger.recording import GameRecorder
-from ml_logger.serialization import serialize_game
+from integrations.regicide_logging import GameRecorder, serialize_game
 
 class RegicideEnv(gym.Env):
     """

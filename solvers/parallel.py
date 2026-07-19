@@ -2,7 +2,8 @@
 
 import multiprocessing as mp
 import time
-from ml_logger import GameRecorder, RunContext, get_logger
+from integrations.regicide_logging import GameRecorder
+from ml_logger import RunContext, get_logger
 from .env import RegicideEnv
 
 logger = get_logger(__name__)
@@ -90,11 +91,13 @@ class ParallelSimulator:
         else:
             self.n_jobs = max(1, n_jobs)
         self.recording = None
-        if run_context and run_context.game_recording_enabled:
-            self.recording = {
-                "context": run_context.descriptor(),
-                "level": recording_level or run_context.game_recording_level,
-            }
+        if run_context:
+            recorder = GameRecorder(run_context, recording_level)
+            if recorder.enabled:
+                self.recording = {
+                    "context": run_context.descriptor(),
+                    "level": recorder.recording_level,
+                }
 
         self.manager = None
         self.status_dict = None

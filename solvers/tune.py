@@ -7,7 +7,8 @@ import numpy as np
 import optuna
 from sb3_contrib.ppo_mask import MaskablePPO
 
-from ml_logger import GameRecorder, RunContext, get_logger, start_run
+from integrations.regicide_logging import GameRecorder
+from ml_logger import RunContext, get_logger, run_scope
 from solvers.analysis.probe import probe_policy
 from solvers.architecture import RegicideFeatureExtractor
 from solvers.callbacks import EpisodeLoggerCallback
@@ -123,11 +124,13 @@ def _score_probe(probe_results):
 def run_tuner(config_path="config.yaml"):
     """Execute the configured Optuna study and persist its best trial."""
     config = load_config(config_path)
-    context = start_run("hyperparameter-tuning", config=config)
-    recorder = GameRecorder(context)
-    number_of_trials = config["tuning"].get("n_trials", 20)
-    logger.info("Starting Optuna optimization with %d trials", number_of_trials)
-    try:
+    with run_scope("hyperparameter-tuning", config=config) as context:
+        recorder = GameRecorder(context)
+        number_of_trials = config["tuning"].get("n_trials", 20)
+        logger.info(
+            "Starting Optuna optimization with %d trials",
+            number_of_trials,
+        )
         study = optuna.create_study(direction="maximize")
         study.optimize(
             lambda trial: objective(trial, config, context, recorder),
@@ -139,7 +142,7 @@ def run_tuner(config_path="config.yaml"):
             "best_params": study.best_params,
         }
         output = context.save_result("tuning.json", result)
-        context.complete({"result": str(output), **result})
+        context.log_summary({"result": str(output), **result})
         logger.info(
             "Tuning complete: best trial=%d score=%.4f params=%s",
             study.best_trial.number,
@@ -147,10 +150,6 @@ def run_tuner(config_path="config.yaml"):
             study.best_params,
         )
         return result
-    except Exception as error:
-        context.fail(error)
-        logger.exception("Hyperparameter tuning failed")
-        raise
 
 
 if __name__ == "__main__":

@@ -3,7 +3,8 @@
 import argparse
 from pathlib import Path
 
-from ml_logger import GameRecorder, RunContext, get_logger, start_run
+from integrations.regicide_logging import GameRecorder
+from ml_logger import RunContext, get_logger, start_run
 from solvers.analysis.plotter import plot_dashboard
 from solvers.analysis.probe import probe_policy
 from solvers.analysis.reporter import generate_reports

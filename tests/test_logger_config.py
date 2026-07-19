@@ -1,6 +1,7 @@
 from pathlib import Path
 
-from ml_logger import GameRecorder, configure_logging, start_run
+from integrations.regicide_logging import GameRecorder
+from ml_logger import configure_logging, start_run
 from ml_logger.configs.config_loader import load_config
 from solvers.env import RegicideEnv
 
@@ -11,9 +12,8 @@ def test_project_config_disables_game_recording_for_benchmark(tmp_path):
     context = start_run("benchmark", root_dir=tmp_path)
     recorder = GameRecorder(context)
 
-    assert benchmark_settings["games"]["enabled"] is False
-    assert game_settings["games"]["enabled"] is True
-    assert context.game_recording_enabled is False
+    assert _recording(benchmark_settings)["enabled"] is False
+    assert _recording(game_settings)["enabled"] is True
     assert recorder.enabled is False
     context.complete()
     configure_logging()
@@ -48,7 +48,7 @@ games:
     assert not (context.run_dir / "logs" / "run.log").exists()
     assert not (context.run_dir / "metrics" / "metrics.jsonl").exists()
     assert not result_path.exists()
-    assert list((context.run_dir / "games").iterdir()) == []
+    assert not (context.run_dir / "games").exists()
     assert (context.run_dir / "manifest.json").exists()
     configure_logging()
 
@@ -80,3 +80,7 @@ def _write_config(tmp_path: Path, contents: str) -> Path:
     config_path = tmp_path / "logger_config.yaml"
     config_path.write_text(contents, encoding="utf-8")
     return config_path
+
+
+def _recording(settings):
+    return settings["integrations"]["regicide"]["recording"]

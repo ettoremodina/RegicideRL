@@ -3,8 +3,8 @@
 import time
 import random
 import argparse
-from ml_logger import GameRecorder, get_logger, start_run
-from ml_logger.serialization import serialize_game
+from integrations.regicide_logging import GameRecorder, serialize_game
+from ml_logger import get_logger, run_scope
 from game.regicide import Game
 from game.action_handler import ActionHandler
 from solvers.parallel import ParallelSimulator
@@ -251,17 +251,13 @@ def build_parser():
 def main():
     """Run selected benchmarks and save their throughput in a canonical run."""
     args = build_parser().parse_args()
-    context = start_run("benchmark", config=vars(args))
-    recorder = GameRecorder(context) if context.game_recording_enabled else None
-    try:
+    with run_scope("benchmark", config=vars(args)) as context:
+        recorder = GameRecorder(context)
+        recorder = recorder if recorder.enabled else None
         modes_to_run = select_modes(args.mode)
         results = run_benchmarks(args, modes_to_run, recorder, context)
         output = context.save_result("benchmark.json", results)
-        context.complete({"result": str(output)})
-    except Exception as error:
-        context.fail(error)
-        logger.exception("Benchmark failed")
-        raise
+        context.log_summary({"result": str(output)})
 
 
 def select_modes(requested_mode):

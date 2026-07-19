@@ -5,8 +5,8 @@ from typing import Optional
 
 from game.regicide import Game
 from game.action_handler import ActionHandler
-from ml_logger import GameRecorder, RunContext, get_logger, start_run
-from ml_logger.serialization import serialize_game
+from integrations.regicide_logging import GameRecorder, serialize_game
+from ml_logger import RunContext, get_logger, start_run
 from .theme import DARK_THEME
 from .ui_elements import Button, HealthBar, draw_card
 from .sound import play_thud, play_draw, play_shimmer, play_clang, play_victory, play_defeat

@@ -1,11 +1,6 @@
 import json
-from ml_logger import (
-    GameRecorder,
-    RunCatalog,
-    configure_logging,
-    get_logger,
-    start_run,
-)
+from integrations.regicide_logging import GameCatalog, GameRecorder
+from ml_logger import RunCatalog, configure_logging, get_logger, start_run
 from solvers.env import RegicideEnv
 
 
@@ -48,7 +43,7 @@ def test_environment_records_a_replayable_game(tmp_path):
         if terminated or truncated:
             break
 
-    games = context.catalog.list_games(context.run_id)
+    games = GameCatalog.from_context(context).list_games(context.run_id)
     assert len(games) == 1
     assert games[0]["status"] == "completed"
     game_dir = context.run_dir / "games" / games[0]["game_id"]

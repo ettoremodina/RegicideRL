@@ -10,7 +10,7 @@ import yaml
 from sb3_contrib.ppo_mask import MaskablePPO
 from torch.utils.data import DataLoader, TensorDataset
 
-from ml_logger import RunContext, get_logger, start_run
+from ml_logger import RunContext, get_logger, run_scope
 from solvers.architecture import RegicideFeatureExtractor
 from solvers.env import RegicideEnv
 from solvers.wrappers import NumericObsWrapper
@@ -132,15 +132,10 @@ def main():
     parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--batch", type=int, default=64)
     args = parser.parse_args()
-    context = start_run("bc-training", config=vars(args))
-    try:
+    with run_scope("bc-training", config=vars(args)) as context:
         result = train_bc(args.data, context, args.config, args.epochs, args.batch)
         context.save_result("training.json", result)
-        context.complete({"model": result["model"]})
-    except Exception as error:
-        context.fail(error)
-        logger.exception("Behavioral-cloning training failed")
-        raise
+        context.log_summary({"model": result["model"]})
 
 
 if __name__ == "__main__":

@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import fnmatch
 import json
 import os
 import shlex
+import shutil
 import sqlite3
 import subprocess
 import sys
@@ -13,13 +15,15 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from .configs.config_loader import load_config
+from .events import EventBus, EventKind, EventListener, RunEvent
 from .serialization import json_safe
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 DEFAULT_ARTIFACTS_DIR = "artifacts"
+ARTIFACTS_ENVIRONMENT_VARIABLE = "ML_LOGGER_ARTIFACTS_DIR"
 
 
 def utc_now() -> str:
@@ -59,7 +63,7 @@ def _git_metadata() -> dict[str, Any]:
 
 
 class RunCatalog:
-    """SQLite index for fast run and game discovery."""
+    """SQLite index and canonical append-only event store."""
 
     def __init__(self, database_path: str | Path):
         self.database_path = Path(database_path)
@@ -74,7 +78,7 @@ class RunCatalog:
         return connection
 
     def _initialize(self) -> None:
-        """Create idempotent run/game tables and lookup indexes."""
+        """Create idempotent run and event tables with lookup indexes."""
         with self._connect() as connection:
             connection.executescript(
                 """
@@ -88,21 +92,18 @@ class RunCatalog:
                     path TEXT NOT NULL,
                     manifest_json TEXT NOT NULL
                 );
-                CREATE TABLE IF NOT EXISTS games (
-                    game_id TEXT PRIMARY KEY,
+                CREATE TABLE IF NOT EXISTS events (
+                    sequence INTEGER PRIMARY KEY AUTOINCREMENT,
                     run_id TEXT NOT NULL,
-                    status TEXT NOT NULL,
-                    victory INTEGER,
-                    bosses_defeated INTEGER,
-                    turns INTEGER,
-                    started_at TEXT NOT NULL,
-                    ended_at TEXT,
-                    path TEXT NOT NULL,
-                    summary_json TEXT,
+                    kind TEXT NOT NULL,
+                    timestamp TEXT NOT NULL,
+                    step INTEGER,
+                    payload_json TEXT NOT NULL,
                     FOREIGN KEY(run_id) REFERENCES runs(run_id)
                 );
-                CREATE INDEX IF NOT EXISTS idx_games_run_id ON games(run_id);
                 CREATE INDEX IF NOT EXISTS idx_runs_started_at ON runs(started_at);
+                CREATE INDEX IF NOT EXISTS idx_events_run_kind
+                    ON events(run_id, kind, sequence);
                 """
             )
 
@@ -133,51 +134,6 @@ class RunCatalog:
                 ),
             )
 
-    def upsert_game(
-        self,
-        game_id: str,
-        run_id: str,
-        status: str,
-        started_at: str,
-        path: Path,
-        summary: dict[str, Any] | None = None,
-    ) -> None:
-        """Insert or update one game summary in the catalog.
-
-        The initial row may represent a running game; finalization updates the
-        status, outcome, turn count, and serialized summary in place.
-        """
-        summary = summary or {}
-        payload = json.dumps(json_safe(summary), ensure_ascii=False) if summary else None
-        with self._connect() as connection:
-            connection.execute(
-                """
-                INSERT INTO games (
-                    game_id, run_id, status, victory, bosses_defeated,
-                    turns, started_at, ended_at, path, summary_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(game_id) DO UPDATE SET
-                    status=excluded.status,
-                    victory=excluded.victory,
-                    bosses_defeated=excluded.bosses_defeated,
-                    turns=excluded.turns,
-                    ended_at=excluded.ended_at,
-                    summary_json=excluded.summary_json
-                """,
-                (
-                    game_id,
-                    run_id,
-                    status,
-                    summary.get("victory"),
-                    summary.get("bosses_defeated"),
-                    summary.get("turns"),
-                    started_at,
-                    summary.get("ended_at"),
-                    str(path),
-                    payload,
-                ),
-            )
-
     def list_runs(self, limit: int = 50) -> list[dict[str, Any]]:
         """Return the newest cataloged runs up to ``limit``."""
         with self._connect() as connection:
@@ -196,28 +152,45 @@ class RunCatalog:
             ).fetchone()
         return dict(row) if row else None
 
-    def list_games(self, run_id: str) -> list[dict[str, Any]]:
-        """Return games belonging to a run in start-time order."""
+    def append_event(self, event: RunEvent) -> None:
+        """Persist one immutable event."""
+        payload = json.dumps(json_safe(event.payload), ensure_ascii=False)
         with self._connect() as connection:
-            rows = connection.execute(
-                "SELECT * FROM games WHERE run_id = ? ORDER BY started_at",
-                (run_id,),
-            ).fetchall()
-        return [dict(row) for row in rows]
+            connection.execute(
+                """
+                INSERT INTO events (run_id, kind, timestamp, step, payload_json)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    event.run_id,
+                    event.kind.value,
+                    event.timestamp,
+                    event.step,
+                    payload,
+                ),
+            )
 
-    def get_game(self, game_id: str) -> dict[str, Any] | None:
-        """Return one catalog row by game identifier, if present."""
+    def list_events(
+        self,
+        run_id: str,
+        kind: EventKind | str | None = None,
+    ) -> list[RunEvent]:
+        """Return persisted events for a run in insertion order."""
+        query = "SELECT * FROM events WHERE run_id = ?"
+        parameters: tuple[Any, ...] = (run_id,)
+        if kind is not None:
+            kind_value = kind.value if isinstance(kind, EventKind) else kind
+            query += " AND kind = ?"
+            parameters = (run_id, kind_value)
+        query += " ORDER BY sequence"
         with self._connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM games WHERE game_id = ?",
-                (game_id,),
-            ).fetchone()
-        return dict(row) if row else None
+            rows = connection.execute(query, parameters).fetchall()
+        return [_event_from_row(row) for row in rows]
 
 
 @dataclass
 class RunContext:
-    """Lifecycle and filesystem context for one executable run."""
+    """Lifecycle, persistence, and event context for one executable run."""
 
     run_id: str
     run_type: str
@@ -227,7 +200,11 @@ class RunContext:
     manifest: dict[str, Any]
     catalog: RunCatalog
     settings: dict[str, Any]
-    _metrics_lock: threading.Lock = field(default_factory=threading.Lock)
+    _event_bus: EventBus = field(default_factory=EventBus, repr=False)
+    _stream_lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
+    _finish_lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
+    _runtime_closer: Callable[[], None] | None = field(default=None, repr=False)
+    _owns_streams: bool = field(default=True, repr=False)
 
     @classmethod
     def create(
@@ -239,57 +216,29 @@ class RunContext:
         metadata: dict[str, Any] | None = None,
         settings: dict[str, Any] | None = None,
     ) -> "RunContext":
-        """Create run directories, manifest, configuration snapshot, and catalog row.
-
-        Args:
-            run_type: Stable workflow category used by configuration overrides.
-            name: Optional human-readable run name.
-            config: Effective workflow configuration to snapshot.
-            root_dir: Artifact root override.
-            metadata: Additional JSON-compatible provenance.
-            settings: Preloaded logger settings; loaded automatically if omitted.
-
-        Returns:
-            Running context ready for logs, metrics, games, and results.
-        """
+        """Create a running context with versioned metadata and event storage."""
         effective_settings = settings or load_config(run_type=run_type)
         started_at = utc_now()
-        timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
         run_name = name or run_type
-        run_id = f"{run_type}-{timestamp}-{uuid.uuid4().hex[:8]}"
-        artifacts_root = Path(
-            root_dir
-            or os.environ.get("REGICIDE_ARTIFACTS_DIR")
-            or effective_settings.get("artifacts", {}).get(
-                "root_dir", DEFAULT_ARTIFACTS_DIR
-            )
-        )
-        (artifacts_root / "datasets").mkdir(parents=True, exist_ok=True)
-        (artifacts_root / "promoted_models").mkdir(parents=True, exist_ok=True)
-        date_path = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        run_dir = artifacts_root / "runs" / date_path / run_id
-        for child in (
-            "logs",
-            "metrics",
-            "games",
-            "models",
-            "checkpoints",
-            "analysis",
-            "datasets",
-        ):
-            (run_dir / child).mkdir(parents=True, exist_ok=True)
-        manifest = _build_manifest(
+        run_id = _new_run_id(run_type)
+        artifacts_root, run_dir = _create_run_directories(
             run_id,
-            run_type,
-            run_name,
-            started_at,
+            root_dir,
+            effective_settings,
+        )
+        identity = {
+            "run_id": run_id,
+            "run_type": run_type,
+            "name": run_name,
+            "started_at": started_at,
+        }
+        manifest = _build_manifest(
+            identity,
             config,
             metadata,
             effective_settings,
         )
-        _atomic_json_write(run_dir / "manifest.json", manifest)
-        if config is not None:
-            _atomic_json_write(run_dir / "config.json", config)
+        _write_initial_run_files(run_dir, manifest, config)
         catalog = RunCatalog(artifacts_root / "catalog.sqlite")
         context = cls(
             run_id,
@@ -310,12 +259,9 @@ class RunContext:
         run_id: str,
         run_dir: str | Path,
         root_dir: str | Path,
+        writer: bool = False,
     ) -> "RunContext":
-        """Attach a process-local context to an existing run directory.
-
-        This is used by worker processes and does not create a new manifest or
-        run identifier.
-        """
+        """Attach to an existing run, optionally owning compatibility streams."""
         path = Path(run_dir)
         manifest = json.loads((path / "manifest.json").read_text(encoding="utf-8"))
         return cls(
@@ -329,6 +275,7 @@ class RunContext:
             settings=manifest.get("logger_settings") or load_config(
                 run_type=manifest["run_type"]
             ),
+            _owns_streams=writer,
         )
 
     def descriptor(self) -> dict[str, str]:
@@ -339,23 +286,117 @@ class RunContext:
             "root_dir": str(self.root_dir),
         }
 
+    def subscribe(self, listener: EventListener) -> None:
+        """Attach an optional view or integration to this run."""
+        self._event_bus.subscribe(listener)
+
+    @property
+    def event_bus(self) -> EventBus:
+        """Expose the bus for standard logging bridges and advanced plugins."""
+        return self._event_bus
+
+    @property
+    def listener_errors(self) -> tuple[tuple[EventListener, Exception], ...]:
+        """Return non-fatal failures raised by optional event consumers."""
+        return self._event_bus.errors
+
+    def unsubscribe(self, listener: EventListener) -> None:
+        """Detach a previously registered view or integration."""
+        self._event_bus.unsubscribe(listener)
+
+    def install_runtime_closer(self, closer: Callable[[], None]) -> None:
+        """Register runtime cleanup owned by the run lifecycle."""
+        self._runtime_closer = closer
+
+    def emit_started(self) -> None:
+        """Publish the start event after runtime consumers are installed."""
+        self._publish(
+            EventKind.RUN_STARTED,
+            {"run_type": self.run_type, "name": self.name},
+        )
+
+    def log_params(self, params: dict[str, Any]) -> None:
+        """Persist run parameters and broadcast their new values."""
+        if not self.saving_enabled("params"):
+            return
+        safe_params = json_safe(params)
+        self.manifest.setdefault("params", {}).update(safe_params)
+        _atomic_json_write(self.run_dir / "manifest.json", self.manifest)
+        self.catalog.upsert_run(self.manifest, self.run_dir)
+        self._publish(EventKind.PARAMS, safe_params)
+
+    def log_summary(self, summary: dict[str, Any]) -> None:
+        """Merge final or intermediate summary values into the manifest."""
+        safe_summary = json_safe(summary)
+        self.manifest.setdefault("result", {}).update(safe_summary)
+        _atomic_json_write(self.run_dir / "manifest.json", self.manifest)
+        self.catalog.upsert_run(self.manifest, self.run_dir)
+        self._publish(EventKind.RESULT, {"summary": safe_summary})
+
+    def log_metric(self, name: str, value: Any, step: int) -> None:
+        """Record one metric through the batch-oriented metric API."""
+        self.log_metrics(step, {name: value})
+
     def log_metrics(self, step: int, metrics: dict[str, Any]) -> None:
-        """Append one timestamped metric record when metric saving is enabled."""
+        """Persist and broadcast one timestamped metric batch."""
         if not self.saving_enabled("metrics"):
             return
-        entry = {"timestamp": utc_now(), "step": step, **json_safe(metrics)}
-        path = self.run_dir / "metrics" / "metrics.jsonl"
-        with self._metrics_lock, path.open("a", encoding="utf-8") as stream:
-            stream.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        selected_metrics = _select_metrics(
+            json_safe(metrics),
+            self.settings.get("metrics", {}),
+        )
+        if not selected_metrics:
+            return
+        event = self._publish(EventKind.METRICS, selected_metrics, step)
+        self._append_compatibility_stream("metrics.jsonl", event)
 
     def log_telemetry(self, telemetry: dict[str, Any]) -> None:
-        """Append one timestamped hardware sample when telemetry is enabled."""
+        """Persist and broadcast one structured hardware sample."""
         if not self.saving_enabled("telemetry"):
             return
-        entry = {"timestamp": utc_now(), **json_safe(telemetry)}
-        path = self.run_dir / "metrics" / "telemetry.jsonl"
-        with self._metrics_lock, path.open("a", encoding="utf-8") as stream:
-            stream.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        event = self._publish(EventKind.TELEMETRY, json_safe(telemetry))
+        self._append_compatibility_stream("telemetry.jsonl", event)
+
+    def log_progress(
+        self,
+        completed: int,
+        total: int,
+        description: str = "Running",
+    ) -> None:
+        """Broadcast progress without persisting high-frequency updates."""
+        self._publish(
+            EventKind.PROGRESS,
+            {
+                "completed": completed,
+                "total": total,
+                "description": description,
+            },
+            persist=False,
+        )
+
+    def log_artifact(
+        self,
+        source: str | Path,
+        kind: str = "artifact",
+        name: str | None = None,
+    ) -> Path:
+        """Copy a file or directory into the run and register it."""
+        source_path = Path(source)
+        target_name = Path(name).name if name else source_path.name
+        destination = self.run_dir / "artifacts" / _safe_segment(kind) / target_name
+        if not self.saving_enabled("artifacts"):
+            return destination
+        if not source_path.exists():
+            raise FileNotFoundError(source_path)
+        _copy_artifact(source_path, destination)
+        self._publish(
+            EventKind.ARTIFACT,
+            {
+                "path": str(destination.relative_to(self.run_dir)),
+                "kind": kind,
+            },
+        )
+        return destination
 
     def save_result(
         self,
@@ -368,29 +409,24 @@ class RunContext:
         Returns the intended path even when result saving is disabled, allowing
         callers to keep a stable control flow.
         """
-        output_path = self.run_dir / category / filename
+        output_path = _safe_run_destination(self.run_dir, category, filename)
         if not self.saving_enabled("results"):
             return output_path
         output_path.parent.mkdir(parents=True, exist_ok=True)
         _atomic_json_write(output_path, result)
+        self._publish(
+            EventKind.RESULT,
+            {
+                "path": str(output_path.relative_to(self.run_dir)),
+                "category": category,
+            },
+        )
         return output_path
 
     def saving_enabled(self, category: str) -> bool:
         """Return whether the global and category-specific save switches are on."""
         saving = self.settings.get("saving", {})
         return bool(saving.get("enabled", True) and saving.get(category, True))
-
-    @property
-    def game_recording_enabled(self) -> bool:
-        """Return whether optional game artifacts are enabled for this run."""
-        games = self.settings.get("games", {})
-        saving_enabled = self.settings.get("saving", {}).get("enabled", True)
-        return bool(saving_enabled and games.get("enabled", True))
-
-    @property
-    def game_recording_level(self) -> str:
-        """Return the configured ``summary``, ``actions``, or ``full`` level."""
-        return self.settings.get("games", {}).get("recording_level", "actions")
 
     def complete(self, metadata: dict[str, Any] | None = None) -> None:
         """Finalize the run successfully and merge optional result metadata."""
@@ -401,19 +437,182 @@ class RunContext:
         self._finish("failed", {"error": str(error)})
 
     def _finish(self, status: str, metadata: dict[str, Any] | None) -> None:
-        self.manifest["status"] = status
-        self.manifest["ended_at"] = utc_now()
-        if metadata:
-            self.manifest.setdefault("result", {}).update(json_safe(metadata))
-        _atomic_json_write(self.run_dir / "manifest.json", self.manifest)
-        self.catalog.upsert_run(self.manifest, self.run_dir)
+        """Finalize storage, publish status, and release runtime resources."""
+        with self._finish_lock:
+            if self.manifest["status"] != "running":
+                return
+            self.manifest["status"] = status
+            self.manifest["ended_at"] = utc_now()
+            if metadata:
+                self.manifest.setdefault("result", {}).update(json_safe(metadata))
+            _atomic_json_write(self.run_dir / "manifest.json", self.manifest)
+            self.catalog.upsert_run(self.manifest, self.run_dir)
+            self._sync_event_exports()
+            kind = (
+                EventKind.RUN_COMPLETED
+                if status == "completed"
+                else EventKind.RUN_FAILED
+            )
+            self._publish(kind, json_safe(metadata or {}))
+        self._close_runtime()
+
+    def _publish(
+        self,
+        kind: EventKind,
+        payload: dict[str, Any],
+        step: int | None = None,
+        persist: bool = True,
+    ) -> RunEvent:
+        event = RunEvent(kind, self.run_id, utc_now(), payload, step)
+        if persist:
+            self.catalog.append_event(event)
+        self._event_bus.publish(event)
+        return event
+
+    def _append_compatibility_stream(
+        self,
+        filename: str,
+        event: RunEvent,
+    ) -> None:
+        """Append a parent-owned JSONL record for legacy readers."""
+        if not self._owns_streams:
+            return
+        path = self.run_dir / "metrics" / filename
+        record = _compatibility_record(event)
+        with self._stream_lock, path.open("a", encoding="utf-8") as stream:
+            stream.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+    def _sync_event_exports(self) -> None:
+        """Materialize complete JSONL views from the canonical event catalog."""
+        if not self._owns_streams:
+            return
+        mappings = {
+            EventKind.METRICS: "metrics.jsonl",
+            EventKind.TELEMETRY: "telemetry.jsonl",
+        }
+        for kind, filename in mappings.items():
+            events = self.catalog.list_events(self.run_id, kind)
+            if events:
+                _atomic_jsonl_write(
+                    self.run_dir / "metrics" / filename,
+                    [_compatibility_record(event) for event in events],
+                )
+
+    def _close_runtime(self) -> None:
+        closer, self._runtime_closer = self._runtime_closer, None
+        if closer is not None:
+            closer()
+
+
+def _event_from_row(row: sqlite3.Row) -> RunEvent:
+    return RunEvent(
+        kind=EventKind(row["kind"]),
+        run_id=row["run_id"],
+        timestamp=row["timestamp"],
+        step=row["step"],
+        payload=json.loads(row["payload_json"]),
+    )
+
+
+def _new_run_id(run_type: str) -> str:
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
+    return f"{run_type}-{timestamp}-{uuid.uuid4().hex[:8]}"
+
+
+def _create_run_directories(
+    run_id: str,
+    root_dir: str | Path | None,
+    settings: dict[str, Any],
+) -> tuple[Path, Path]:
+    """Resolve the artifact root and create configured run subdirectories."""
+    artifacts_settings = settings.get("artifacts", {})
+    artifacts_root = Path(
+        root_dir
+        or os.environ.get(ARTIFACTS_ENVIRONMENT_VARIABLE)
+        or artifacts_settings.get("root_dir", DEFAULT_ARTIFACTS_DIR)
+    )
+    date_path = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    run_dir = artifacts_root / "runs" / date_path / run_id
+    configured = artifacts_settings.get("directories", [])
+    directories = {"logs", "metrics", "artifacts", *configured}
+    for directory in directories:
+        (run_dir / _safe_segment(directory)).mkdir(parents=True, exist_ok=True)
+    return artifacts_root, run_dir
+
+
+def _write_initial_run_files(
+    run_dir: Path,
+    manifest: dict[str, Any],
+    config: dict[str, Any] | None,
+) -> None:
+    _atomic_json_write(run_dir / "manifest.json", manifest)
+    if config is not None:
+        _atomic_json_write(run_dir / "config.json", config)
+
+
+def _compatibility_record(event: RunEvent) -> dict[str, Any]:
+    record = {"timestamp": event.timestamp}
+    if event.step is not None:
+        record["step"] = event.step
+    record.update(json_safe(event.payload))
+    return record
+
+
+def _atomic_jsonl_write(path: Path, records: list[dict[str, Any]]) -> None:
+    """Replace a JSONL stream atomically from complete records."""
+    temporary_path = path.with_suffix(path.suffix + ".tmp")
+    with temporary_path.open("w", encoding="utf-8") as stream:
+        for record in records:
+            stream.write(json.dumps(record, ensure_ascii=False) + "\n")
+    temporary_path.replace(path)
+
+
+def _copy_artifact(source: Path, destination: Path) -> None:
+    """Copy one file or directory unless it already occupies the target."""
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    if source.resolve() == destination.resolve():
+        return
+    if source.is_dir():
+        shutil.copytree(source, destination, dirs_exist_ok=True)
+    else:
+        shutil.copy2(source, destination)
+
+
+def _safe_segment(value: str) -> str:
+    """Validate a single user-configurable path segment."""
+    segment = str(value).strip()
+    if not segment or Path(segment).name != segment or segment in {".", ".."}:
+        raise ValueError(f"Invalid path segment: {value}")
+    return segment
+
+
+def _safe_run_destination(run_dir: Path, category: str, filename: str) -> Path:
+    """Resolve a result path while preventing escape from the run directory."""
+    category_path = Path(category)
+    filename_path = Path(filename)
+    relative_path = category_path / filename_path
+    if relative_path.is_absolute() or ".." in relative_path.parts:
+        raise ValueError("Result path must stay inside the run directory")
+    return run_dir / relative_path
+
+
+def _select_metrics(
+    metrics: dict[str, Any],
+    filters: dict[str, Any],
+) -> dict[str, Any]:
+    """Filter stored metric keys with shell-style include and exclude rules."""
+    include = filters.get("include", ["*"])
+    exclude = filters.get("exclude", [])
+    return {
+        name: value
+        for name, value in metrics.items()
+        if any(fnmatch.fnmatch(name, pattern) for pattern in include)
+        and not any(fnmatch.fnmatch(name, pattern) for pattern in exclude)
+    }
 
 
 def _build_manifest(
-    run_id: str,
-    run_type: str,
-    name: str,
-    started_at: str,
+    identity: dict[str, str],
     config: dict[str, Any] | None,
     metadata: dict[str, Any] | None,
     logger_settings: dict[str, Any],
@@ -422,11 +621,11 @@ def _build_manifest(
     command = " ".join(shlex.quote(argument) for argument in sys.argv)
     return {
         "schema_version": SCHEMA_VERSION,
-        "run_id": run_id,
-        "run_type": run_type,
-        "name": name,
+        "run_id": identity["run_id"],
+        "run_type": identity["run_type"],
+        "name": identity["name"],
         "status": "running",
-        "started_at": started_at,
+        "started_at": identity["started_at"],
         "ended_at": None,
         "command": command,
         "python": sys.version,

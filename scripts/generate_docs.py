@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 from typing import Iterable
 
-from ml_logger import get_logger, start_run
+from ml_logger import get_logger, run_scope
 
 logger = get_logger(__name__)
 
@@ -27,6 +27,7 @@ DOCUMENTED_MODULES = (
     "agents.random_agent",
     "solvers",
     "ml_logger",
+    "integrations",
     "scripts",
     "ui",
     "benchmark",
@@ -88,9 +89,8 @@ def build_documentation(
 
 def main() -> None:
     """Generate the project API reference and record the build as a run."""
-    context = start_run("documentation")
-    logger.info("Generating documentation with pdoc")
-    try:
+    with run_scope("documentation") as context:
+        logger.info("Generating documentation with pdoc")
         output_directory = build_documentation()
         result = {
             "status": "completed",
@@ -98,12 +98,8 @@ def main() -> None:
             "modules": list(DOCUMENTED_MODULES),
         }
         context.save_result("documentation.json", result)
-        context.complete(result)
+        context.log_summary(result)
         logger.info("Documentation generated in %s", output_directory)
-    except (subprocess.CalledProcessError, DocumentationBuildWarning) as error:
-        context.fail(error)
-        logger.exception("Documentation generation failed")
-        raise
 
 
 if __name__ == "__main__":

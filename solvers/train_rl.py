@@ -4,7 +4,8 @@ import os
 import argparse
 from stable_baselines3.common.callbacks import CheckpointCallback, CallbackList
 from sb3_contrib.ppo_mask import MaskablePPO
-from ml_logger import GameRecorder, get_logger, start_run
+from integrations.regicide_logging import GameRecorder
+from ml_logger import get_logger, start_run
 from solvers.config import load_config
 from solvers.env import RegicideEnv
 from solvers.wrappers import NumericObsWrapper

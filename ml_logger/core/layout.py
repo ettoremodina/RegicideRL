@@ -24,40 +24,43 @@ def create_command_center_layout() -> Layout:
     return layout
 
 def render_metrics_table(metrics: dict) -> Table:
-    """Renders the metrics dictionary into a rich Table."""
+    """Render a flat metric mapping into a Rich table."""
     table = Table(box=box.ROUNDED, expand=True)
-    table.add_column("Category", style="cyan")
     table.add_column("Metric", style="magenta")
     table.add_column("Value", justify="right")
-    
-    for category, mets in metrics.items():
-        for i, (name, val) in enumerate(mets.items()):
-            cat_str = category if i == 0 else ""
-            
-            # Format value if it's a float
-            if isinstance(val, float):
-                formatted = f"{val:.4f}"
-            else:
-                formatted = str(val)
-                
-            table.add_row(cat_str, name, formatted)
-            
+    for name, value in metrics.items():
+        formatted = f"{value:.4f}" if isinstance(value, float) else str(value)
+        table.add_row(name, formatted)
     return table
 
-def render_hardware_table(cpu: float, ram: float, gpus: list) -> Table:
-    """Renders system metrics into a rich Table."""
+
+def render_hardware_table(telemetry: dict) -> Table:
+    """Render selected structured telemetry values."""
     table = Table(box=box.SIMPLE, expand=True, show_header=False)
     table.add_column("Component", style="cyan")
     table.add_column("Usage", justify="right", style="green")
-    
-    table.add_row("CPU", f"{cpu}%")
-    table.add_row("RAM", f"{ram}%")
-    for i, gpu_stat in enumerate(gpus):
-        table.add_row(f"GPU {i}", gpu_stat)
-        
+    for name, value in telemetry.items():
+        table.add_row(_telemetry_label(name), _telemetry_value(name, value))
     return table
 
 def render_logs_panel(log_queue: list) -> Panel:
     """Renders the queued log strings into a Panel."""
     content = Text("\n").join(log_queue)
     return Panel(content, title="Log Stream", border_style="white")
+
+
+def _telemetry_label(name: str) -> str:
+    return name.replace("_", " ").replace("/", " · ")
+
+
+def _telemetry_value(name: str, value) -> str:
+    """Format numeric telemetry using the unit encoded in its name."""
+    if not isinstance(value, (int, float)):
+        return str(value)
+    if name.endswith("_percent"):
+        return f"{value:.1f}%"
+    if name.endswith("_mb"):
+        return f"{value:.1f} MB"
+    if name.endswith("_c"):
+        return f"{value:.1f} °C"
+    return f"{value:.2f}" if isinstance(value, float) else str(value)

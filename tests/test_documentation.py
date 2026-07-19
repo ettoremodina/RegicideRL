@@ -8,7 +8,15 @@ from pathlib import Path
 from scripts.generate_docs import DOCUMENTED_MODULES, build_documentation
 
 PROJECT_ROOT = Path(__file__).parents[1]
-PACKAGE_ROOTS = ("game", "agents", "solvers", "ml_logger", "scripts", "ui")
+PACKAGE_ROOTS = (
+    "game",
+    "agents",
+    "solvers",
+    "ml_logger",
+    "integrations",
+    "scripts",
+    "ui",
+)
 CONTROL_FLOW_NODES = (
     ast.If,
     ast.For,

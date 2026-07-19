@@ -100,7 +100,7 @@ def _resume_existing_run(run_dir: Path):
         raise FileNotFoundError(f"Missing run configuration: {snapshot_path}")
     report_config = load_report_config(snapshot_path)
     root_dir = run_dir.parents[2]
-    context = RunContext.attach(run_dir.name, run_dir, root_dir)
+    context = RunContext.attach(run_dir.name, run_dir, root_dir, writer=True)
     previous_result = context.manifest.pop("result", None)
     if previous_result:
         context.manifest.setdefault("metadata", {})["previous_result"] = previous_result

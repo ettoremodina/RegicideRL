@@ -5,7 +5,7 @@ import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
-from ml_logger import get_logger, start_run
+from ml_logger import get_logger, run_scope
 
 logger = get_logger(__name__)
 LEGACY_DIRECTORIES = (
@@ -69,19 +69,14 @@ def main():
     parser.add_argument("--workspace", default=".")
     parser.add_argument("--artifacts-dir", default="artifacts")
     args = parser.parse_args()
-    context = start_run(
+    with run_scope(
         "artifact-migration",
         config=vars(args),
         root_dir=Path(args.workspace) / args.artifacts_dir,
-    )
-    try:
+    ) as context:
         moved = migrate_legacy_artifacts(args.workspace, args.artifacts_dir)
         report = context.save_result("migration.json", {"moved": moved})
-        context.complete({"moved": len(moved), "report": str(report)})
-    except Exception as error:
-        context.fail(error)
-        logger.exception("Artifact migration failed")
-        raise
+        context.log_summary({"moved": len(moved), "report": str(report)})
 
 
 if __name__ == "__main__":

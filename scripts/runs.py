@@ -4,6 +4,7 @@ import argparse
 import json
 from pathlib import Path
 
+from integrations.regicide_logging import GameCatalog
 from ml_logger import RunCatalog, configure_logging, get_logger
 
 logger = get_logger(__name__)
@@ -18,8 +19,8 @@ def main():
     commands = {
         "list": lambda: _list_runs(catalog, args.limit),
         "show": lambda: _show_run(catalog, args.run_id),
-        "games": lambda: _list_games(catalog, args.run_id),
-        "replay": lambda: _replay_game(catalog, args.game_id),
+        "games": lambda: _list_games(GameCatalog(catalog.database_path), args.run_id),
+        "replay": lambda: _replay_game(GameCatalog(catalog.database_path), args.game_id),
     }
     commands[args.command]()
 

@@ -1,8 +1,17 @@
 # Central runtime switches read before every ml_logger run.
-version: 1
+version: 2
 
 artifacts:
   root_dir: artifacts
+  directories:
+    - logs
+    - metrics
+    - artifacts
+    - games
+    - models
+    - checkpoints
+    - analysis
+    - datasets
 
 logging:
   enabled: true       # Master switch for application log messages.
@@ -21,40 +30,81 @@ terminal:
 
 saving:
   enabled: true       # Master switch for optional logger-managed artifacts.
+  params: true        # Save parameters in the manifest and event catalog.
   metrics: true       # Save metrics/metrics.jsonl.
   results: true       # Save JSON results produced through RunContext.
-  telemetry: false    # Save hardware telemetry when using the dashboard.
+  artifacts: true     # Copy artifacts registered through log_artifact.
+  telemetry: true     # Save numeric process and hardware telemetry.
 
-games:
-  enabled: true       # Save real game histories unless overridden below.
-  recording_level: actions  # summary, actions, or full.
+metrics:
+  include: ["*"]
+  exclude: ["debug/*"]
+
+integrations:
+  regicide:
+    recording:
+      enabled: true
+      level: actions  # summary, actions, or full.
 
 dashboard:
+  mode: auto          # auto, live, compact, or off.
   refresh_rate: 4
   max_log_lines: 50
-  telemetry_interval_sec: 10
+  max_metrics: 16
+  screen: true
+  metrics:
+    include: ["train/*", "eval/*", "loss", "win_rate", "trial_score"]
+    exclude: ["debug/*"]
+
+telemetry:
+  enabled: true
+  sample_interval_sec: 5
+  include_process: true
+  include_system: true
+  gpu_provider: auto
+
+report:
+  enabled: true
+  filename: run_report.html
+  visualization: auto
+  max_charts: 20
+  metrics:
+    include: ["*"]
+    exclude: ["debug/*"]
 
 # Per-run settings are merged over the global flags. These defaults prevent
 # game-by-game disk I/O in high-volume workflows.
 run_type_overrides:
   benchmark:
-    games:
-      enabled: false
+    integrations:
+      regicide:
+        recording:
+          enabled: false
   ppo-training:
-    games:
-      enabled: false
+    integrations:
+      regicide:
+        recording:
+          enabled: false
   evaluation:
-    games:
-      enabled: false
+    integrations:
+      regicide:
+        recording:
+          enabled: false
   alphazero:
-    games:
-      enabled: false
+    integrations:
+      regicide:
+        recording:
+          enabled: false
   hyperparameter-tuning:
-    games:
-      enabled: false
+    integrations:
+      regicide:
+        recording:
+          enabled: false
   bc-data-generation:
-    games:
-      enabled: false
+    integrations:
+      regicide:
+        recording:
+          enabled: false
 
 highlights:
   - pattern: '\b(starting|started|complete|completed|saved)\b'

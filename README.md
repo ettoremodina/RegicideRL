@@ -99,18 +99,29 @@ layout and analysis protocol.
 
 ## Logging and artifacts
 
-`ml_logger` is the only application logging and persistence entry point.
-Modules acquire a logger with `get_logger(__name__)`; executable commands
-create a `RunContext` with `start_run(...)`. Application code must not use
-`print()` or write directly to `stdout`.
+`ml_logger` is the application logging and experiment-tracking entry point.
+Modules acquire a standard logger with `get_logger(__name__)`; new executable
+commands should own their lifecycle with `with run(...):`. The same event
+stream feeds SQLite storage, JSONL compatibility exports, the optional Rich
+dashboard, structured telemetry, and a portable HTML report.
+
+Regicide-specific game recording is kept outside the generic package in
+[`integrations/regicide_logging.py`](integrations/regicide_logging.py).
+See [`docs/ml_logger.md`](docs/ml_logger.md) for the standalone guide, complete
+configuration reference, multiprocessing contract, and adapter examples.
 
 Before every run, `ml_logger` reads [`logger_config.yaml`](logger_config.yaml).
 The main switches are:
 
 - `logging.enabled`, `console`, `file`, and `level`;
 - `terminal.colors`, `timezone`, visibility, and traceback rendering;
-- `saving.enabled`, `metrics`, `results`, and `telemetry`;
-- `games.enabled` and `recording_level`;
+- `saving.enabled`, `params`, `metrics`, `results`, `artifacts`, and
+  `telemetry`;
+- `metrics.include` and `exclude`;
+- `dashboard.mode` and its visible metric filters;
+- `telemetry` sampling and providers;
+- `report.enabled`, metric filters, and visualization;
+- `integrations.regicide.recording` for domain-specific game histories;
 - `run_type_overrides` for high-volume commands.
 
 `benchmark`, PPO, AlphaZero, tuning, and BC data generation disable individual
@@ -119,11 +130,13 @@ game recording by default. To record benchmark games, change:
 ```yaml
 run_type_overrides:
   benchmark:
-    games:
-      enabled: true
+    integrations:
+      regicide:
+        recording:
+          enabled: true
 ```
 
-`recording_level` accepts `summary`, `actions`, or `full`. A different
+The Regicide recording `level` accepts `summary`, `actions`, or `full`. A different
 configuration file can be selected without editing the repository by setting
 the `ML_LOGGER_CONFIG` environment variable. A minimal manifest and catalog
 entry are always retained; `saving.enabled` controls optional logger-managed
@@ -175,7 +188,8 @@ python -m solvers.train --help
 - `agents/`: Core interfaces and heuristic bots (e.g., Random, ISMCTS, PIMC).
 - `solvers/`: Advanced RL training loops, AlphaZero networks, self-play logic, and TensorBoard logging.
 - `ui/`: Pygame-based graphical interface.
-- `ml_logger/`: Custom Rich-based telemetry, dashboard, and metrics tracker.
+- `ml_logger/`: Reusable local-first run, event, telemetry, dashboard, and report package.
+- `integrations/`: Project-specific adapters, including Regicide game recording.
 - `scripts/`: Diagnostic tools, game runners, and documentation generators (run them with `python -m scripts.<name>`).
 - `tests/`: Comprehensive test suite (`pytest`).
 - `rules/`: Text files containing reference rulebooks.

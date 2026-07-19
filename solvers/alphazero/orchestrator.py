@@ -18,7 +18,8 @@ from solvers.alphazero.trainer import AlphaZeroTrainer
 from solvers.alphazero.replay_buffer import ReplayBuffer
 from solvers.alphazero.self_play import generate_self_play_data
 from solvers.alphazero.eval import evaluate_network
-from ml_logger import GameRecorder, RunContext, RunLogger, get_logger
+from integrations.regicide_logging import GameRecorder
+from ml_logger import RunContext, RunLogger, get_logger
 
 logger = get_logger(__name__)
 

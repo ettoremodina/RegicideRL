@@ -5,7 +5,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from ml_logger import RunCatalog, get_logger, start_run
+from ml_logger import RunCatalog, get_logger, run_scope
 from solvers.analysis.run_analysis import run_analysis_pipeline
 from solvers.config import load_config
 
@@ -26,14 +26,13 @@ def run_experiment(config_path="config.yaml"):
         FileNotFoundError: If the training run contains no model.
     """
     config = load_config(config_path)
-    context = start_run(
+    with run_scope(
         "experiment",
         name="ppo-training-and-analysis",
         config=config,
-    )
-    catalog = RunCatalog(context.root_dir / "catalog.sqlite")
-    known_runs = {row["run_id"] for row in catalog.list_runs(100_000)}
-    try:
+    ) as context:
+        catalog = RunCatalog(context.root_dir / "catalog.sqlite")
+        known_runs = {row["run_id"] for row in catalog.list_runs(100_000)}
         logger.info("Starting PPO training phase")
         subprocess.run(
             [sys.executable, "-m", "solvers.train_rl", "--config", config_path],
@@ -50,7 +49,7 @@ def run_experiment(config_path="config.yaml"):
         )
         if not success:
             raise RuntimeError("Policy analysis failed")
-        context.complete(
+        context.log_summary(
             {
                 "training_run_id": training_run["run_id"],
                 "model_path": str(model_path),
@@ -58,10 +57,6 @@ def run_experiment(config_path="config.yaml"):
         )
         logger.info("Experiment completed in %s", context.run_dir)
         return context
-    except Exception as error:
-        context.fail(error)
-        logger.exception("Experiment failed")
-        raise
 
 
 def _find_new_training_run(catalog, known_runs):

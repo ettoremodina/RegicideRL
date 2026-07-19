@@ -2,6 +2,7 @@ import ast
 from pathlib import Path
 
 from agents.random_agent import RandomAgent
+from integrations.regicide_logging import GameCatalog
 from ml_logger import start_run
 from scripts.migrate_artifacts import migrate_legacy_artifacts
 from solvers.parallel import ParallelSimulator
@@ -49,7 +50,8 @@ def test_single_worker_simulation_records_each_game(tmp_path):
     context.complete()
 
     assert 0.0 <= metrics["win_rate"] <= 1.0
-    assert len(context.catalog.list_games(context.run_id)) == 3
+    games = GameCatalog.from_context(context).list_games(context.run_id)
+    assert len(games) == 3
 
 
 def test_legacy_migration_preserves_outputs_and_promotes_models(tmp_path):

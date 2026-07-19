@@ -13,6 +13,8 @@ PROJECT_CONFIG_NAME = "logger_config.yaml"
 CONFIG_ENVIRONMENT_VARIABLE = "ML_LOGGER_CONFIG"
 VALID_LEVELS = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
 VALID_RECORDING_LEVELS = {"summary", "actions", "full"}
+VALID_DASHBOARD_MODES = {"auto", "live", "compact", "off"}
+VALID_REPORT_VISUALIZATIONS = {"auto", "line", "table"}
 
 
 def load_config(config_path: str | Path | None = None, run_type=None) -> dict:
@@ -61,7 +63,48 @@ def _validate_config(config):
     if logging_level not in VALID_LEVELS:
         raise ValueError(f"Unsupported logging level: {logging_level}")
     config["logging"]["level"] = logging_level
-    recording_level = config["games"]["recording_level"]
+    parse_utc_offset(config["terminal"]["timezone"])
+    _validate_dashboard(config.get("dashboard", {}))
+    _validate_report(config.get("report", {}))
+    _validate_recording(config)
+
+
+def _validate_dashboard(settings):
+    """Normalize dashboard mode and reject invalid refresh settings."""
+    raw_mode = settings.get("mode", "auto")
+    if isinstance(raw_mode, bool):
+        mode = "live" if raw_mode else "off"
+    else:
+        mode = str(raw_mode).lower()
+    if mode not in VALID_DASHBOARD_MODES:
+        raise ValueError(f"Unsupported dashboard mode: {mode}")
+    settings["mode"] = mode
+    if settings.get("refresh_rate", 1) <= 0:
+        raise ValueError("dashboard.refresh_rate must be positive")
+
+
+def _validate_report(settings):
+    """Normalize the configured HTML report visualization."""
+    visualization = str(settings.get("visualization", "auto")).lower()
+    if visualization not in VALID_REPORT_VISUALIZATIONS:
+        raise ValueError(f"Unsupported report visualization: {visualization}")
+    settings["visualization"] = visualization
+
+
+def _validate_recording(config):
+    """Validate optional Regicide adapter settings, including legacy keys."""
+    recording = (
+        config.get("integrations", {})
+        .get("regicide", {})
+        .get("recording")
+    )
+    games = config.get("games")
+    settings = recording or games
+    if not settings:
+        return
+    recording_level = settings.get(
+        "level",
+        settings.get("recording_level", "actions"),
+    )
     if recording_level not in VALID_RECORDING_LEVELS:
         raise ValueError(f"Unsupported recording level: {recording_level}")
-    parse_utc_offset(config["terminal"]["timezone"])

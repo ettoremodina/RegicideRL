@@ -6,7 +6,8 @@ from pathlib import Path
 import numpy as np
 
 from agents.heuristic_agent import HeuristicAgent
-from ml_logger import GameRecorder, get_logger, start_run
+from integrations.regicide_logging import GameRecorder
+from ml_logger import get_logger, run_scope
 from solvers.env import RegicideEnv
 from solvers.wrappers import NumericObsWrapper
 
@@ -91,17 +92,12 @@ def main():
     parser.add_argument("--games", type=int, default=5000)
     parser.add_argument("--out")
     args = parser.parse_args()
-    context = start_run("bc-data-generation", config=vars(args))
-    recorder = GameRecorder(context)
-    output = args.out or context.run_dir / "datasets" / "bc_data.npz"
-    try:
+    with run_scope("bc-data-generation", config=vars(args)) as context:
+        recorder = GameRecorder(context)
+        output = args.out or context.run_dir / "datasets" / "bc_data.npz"
         result = generate_data(args.games, output, recorder)
         context.save_result("dataset.json", result)
-        context.complete(result)
-    except Exception as error:
-        context.fail(error)
-        logger.exception("BC dataset generation failed")
-        raise
+        context.log_summary(result)
 
 
 if __name__ == "__main__":

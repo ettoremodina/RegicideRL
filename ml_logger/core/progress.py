@@ -30,6 +30,23 @@ class ProgressManager:
                 kwargs["description"] = f"[magenta]{description}"
             self.progress.update(self.task_id, **kwargs)
 
+    def update(
+        self,
+        completed: int,
+        total: int,
+        description: str = "Running",
+    ):
+        """Set absolute progress, creating the Rich task on first use."""
+        if self.task_id is None:
+            self.start(total, description)
+        self.progress.update(
+            self.task_id,
+            completed=completed,
+            total=total,
+            description=f"[magenta]{description}",
+        )
+        self.is_active = completed < total
+
     def stop(self):
         """Hide progress updates without discarding the Rich task."""
         self.is_active = False
