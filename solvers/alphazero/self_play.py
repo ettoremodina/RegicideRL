@@ -13,11 +13,18 @@ from ml_logger import get_logger
 from solvers.env import RegicideEnv
 from solvers.alphazero.featurizer import encode_state
 from solvers.alphazero.mcts import run_mcts
+from solvers.alphazero.outcomes import enemies_defeated, terminal_value
 
 logger = get_logger(__name__)
 
 
-def run_self_play_game(network, config, device, recorder=None):
+def run_self_play_game(
+    network,
+    config,
+    device,
+    recorder=None,
+    use_heuristic_guidance=False,
+):
     """Play one full game via MCTS+Network and return training data.
 
     Args:
@@ -33,71 +40,80 @@ def run_self_play_game(network, config, device, recorder=None):
     """
     env = RegicideEnv(num_players=1, recorder=recorder)
     obs, _ = env.reset()
-
-    history = []  # [(state_vector, policy_vector), ...]
-    move_count = 0
-
-    while not env.game.game_over:
-        action_mask_obs = obs["action_mask"]
-        valid_actions = np.nonzero(action_mask_obs)[0].tolist()
-        if not valid_actions:
-            break
-
-        # Single valid action — skip MCTS
-        if len(valid_actions) == 1:
-            obs, _, terminated, truncated, _ = env.step(valid_actions[0])
-            move_count += 1
-            continue
-
-        # Run MCTS from current position
-        network.eval()
-        policy, _ = run_mcts(env, network, config, device)
-
-        # Record the state *before* acting
-        state_vec = encode_state(env)
-
-        # Temperature-based action selection
-        if move_count < config.temp_threshold:
-            # τ = 1.0 — sample proportionally to visit counts
-            action_id = _sample_from_policy(policy)
-        else:
-            # τ → 0 — pick the most-visited action
-            action_id = int(np.argmax(policy))
-
-        history.append((state_vec, policy))
-
-        # Execute the action
-        obs, _, terminated, truncated, _ = env.step(action_id)
-        move_count += 1
-
-    # --- Compute terminal value (progress-based) ---
-    enemies_left = len(env.game.castle_deck) + (
-        1 if env.game.current_enemy and not env.game.victory else 0
+    history, move_count = _play_episode(
+        env,
+        obs,
+        network,
+        config,
+        device,
+        use_heuristic_guidance,
     )
-    enemies_defeated = 12 - enemies_left
-    progress = enemies_defeated / 12.0
 
-    if env.game.victory:
-        terminal_value = 1.0
-    else:
-        terminal_value = progress * 2.0 - 1.0
-
-    # Apply the terminal value to all recorded states
+    defeated_count = enemies_defeated(env.game)
+    outcome = terminal_value(env.game)
     game_data = [
-        (state, policy, terminal_value) for state, policy in history
+        (state, policy, outcome) for state, policy in history
     ]
-
     game_info = {
-        "enemies_defeated": enemies_defeated,
+        "enemies_defeated": defeated_count,
         "victory": env.game.victory,
         "moves": move_count,
         "samples": len(game_data),
     }
-
     return game_data, game_info
 
 
-def generate_self_play_data(network, config, device, recorder=None):
+def _play_episode(
+    env,
+    observation,
+    network,
+    config,
+    device,
+    use_heuristic_guidance,
+):
+    """Play until termination and retain non-forced policy targets."""
+    history = []
+    move_count = 0
+    while not env.game.game_over:
+        action_mask_obs = observation["action_mask"]
+        valid_actions = np.nonzero(action_mask_obs)[0].tolist()
+        if not valid_actions:
+            break
+
+        if len(valid_actions) == 1:
+            observation, _, _, _, _ = env.step(valid_actions[0])
+            move_count += 1
+            continue
+
+        network.eval()
+        policy, _ = run_mcts(
+            env,
+            network,
+            config,
+            device,
+            add_exploration_noise=True,
+            use_heuristic_guidance=use_heuristic_guidance,
+        )
+        state_vec = encode_state(env)
+
+        if move_count < config.temp_threshold:
+            action_id = _sample_from_policy(policy)
+        else:
+            action_id = int(np.argmax(policy))
+
+        history.append((state_vec, policy))
+        observation, _, _, _, _ = env.step(action_id)
+        move_count += 1
+    return history, move_count
+
+
+def generate_self_play_data(
+    network,
+    config,
+    device,
+    recorder=None,
+    use_heuristic_guidance=False,
+):
     """Run multiple self-play games and aggregate results.
 
     Args:
@@ -119,6 +135,7 @@ def generate_self_play_data(network, config, device, recorder=None):
             config,
             device,
             recorder=recorder,
+            use_heuristic_guidance=use_heuristic_guidance,
         )
         all_data.extend(game_data)
         total_enemies += game_info["enemies_defeated"]

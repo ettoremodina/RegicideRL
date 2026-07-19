@@ -11,6 +11,7 @@ import numpy as np
 from ml_logger import get_logger
 from solvers.env import RegicideEnv
 from solvers.alphazero.mcts import run_mcts
+from solvers.alphazero.outcomes import enemies_defeated
 
 logger = get_logger(__name__)
 
@@ -28,7 +29,9 @@ def evaluate_network(network, config, device, n_games=None, recorder=None):
         Dict with ``avg_enemies_defeated``, ``win_rate``, ``avg_moves``.
     """
     network.eval()
-    n_games = n_games or config.eval_games
+    n_games = config.eval_games if n_games is None else n_games
+    if n_games <= 0:
+        raise ValueError("n_games must be greater than zero")
     total_enemies = 0
     victories = 0
     total_moves = 0
@@ -56,10 +59,7 @@ def evaluate_network(network, config, device, n_games=None, recorder=None):
             obs, _, terminated, truncated, _ = env.step(action_id)
             moves += 1
 
-        enemies_left = len(env.game.castle_deck) + (
-            1 if env.game.current_enemy and not env.game.victory else 0
-        )
-        total_enemies += 12 - enemies_left
+        total_enemies += enemies_defeated(env.game)
         victories += int(env.game.victory)
         total_moves += moves
 

@@ -8,6 +8,7 @@ serialized to / deserialized from YAML and logged alongside each run.
 from dataclasses import dataclass
 
 from game.action_space import GLOBAL_ACTION_SPACE_SIZE
+from solvers.alphazero.featurizer import STATE_DIM
 
 
 @dataclass
@@ -18,7 +19,7 @@ class AlphaZeroConfig:
     action_space_size: int = GLOBAL_ACTION_SPACE_SIZE
 
     # --- State featurizer ---
-    state_dim: int = 56  # Flat feature vector size (see featurizer.py)
+    state_dim: int = STATE_DIM
 
     # --- Network ---
     hidden_dim: int = 256  # Width of hidden layers in the shared trunk
@@ -40,6 +41,8 @@ class AlphaZeroConfig:
     # --- Self-play ---
     games_per_iteration: int = 100  # Self-play games per training iteration
     eval_games: int = 50  # Games to run for evaluation after each iteration
+    heuristic_warmup_iterations: int = 10  # Mix heuristic priors first
+    heuristic_prior_weight: float = 0.75
 
     # --- Replay buffer ---
     buffer_size: int = 50_000  # Max samples in the replay buffer
@@ -56,3 +59,46 @@ class AlphaZeroConfig:
 
     # --- Device ---
     device: str = "cpu"  # "cpu" or "cuda"
+
+    def __post_init__(self):
+        """Reject configurations that would produce invalid searches."""
+        if self.action_space_size != GLOBAL_ACTION_SPACE_SIZE:
+            raise ValueError(
+                f"action_space_size must be {GLOBAL_ACTION_SPACE_SIZE}"
+            )
+        if self.state_dim != STATE_DIM:
+            raise ValueError(f"state_dim must be {STATE_DIM}")
+        positive_fields = (
+            "hidden_dim",
+            "num_hidden_layers",
+            "n_simulations",
+            "games_per_iteration",
+            "eval_games",
+            "buffer_size",
+            "batch_size",
+            "min_buffer_size",
+            "epochs_per_iteration",
+            "max_iterations",
+            "checkpoint_freq",
+        )
+        for field_name in positive_fields:
+            if getattr(self, field_name) <= 0:
+                raise ValueError(f"{field_name} must be greater than zero")
+        if self.min_buffer_size > self.buffer_size:
+            raise ValueError("min_buffer_size cannot exceed buffer_size")
+        if self.learning_rate <= 0:
+            raise ValueError("learning_rate must be greater than zero")
+        if self.weight_decay < 0:
+            raise ValueError("weight_decay cannot be negative")
+        if self.c_puct < 0:
+            raise ValueError("c_puct cannot be negative")
+        if self.dirichlet_alpha <= 0:
+            raise ValueError("dirichlet_alpha must be greater than zero")
+        if not 0 <= self.dirichlet_epsilon <= 1:
+            raise ValueError("dirichlet_epsilon must be between zero and one")
+        if self.temp_threshold < 0:
+            raise ValueError("temp_threshold cannot be negative")
+        if self.heuristic_warmup_iterations < 0:
+            raise ValueError("heuristic_warmup_iterations cannot be negative")
+        if not 0 <= self.heuristic_prior_weight <= 1:
+            raise ValueError("heuristic_prior_weight must be between zero and one")

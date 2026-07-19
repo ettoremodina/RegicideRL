@@ -22,37 +22,34 @@ class HeuristicAgent(BaseAgent):
         Raises:
             ValueError: If ``env`` is omitted.
         """
-        if env is None:
-            raise ValueError("HeuristicAgent requires the env object to be passed in to access game state directly.")
-            
-        action_mask = obs['action_mask']
-        valid_indices = np.nonzero(action_mask)[0]
-        
-        if len(valid_indices) == 0:
+        action_scores = self.score_actions(obs, env)
+        if not action_scores:
             return None
-            
-        hand = obs['hand']
+        return max(
+            action_scores,
+            key=lambda action_id: (
+                action_scores[action_id] + random.uniform(0, 0.1)
+            ),
+        )
+
+    def score_actions(self, obs, env=None):
+        """Return the rule-based score of every legal action."""
+        if env is None:
+            raise ValueError(
+                "HeuristicAgent requires the env object to access game state"
+            )
+        valid_actions = np.flatnonzero(obs["action_mask"])
+        hand = obs["hand"]
         game = env.game
-        
-        # If there's only one action, just take it
-        if len(valid_indices) == 1:
-            return int(valid_indices[0])
-            
-        best_action = None
-        best_score = float('-inf')
-        
-        for idx in valid_indices:
-            idx = int(idx)
-            score = self._evaluate_action(idx, hand, game, env)
-            
-            # Add a tiny bit of random noise to tie-break equivalent actions
-            score += random.uniform(0, 0.1)
-            
-            if score > best_score:
-                best_score = score
-                best_action = idx
-                
-        return best_action
+        return {
+            int(action_id): self._evaluate_action(
+                int(action_id),
+                hand,
+                game,
+                env,
+            )
+            for action_id in valid_actions
+        }
         
     def _evaluate_action(self, action_id, hand, game, env):
         """Assign a strategic score to one legal attack or defense action.

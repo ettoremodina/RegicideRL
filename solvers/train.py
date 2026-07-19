@@ -1,7 +1,7 @@
 """CLI for agent evaluation and AlphaZero training."""
 
 import argparse
-from dataclasses import fields
+from dataclasses import asdict, fields
 
 from ml_logger import RunLogger, start_run
 from .parallel import ParallelSimulator
@@ -28,6 +28,16 @@ def build_parser():
     parser.add_argument("--az-iterations", type=int, help="Override AlphaZero training iterations")
     parser.add_argument("--sims", type=int, help="Override AlphaZero MCTS simulations per move")
     parser.add_argument("--eval-games", type=int, help="Override AlphaZero evaluation games")
+    parser.add_argument(
+        "--heuristic-warmup-iterations",
+        type=int,
+        help="Override iterations using heuristic AlphaZero search priors",
+    )
+    parser.add_argument(
+        "--heuristic-prior-weight",
+        type=float,
+        help="Override heuristic weight in warm-up search priors",
+    )
     parser.add_argument("--device", choices=("cpu", "cuda"), help="Override AlphaZero device")
     parser.add_argument("--resume", help="AlphaZero checkpoint path without the .pt suffix")
     return parser
@@ -129,23 +139,26 @@ def train_alphazero(args):
 
     config_data = load_config(args.config).get("alphazero", {})
     valid_fields = {field.name for field in fields(AlphaZeroConfig)}
-    config = AlphaZeroConfig(**{
+    config_values = {
         key: value for key, value in config_data.items() if key in valid_fields
-    })
+    }
     overrides = {
         "max_iterations": args.az_iterations,
         "games_per_iteration": args.games_per_episode,
         "n_simulations": args.sims,
         "eval_games": args.eval_games,
+        "heuristic_warmup_iterations": args.heuristic_warmup_iterations,
+        "heuristic_prior_weight": args.heuristic_prior_weight,
         "device": args.device,
     }
     for name, value in overrides.items():
         if value is not None:
-            setattr(config, name, value)
+            config_values[name] = value
+    config = AlphaZeroConfig(**config_values)
     context = start_run(
         "alphazero",
         name="alphazero-training",
-        config=config_data,
+        config=asdict(config),
     )
     try:
         AlphaZeroOrchestrator(

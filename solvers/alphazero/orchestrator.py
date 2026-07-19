@@ -58,25 +58,40 @@ class AlphaZeroOrchestrator:
         logger.info(f"  Simulations/move: {self.config.n_simulations}")
         logger.info(f"  Games/iteration:  {self.config.games_per_iteration}")
         logger.info(f"  Max iterations:   {self.config.max_iterations}")
+        logger.info(
+            "  Heuristic warm-up: %d iterations",
+            self.config.heuristic_warmup_iterations,
+        )
         logger.info(f"  Device:           {self.config.device}")
         logger.info("=" * 60)
 
         device = self.trainer.device
 
-        for iteration in range(1, self.config.max_iterations + 1):
+        first_iteration = self.trainer.training_iteration + 1
+        for iteration in range(first_iteration, self.config.max_iterations + 1):
             iter_start = time.time()
             logger.info(f"\n{'='*40} Iteration {iteration} {'='*40}")
 
             # --- 1. Self-Play ---
             sp_start = time.time()
-            logger.info("Phase 1: Self-Play")
+            use_heuristic_guidance = (
+                iteration <= self.config.heuristic_warmup_iterations
+            )
+            leaf_evaluator = (
+                "heuristic-guided priors"
+                if use_heuristic_guidance
+                else "network priors"
+            )
+            logger.info("Phase 1: Self-Play (%s)", leaf_evaluator)
             game_data, sp_stats = generate_self_play_data(
                 self.trainer.network,
                 self.config,
                 device,
                 recorder=self.game_recorder,
+                use_heuristic_guidance=use_heuristic_guidance,
             )
             self.replay_buffer.add_game(game_data)
+            self.trainer.training_iteration = iteration
             sp_time = time.time() - sp_start
             logger.info(
                 f"  Generated {sp_stats['total_samples']} samples from "

@@ -1,274 +1,278 @@
-"""
-ISMCTS with PUCT selection and neural network leaf evaluation.
+"""Neural-guided information-set Monte Carlo tree search.
 
-This module upgrades the vanilla ISMCTS (UCB1 + heuristic rollouts) to use:
-  1. PUCT formula with network-provided prior probabilities P(s, a).
-  2. Network value-head evaluation at leaf nodes (replacing rollouts).
-  3. Dirichlet noise at the root for exploration diversity.
-
-The core ISMCTS mechanisms are preserved:
-  - Determinization of hidden information (tavern / castle deck).
-  - Single tree shared across determinizations.
-  - Availability counts for the subset-armed-bandit problem.
+This is the AlphaZero search expert for solo Regicide. It retains the ISMCTS
+mechanisms needed for hidden cards and uses network priors with PUCT selection.
+During warm-up, rule-based action scores are mixed into the network priors;
+leaf values always use the inexpensive network evaluation.
 """
 
 import math
+from dataclasses import dataclass
 
 import numpy as np
 import torch
 
 from agents.determinize import determinize_env
+from agents.heuristic_agent import HeuristicAgent
 from game.action_space import GLOBAL_ACTION_SPACE_SIZE
-from ml_logger import get_logger
-from solvers.alphazero.featurizer import encode_state
-
-logger = get_logger(__name__)
+from solvers.alphazero.featurizer import encode_state, information_state_key
+from solvers.alphazero.outcomes import terminal_value
 
 
-class PUCTNode:
-    """A node in the ISMCTS tree using PUCT selection.
+class PUCTEdge:
+    """Statistics for one action available from an information-set node."""
 
-    Attributes:
-        action_tuple: The hand-relative action mask (as tuple) that led here.
-            None for the root.
-        global_action_id: The corresponding 543-dim global action index.
-            -1 for the root.
-        parent: Parent PUCTNode (None for root).
-        children: Dict mapping action_tuple → child PUCTNode.
-        visit_count (N): Number of backpropagation passes through this node.
-        total_value (W): Cumulative value from backpropagation.
-        prior (P): Network prior probability for this action.
-        availability_count: ISMCTS availability counter (how many times
-            this action was *legal* during selection at its parent).
-    """
+    __slots__ = (
+        "action_id",
+        "visit_count",
+        "total_value",
+        "prior",
+        "availability_count",
+        "outcomes",
+    )
 
-    __slots__ = [
-        "action_tuple", "global_action_id", "parent", "children",
-        "visit_count", "total_value", "prior", "availability_count",
-        "noise_added"
-    ]
-
-    def __init__(self, action_tuple=None, global_action_id=-1,
-                 parent=None, prior=0.0):
-        self.action_tuple = action_tuple
-        self.global_action_id = global_action_id
-        self.parent = parent
-        self.children = {}
+    def __init__(self, action_id: int, prior: float):
+        self.action_id = action_id
         self.visit_count = 0
         self.total_value = 0.0
         self.prior = prior
         self.availability_count = 0
-        self.noise_added = False
+        self.outcomes = {}
 
     @property
-    def Q(self):
-        """Mean action value."""
+    def mean_value(self) -> float:
+        """Return the backed-up mean value for this action."""
         if self.visit_count == 0:
             return 0.0
         return self.total_value / self.visit_count
 
-    def puct_score(self, c_puct):
-        """PUCT score adapted for ISMCTS (uses availability_count).
-
-        Score = Q(s,a) + c_puct * P(s,a) * sqrt(availability_count) / (1 + N(s,a))
-
-        Uses ``availability_count`` instead of parent ``visit_count``
-        to handle the subset-armed-bandit nature of ISMCTS.
-        """
-        exploration = c_puct * self.prior * (
+    def puct_score(self, exploration_constant: float) -> float:
+        """Return PUCT adapted to ISMCTS action-availability counts."""
+        exploration = exploration_constant * self.prior * (
             math.sqrt(self.availability_count) / (1 + self.visit_count)
         )
-        return self.Q + exploration
+        return self.mean_value + exploration
 
 
-def run_mcts(env, network, config, device):
-    """Run ISMCTS with PUCT and return a policy vector.
+class PUCTNode:
+    """One observable information state in the ISMCTS search tree."""
 
-    Args:
-        env: A *live* RegicideEnv (will be cloned for each simulation).
-        network: The RegicideNet model (in eval mode).
-        config: AlphaZeroConfig with MCTS hyperparameters.
-        device: torch device for network inference.
+    __slots__ = (
+        "children",
+        "visit_count",
+        "total_value",
+        "noise_added",
+    )
 
-    Returns:
-        policy: np.ndarray of shape ``(543,)`` — normalized visit counts.
-        root_value: float — the mean value at the root after all sims.
-    """
+    def __init__(self):
+        self.children = {}
+        self.visit_count = 0
+        self.total_value = 0.0
+        self.noise_added = False
+
+    @property
+    def mean_value(self) -> float:
+        """Return the backed-up mean value for this information state."""
+        if self.visit_count == 0:
+            return 0.0
+        return self.total_value / self.visit_count
+
+
+@dataclass(frozen=True)
+class _SearchContext:
+    """Dependencies and options shared by all simulations in one search."""
+
+    network: object
+    config: object
+    device: object
+    add_exploration_noise: bool
+    heuristic_agent: HeuristicAgent | None
+
+
+def run_mcts(
+    env,
+    network,
+    config,
+    device,
+    add_exploration_noise: bool = False,
+    use_heuristic_guidance: bool = False,
+):
+    """Run neural-guided ISMCTS and return root visits and mean value."""
     root = PUCTNode()
-    root.noise_added = False
-    handler = env.handler
+    context = _SearchContext(
+        network=network,
+        config=config,
+        device=device,
+        add_exploration_noise=add_exploration_noise,
+        heuristic_agent=(
+            HeuristicAgent(name="AlphaZero warm-up")
+            if use_heuristic_guidance
+            else None
+        ),
+    )
     for _ in range(config.n_simulations):
-        # 1. Clone + determinize
-        sim_env = env.clone()
-        determinize_env(sim_env)
+        simulation_env = env.clone()
+        determinize_env(simulation_env)
+        _run_simulation(root, simulation_env, context)
 
-        # 2-4. Select → Expand → Backpropagate
-        _run_simulation(root, sim_env, network, config, device, handler)
-
-    # Build policy from visit counts
     policy = np.zeros(config.action_space_size, dtype=np.float32)
-    for action_tuple, child in root.children.items():
-        policy[child.global_action_id] = child.visit_count
-
+    for action_id, edge in root.children.items():
+        policy[action_id] = edge.visit_count
     visit_sum = policy.sum()
-    if visit_sum > 0:
-        policy /= visit_sum
+    if visit_sum <= 0:
+        raise RuntimeError("ISMCTS completed without visiting a legal action")
+    policy /= visit_sum
+    return policy, root.mean_value
 
-    root_value = root.Q
-    return policy, root_value
 
-
-def _run_simulation(root, sim_env, network, config, device, handler):
-    """One ISMCTS simulation: select → expand/evaluate → backpropagate.
-
-    Descends the tree following PUCT until reaching an unexpanded node
-    or a terminal state.  At the leaf, the network's value head provides
-    the bootstrap value (no rollout).
-    """
+def _run_simulation(root, simulation_env, context):
+    """Traverse one determinization and back up its leaf evaluation."""
     node = root
-    path = [node]
-    sim_obs = sim_env._get_obs()
-    is_defense = sim_env.required_defense > 0
+    visited_nodes = [root]
+    visited_edges = []
+    value = None
 
-    # --- SELECTION ---
-    while not sim_env.game.game_over:
-        action_mask_obs = sim_obs["action_mask"]
-        legal_actions = np.nonzero(action_mask_obs)[0].tolist()
+    while not simulation_env.game.game_over:
+        observation = simulation_env._get_obs()
+        legal_actions = np.flatnonzero(observation["action_mask"]).tolist()
         if not legal_actions:
             break
 
-        # Update availability counts for existing children
-        for at in legal_actions:
-            if at in node.children:
-                node.children[at].availability_count += 1
+        _ensure_action_edges(
+            node,
+            legal_actions,
+            simulation_env,
+            context,
+        )
+        for action_id in legal_actions:
+            node.children[action_id].availability_count += 1
 
-        # Check for untried (unexpanded) actions
-        untried = [a for a in legal_actions if a not in node.children]
+        if (
+            node is root
+            and context.add_exploration_noise
+            and not root.noise_added
+        ):
+            _add_dirichlet_noise(root, legal_actions, context.config)
 
-        if untried:
-            # --- EXPANSION ---
-            # Get network priors for all legal actions at this state
-            priors = _get_priors(
-                sim_env, network, device, handler, is_defense
-            )
+        edge = max(
+            (node.children[action_id] for action_id in legal_actions),
+            key=lambda candidate: candidate.puct_score(context.config.c_puct),
+        )
+        _, _, terminated, truncated, _ = simulation_env.step(edge.action_id)
+        visited_edges.append(edge)
 
-            # Expand *all* untried children with their priors
-            for at in untried:
-                gid = at
-                child = PUCTNode(
-                    action_tuple=at,
-                    global_action_id=gid,
-                    parent=node,
-                    prior=priors[gid],
-                )
-                child.availability_count = 1
-                node.children[at] = child
-
-            # Pick one untried action (highest prior for efficiency)
-            action_tuple = max(
-                untried, key=lambda a: node.children[a].prior
-            )
-            child = node.children[action_tuple]
-
-            # Apply action
-            sim_obs, _, terminated, truncated, _ = sim_env.step(action_tuple)
-            is_defense = sim_env.required_defense > 0
-            path.append(child)
-            node = child
-
-            # After expansion, evaluate the leaf and stop descending
+        if terminated or truncated or simulation_env.game.game_over:
+            value = terminal_value(simulation_env.game)
             break
-        else:
-            # All children expanded — select via PUCT
-            # Add Dirichlet noise at root for exploration exactly once
-            if node is root and config.dirichlet_epsilon > 0 and not root.noise_added:
-                _add_dirichlet_noise(node, legal_actions, config)
-                root.noise_added = True
 
-            action_tuple = max(
-                legal_actions,
-                key=lambda a: node.children[a].puct_score(config.c_puct),
-            )
-            child = node.children[action_tuple]
+        outcome_key = information_state_key(simulation_env)
+        child = edge.outcomes.get(outcome_key)
+        if child is None:
+            child = PUCTNode()
+            edge.outcomes[outcome_key] = child
+            visited_nodes.append(child)
+            value = _evaluate_leaf(simulation_env, context)
+            break
 
-            sim_obs, _, terminated, truncated, _ = sim_env.step(action_tuple)
-            is_defense = sim_env.required_defense > 0
-            path.append(child)
-            node = child
-
-            if terminated or truncated:
-                break
-
-    # --- LEAF EVALUATION ---
-    if sim_env.game.game_over:
-        value = _evaluate_terminal(sim_env)
+        node = child
+        visited_nodes.append(node)
     else:
-        # Network value-head evaluation (no rollout)
-        value = _evaluate_network(sim_env, network, device)
+        value = terminal_value(simulation_env.game)
 
-    # --- BACKPROPAGATION ---
-    for n in path:
-        n.visit_count += 1
-        n.total_value += value
+    if value is None:
+        value = (
+            terminal_value(simulation_env.game)
+            if simulation_env.game.game_over
+            else _evaluate_leaf(simulation_env, context)
+        )
+    _backpropagate(visited_nodes, visited_edges, value)
 
 
-def _get_priors(sim_env, network, device, handler, is_defense):
-    """Get the network's prior distribution for a state.
+def _ensure_action_edges(node, legal_actions, env, context):
+    """Create missing legal action edges with network-provided priors."""
+    missing_actions = [
+        action_id for action_id in legal_actions if action_id not in node.children
+    ]
+    if not missing_actions:
+        return
+    priors = _get_priors(env, context)
+    for action_id in missing_actions:
+        node.children[action_id] = PUCTEdge(
+            action_id=action_id,
+            prior=float(priors[action_id]),
+        )
 
-    Returns a full 543-dim numpy array of probabilities.
-    """
-    state = encode_state(sim_env)
-    state_t = torch.tensor(state, dtype=torch.float32, device=device)
 
-    # Build the global action mask.
-    hand = sim_env.game.get_player_hand(sim_env.game.current_player)
-    phase = "defense" if is_defense else "attack"
-    raw_state = sim_env.game.get_raw_state()
-    game_state = raw_state if phase == "attack" else {"enemy_attack": sim_env.required_defense}
-    action_mask = handler.get_global_action_mask(hand, phase, game_state)
-    mask_t = torch.tensor(action_mask, dtype=torch.float32, device=device)
+def _backpropagate(nodes, edges, value):
+    """Accumulate one simulation value over visited nodes and actions."""
+    for node in nodes:
+        node.visit_count += 1
+        node.total_value += value
+    for edge in edges:
+        edge.visit_count += 1
+        edge.total_value += value
 
-    priors, _ = network.predict(state_t, mask_t)
+
+def _get_priors(env, context):
+    """Return network priors, optionally mixed with heuristic guidance."""
+    observation = env._get_obs()
+    state = torch.tensor(
+        encode_state(env),
+        dtype=torch.float32,
+        device=context.device,
+    )
+    legal_mask = torch.tensor(
+        observation["action_mask"],
+        dtype=torch.float32,
+        device=context.device,
+    )
+    network_priors, _ = context.network.predict(state, legal_mask)
+    if context.heuristic_agent is None:
+        return network_priors
+    heuristic_priors = _get_heuristic_priors(
+        env,
+        context.heuristic_agent,
+        observation,
+    )
+    weight = context.config.heuristic_prior_weight
+    return (1 - weight) * network_priors + weight * heuristic_priors
+
+
+def _get_heuristic_priors(env, agent, observation):
+    """Convert rule scores into a normalized legal-action distribution."""
+    action_scores = agent.score_actions(observation, env=env)
+    priors = np.zeros_like(observation["action_mask"], dtype=np.float32)
+    if not action_scores:
+        return priors
+    minimum_score = min(action_scores.values())
+    for action_id, score in action_scores.items():
+        priors[action_id] = score - minimum_score + 1.0
+    priors /= priors.sum()
     return priors
 
 
-def _evaluate_network(sim_env, network, device):
-    """Evaluate a non-terminal leaf node using the network's value head."""
-    state = encode_state(sim_env)
-    state_t = torch.tensor(state, dtype=torch.float32, device=device)
-
-    # We only need the value; create a dummy mask
-    mask_t = torch.ones(
-        GLOBAL_ACTION_SPACE_SIZE, dtype=torch.float32, device=device
+def _evaluate_network(env, network, device):
+    state = torch.tensor(encode_state(env), dtype=torch.float32, device=device)
+    dummy_mask = torch.ones(
+        GLOBAL_ACTION_SPACE_SIZE,
+        dtype=torch.float32,
+        device=device,
     )
-
-    _, value = network.predict(state_t, mask_t)
+    _, value = network.predict(state, dummy_mask)
     return value
 
 
-def _evaluate_terminal(env):
-    """Progress-based terminal evaluation in [-1, +1].
-
-    Maps ``enemies_defeated / 12`` into [-1, +1] with a bonus for victory.
-    """
-    enemies_left = len(env.game.castle_deck) + (
-        1 if env.game.current_enemy and not env.game.victory else 0
-    )
-    enemies_defeated = 12 - enemies_left
-    progress = enemies_defeated / 12.0  # [0, 1]
-
-    if env.game.victory:
-        return 1.0
-    # Map [0, 1) progress to [-1, +1): e.g. 0→-1, 0.5→0, ~1→~1
-    return progress * 2.0 - 1.0
+def _evaluate_leaf(env, context):
+    """Evaluate a search leaf using the policy-value network."""
+    return _evaluate_network(env, context.network, context.device)
 
 
 def _add_dirichlet_noise(root, legal_actions, config):
-    """Add Dirichlet noise to the root priors for exploration."""
-    legal_children = [root.children[a] for a in legal_actions]
+    legal_edges = [root.children[action_id] for action_id in legal_actions]
     noise = np.random.dirichlet(
-        [config.dirichlet_alpha] * len(legal_children)
+        [config.dirichlet_alpha] * len(legal_edges)
     )
-    eps = config.dirichlet_epsilon
-    for child, n in zip(legal_children, noise):
-        child.prior = (1 - eps) * child.prior + eps * n
+    epsilon = config.dirichlet_epsilon
+    for edge, noise_value in zip(legal_edges, noise):
+        edge.prior = (1 - epsilon) * edge.prior + epsilon * noise_value
+    root.noise_added = True

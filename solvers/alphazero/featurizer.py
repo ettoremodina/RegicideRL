@@ -27,6 +27,8 @@ _SUIT_INDEX = {
     Suit.SPADES: 3,
 }
 
+STATE_DIM = 56
+
 
 def encode_state(env) -> np.ndarray:
     """Encode a RegicideEnv snapshot into a flat float32 feature vector.
@@ -86,6 +88,47 @@ def encode_state(env) -> np.ndarray:
     return np.array(features, dtype=np.float32)
 
 
+def information_state_key(env) -> tuple:
+    """Return a hashable key containing only player-observable information.
+
+    Search nodes must distinguish future observations such as different cards
+    drawn from the hidden tavern deck. Hidden deck order and unrevealed enemy
+    suits are intentionally excluded.
+    """
+    game = env.game
+    hand = game.get_player_hand(game.current_player)
+    enemy = game.current_enemy
+    enemy_state = None
+    if enemy is not None:
+        enemy_state = (
+            _card_key(enemy.card),
+            enemy.health,
+            enemy.attack,
+            enemy.damage_taken,
+            enemy.spade_protection,
+        )
+    return (
+        game.current_player,
+        tuple(_card_key(card) for card in hand),
+        enemy_state,
+        tuple(sorted(_card_key(card) for card in game.discard_pile)),
+        tuple(sorted(_card_key(card) for card in game.attack_cards_buffer)),
+        len(game.tavern_deck),
+        len(game.castle_deck),
+        env.required_defense,
+        game.jester_immunity_cancelled,
+        game.blocked_spade_value,
+        game.solo_jesters_remaining,
+        tuple(game.players_yielded_this_round),
+        game.can_yield(),
+    )
+
+
+def _card_key(card) -> tuple[int, int]:
+    """Return a stable value/suit identity for a public card."""
+    return card.value, _SUIT_INDEX[card.suit]
+
+
 # ---------------------------------------------------------------------------
 # Action-index helpers
 # ---------------------------------------------------------------------------
@@ -143,12 +186,14 @@ def global_index_to_action_mask(global_index, hand, handler):
     network picks an action and we need to execute it in the environment.
 
     Args:
-        global_index: int in [0, 541].
+        global_index: int in [0, 542].
         hand: The current player's hand (list of Card).
         handler: An ActionHandler instance.
 
     Returns:
-        list[int] of length ``handler.max_hand_size``.
+        Hand-relative mask. The solo-jester action uses a ninth sentinel bit.
     """
+    if global_index == SOLO_JESTER_ACTION_ID:
+        return [0] * MAX_HAND_SIZE + [1]
     card_indices = handler.global_action_to_hand_indices(global_index, hand)
     return handler.cards_to_mask(card_indices)

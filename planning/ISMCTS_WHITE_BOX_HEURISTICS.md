@@ -6,6 +6,9 @@ Questo documento descrive un possibile sviluppo futuro: osservare le scelte di
 un agente **ISMCTS** e trasformarle in una strategia compatta, interpretabile e
 utilizzabile anche da un giocatore umano.
 
+Le alternative di implementazione sono confrontate anche nella pagina
+interattiva [`regicide-ai-routes.html`](../docs/regicide-ai-routes.html).
+
 L'output desiderato non è un altro agente opaco che imita ISMCTS, ma un insieme
 ordinato di istruzioni del tipo:
 

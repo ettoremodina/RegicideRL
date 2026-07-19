@@ -5,11 +5,14 @@ Loads a checkpoint and uses MCTS with PUCT for action selection, making it
 compatible with the existing benchmark / evaluation infrastructure.
 """
 
+from dataclasses import fields
+
 import numpy as np
 import torch
 
 from agents.base_agent import BaseAgent
 from ml_logger import get_logger
+from solvers.alphazero.checkpoints import checkpoint_file
 from solvers.alphazero.config import AlphaZeroConfig
 from solvers.alphazero.network import RegicideNet
 from solvers.alphazero.mcts import run_mcts
@@ -36,13 +39,22 @@ class AlphaZeroAgent(BaseAgent):
         **kwargs
     ):
         super().__init__(name=name, **kwargs)
-        self.config = AlphaZeroConfig(
+        self.device = torch.device(device)
+
+        source = checkpoint_file(checkpoint_path)
+        checkpoint = torch.load(source, map_location=self.device)
+        saved_config = checkpoint.get("config", {})
+        valid_fields = {field.name for field in fields(AlphaZeroConfig)}
+        config_values = {
+            key: value
+            for key, value in saved_config.items()
+            if key in valid_fields
+        }
+        config_values.update(
             n_simulations=n_simulations,
             device=device,
         )
-        self.device = torch.device(device)
-
-        # Build and load network
+        self.config = AlphaZeroConfig(**config_values)
         self.network = RegicideNet(
             state_dim=self.config.state_dim,
             action_dim=self.config.action_space_size,
@@ -50,12 +62,9 @@ class AlphaZeroAgent(BaseAgent):
             num_hidden_layers=self.config.num_hidden_layers,
         ).to(self.device)
 
-        checkpoint = torch.load(
-            checkpoint_path + ".pt", map_location=self.device
-        )
         self.network.load_state_dict(checkpoint["model_state_dict"])
         self.network.eval()
-        logger.info(f"Loaded checkpoint from {checkpoint_path}.pt")
+        logger.info("Loaded checkpoint from %s", source)
 
     def select_action(self, obs, env=None):
         """Select an action via MCTS + trained network.
@@ -73,7 +82,6 @@ class AlphaZeroAgent(BaseAgent):
         if env is None:
             raise ValueError("AlphaZeroAgent requires the env object.")
 
-        import numpy as np
         action_mask = obs["action_mask"]
         valid_actions = np.nonzero(action_mask)[0].tolist()
         if not valid_actions:

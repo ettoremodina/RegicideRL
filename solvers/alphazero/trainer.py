@@ -15,12 +15,13 @@ Where:
     c = L2 regularization (handled by AdamW weight_decay)
 """
 
-import os
+from dataclasses import asdict
 
 import torch
 import torch.nn.functional as F
 
 from ml_logger import get_logger
+from solvers.alphazero.checkpoints import checkpoint_file
 from solvers.alphazero.network import RegicideNet
 from solvers.alphazero.config import AlphaZeroConfig
 
@@ -52,6 +53,7 @@ class AlphaZeroTrainer:
         )
 
         self.train_step_count = 0
+        self.training_iteration = 0
 
     def train_on_buffer(self, replay_buffer):
         """Run multiple epochs of training on the replay buffer.
@@ -141,27 +143,37 @@ class AlphaZeroTrainer:
         """Save model + optimizer state.
 
         Args:
-            path: File path (without extension — ``.pt`` is appended).
+            path: File path with an optional ``.pt`` extension.
         """
-        os.makedirs(os.path.dirname(path) if os.path.dirname(path) else ".", exist_ok=True)
+        destination = checkpoint_file(path)
+        destination.parent.mkdir(parents=True, exist_ok=True)
         torch.save(
             {
                 "model_state_dict": self.network.state_dict(),
                 "optimizer_state_dict": self.optimizer.state_dict(),
                 "train_step_count": self.train_step_count,
+                "training_iteration": self.training_iteration,
+                "config": asdict(self.config),
             },
-            path + ".pt",
+            destination,
         )
-        logger.info(f"Checkpoint saved to {path}.pt")
+        logger.info("Checkpoint saved to %s", destination)
 
     def load_checkpoint(self, path):
         """Load model + optimizer state.
 
         Args:
-            path: File path (without extension — ``.pt`` is appended).
+            path: File path with an optional ``.pt`` extension.
         """
-        checkpoint = torch.load(path + ".pt", map_location=self.device)
+        source = checkpoint_file(path)
+        checkpoint = torch.load(source, map_location=self.device)
         self.network.load_state_dict(checkpoint["model_state_dict"])
         self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
         self.train_step_count = checkpoint.get("train_step_count", 0)
-        logger.info(f"Checkpoint loaded from {path}.pt (step {self.train_step_count})")
+        self.training_iteration = checkpoint.get("training_iteration", 0)
+        logger.info(
+            "Checkpoint loaded from %s (iteration %d, step %d)",
+            source,
+            self.training_iteration,
+            self.train_step_count,
+        )
