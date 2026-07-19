@@ -45,6 +45,7 @@ def _average(rows, field):
 
 
 def main():
+    """Parse CLI arguments, aggregate catalog results, and persist the analysis."""
     parser = argparse.ArgumentParser(description="Analyze recorded Regicide games")
     parser.add_argument("--artifacts-dir", default="artifacts")
     parser.add_argument("--run-id")

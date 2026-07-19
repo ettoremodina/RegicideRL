@@ -1,3 +1,5 @@
+"""CLI for agent evaluation and AlphaZero training."""
+
 import argparse
 from dataclasses import fields
 
@@ -10,6 +12,7 @@ DEFAULT_GAMES_PER_EPISODE = 1000
 
 
 def build_parser():
+    """Create the unified solver command-line parser."""
     parser = argparse.ArgumentParser(description="Regicide Solver Training & Evaluation")
     parser.add_argument("--agent", type=str, default="random", help="Agent name, or 'alphazero' to train AlphaZero")
     parser.add_argument("--episodes", type=int, help=f"Number of evaluation loops (default: {DEFAULT_EPISODES})")
@@ -31,6 +34,7 @@ def build_parser():
 
 
 def main():
+    """Dispatch to AlphaZero training or repeated agent evaluation."""
     args = build_parser().parse_args()
     if args.agent == "alphazero":
         train_alphazero(args)
@@ -39,6 +43,11 @@ def main():
 
 
 def run_evaluation(args):
+    """Evaluate a configured agent and persist metrics for every episode.
+
+    Args:
+        args: Parsed CLI namespace produced by :func:`build_parser`.
+    """
     context = start_run(
         "evaluation",
         name=f"{args.agent}-evaluation",
@@ -79,6 +88,11 @@ def run_evaluation(args):
 
 
 def get_agent_class(name):
+    """Resolve a supported CLI agent name to its implementation class.
+
+    Raises:
+        ValueError: If ``name`` is not registered.
+    """
     from agents.heuristic_agent import HeuristicAgent
     from agents.ismcts_agent import ISMCTSAgent
     from agents.pimc_agent import PIMCAgent
@@ -99,6 +113,7 @@ def get_agent_class(name):
 
 
 def get_agent_kwargs(args):
+    """Build agent-specific constructor arguments from CLI options."""
     kwargs = {"name": args.agent}
     if args.agent == "ismcts":
         kwargs["n_iterations"] = args.iterations
@@ -107,6 +122,7 @@ def get_agent_kwargs(args):
 
 
 def train_alphazero(args):
+    """Run AlphaZero training with YAML defaults and explicit CLI overrides."""
     from solvers.alphazero.config import AlphaZeroConfig
     from solvers.alphazero.orchestrator import AlphaZeroOrchestrator
     from solvers.config import load_config

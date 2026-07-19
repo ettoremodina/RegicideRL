@@ -13,6 +13,18 @@ logger = get_logger(__name__)
 
 
 def run_experiment(config_path="config.yaml"):
+    """Train PPO in a child process and analyze the newly registered model.
+
+    Args:
+        config_path: Solver YAML shared by training and analysis.
+
+    Returns:
+        Parent experiment context linking the training run and analysis output.
+
+    Raises:
+        RuntimeError: If training registers no run or policy analysis fails.
+        FileNotFoundError: If the training run contains no model.
+    """
     config = load_config(config_path)
     context = start_run(
         "experiment",
@@ -53,6 +65,7 @@ def run_experiment(config_path="config.yaml"):
 
 
 def _find_new_training_run(catalog, known_runs):
+    """Locate the PPO run registered after the parent experiment started."""
     candidates = [
         row
         for row in catalog.list_runs(100_000)
@@ -64,6 +77,7 @@ def _find_new_training_run(catalog, known_runs):
 
 
 def _find_model(training_run):
+    """Return the last model archive stored by a completed training run."""
     models = sorted(Path(training_run["path"]).glob("models/*.zip"))
     if not models:
         raise FileNotFoundError(

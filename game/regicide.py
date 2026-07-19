@@ -1,3 +1,10 @@
+"""Core Regicide domain model and rules engine.
+
+The module owns mutable game state and enforces card combinations, enemy
+immunities, suit powers, defense, yielding, and solo-jester rules. Solver and UI
+layers should call this API instead of reproducing game rules.
+"""
+
 from enum import Enum
 from typing import List, Optional, Dict
 import random
@@ -7,6 +14,12 @@ from ml_logger import get_logger
 logger = get_logger(__name__)
 
 class Suit(Enum):
+    """Card suits and their associated Regicide powers.
+
+    Hearts recycle cards, Diamonds draw, Clubs double damage, and Spades reduce
+    the current enemy's attack.
+    """
+
     HEARTS = "♥"
     DIAMONDS = "♦"
     CLUBS = "♣"
@@ -15,6 +28,17 @@ class Suit(Enum):
 _CARD_CACHE = {}
 
 class Card:
+    """Immutable, interned card identified by value and suit.
+
+    Reusing one object for each ``(value, suit)`` pair makes cloning search
+    states inexpensive. Callers must therefore treat card attributes as
+    immutable.
+
+    Args:
+        value: Rank from 1 to 13, or 0 for a Jester.
+        suit: Suit used for ordering and suit powers.
+    """
+
     def __new__(cls, value: int, suit: Suit):
         key = (value, suit)
         if key not in _CARD_CACHE:
@@ -56,6 +80,11 @@ class Card:
         return self._hash
     
     def get_attack_value(self):
+        """Return the Regicide combat value of the card.
+
+        Face cards use enemy-scale values: Jack 10, Queen 15, and King 20.
+        Number cards and Animal Companions use their printed numeric value.
+        """
         if self.value == 1:  # Animal Companion
             return 1
         elif self.value == 11:  # Jack
@@ -68,6 +97,7 @@ class Card:
             return self.value
     
     def get_discard_value(self):
+        """Return the defense value contributed when discarding the card."""
         if self.value == 1:  # Animal Companion
             return 1
         elif self.value == 11:  # Jack
@@ -80,6 +110,16 @@ class Card:
             return self.value
 
 class Enemy:
+    """Mutable combat state for the currently revealed castle card.
+
+    Args:
+        card: Jack, Queen, or King whose rank determines base health and attack.
+
+    Attributes:
+        damage_taken: Accumulated damage dealt to this enemy.
+        spade_protection: Persistent attack reduction granted by Spades.
+    """
+
     def __init__(self, card: Card):
         self.card = card
         self.health = self._get_health()
@@ -88,6 +128,7 @@ class Enemy:
         self.spade_protection = 0
     
     def _get_health(self):
+        """Map the enemy rank to its fixed starting health."""
         if self.card.value == 11:  # Jack
             return 20
         elif self.card.value == 12:  # Queen
@@ -96,6 +137,7 @@ class Enemy:
             return 40
     
     def _get_attack(self):
+        """Map the enemy rank to its fixed base attack."""
         if self.card.value == 11:  # Jack
             return 10
         elif self.card.value == 12:  # Queen
@@ -104,15 +146,29 @@ class Enemy:
             return 20
     
     def is_defeated(self):
+        """Return whether accumulated damage meets or exceeds health."""
         return self.damage_taken >= self.health
     
     def get_effective_attack(self):
+        """Return base attack after persistent Spades protection."""
         return max(0, self.attack - self.spade_protection)
     
     def __str__(self):
         return f"{self.card} (HP: {self.health - self.damage_taken}/{self.health}, ATK: {self.get_effective_attack()})"
 
 class Game:
+    """Mutable rules state for one Regicide game.
+
+    The engine supports one to four players. Deck lists use their final element
+    as the top, while the castle deck is ordered so Jacks precede Queens and
+    Kings. Search agents may use :meth:`clone` to fork the complete state.
+
+    Args:
+        num_players: Number of players, from 1 through 4.
+        deterministic_hearts: Sort recycled cards instead of shuffling them.
+            This is intended for exhaustive perfect-information solving.
+    """
+
     def __init__(self, num_players: int, deterministic_hearts: bool = False):
         self.num_players = num_players
         self.deterministic_hearts = deterministic_hearts
@@ -162,6 +218,7 @@ class Game:
         return self.get_player_hand(self.current_player)
     
     def _setup_game(self):
+        """Create decks, deal opening hands, and reveal the first enemy."""
         # Create castle deck (Jacks, Queens, Kings)
         for suit in Suit:
             self.castle_deck.extend([Card(11, suit), Card(12, suit), Card(13, suit)])
@@ -261,6 +318,7 @@ class Game:
         return new
 
     def get_max_hand_size(self):
+        """Return the official hand limit for the configured player count."""
         hand_sizes = {1: 8, 2: 7, 3: 6, 4: 5}
         return hand_sizes[self.num_players]
     
@@ -522,11 +580,18 @@ class Game:
         return total_attack
 
     def _is_immune(self, card: Card) -> bool:
+        """Return whether the current enemy blocks this card's suit power."""
         if self.jester_immunity_cancelled:
             return False
         return card.suit == self.current_enemy.card.suit
     
     def _hearts_power(self, value: int):
+        """Recycle up to ``value`` discard cards under the Tavern deck.
+
+        Normal games randomize the discard pile before recycling it. Perfect
+        solving can request deterministic ordering through
+        ``deterministic_hearts``.
+        """
         if not self.discard_pile:
             return
             
@@ -545,6 +610,7 @@ class Game:
         self.last_hearts_healed += cards_to_heal
     
     def _diamonds_power(self, value: int):
+        """Draw cards round-robin without exceeding any player's hand limit."""
         cards_drawn = 0
         player_idx = self.current_player
         
@@ -564,6 +630,12 @@ class Game:
         self.last_diamonds_drawn += cards_drawn
     
     def _defeat_enemy(self):
+        """Resolve an enemy defeat and reveal the next castle card.
+
+        Exact kills place the defeated enemy on top of the Tavern deck;
+        overkills discard it. Attack cards are discarded and enemy-specific
+        immunity and protection bookkeeping is reset.
+        """
         # When an enemy is defeated, move all attack-played cards to the discard pile
         if self.attack_cards_buffer:
             self.discard_pile.extend(self.attack_cards_buffer)
@@ -825,6 +897,12 @@ class Game:
         }
 
     def get_game_state(self):
+        """Return an allocation-friendly, display-oriented state snapshot.
+
+        Card and enemy objects are converted to strings, while hidden deck
+        contents are represented only by counts. Use :meth:`get_raw_state`
+        when an in-process solver needs object references and numeric fields.
+        """
         # Hands are kept sorted after every mutation (play_card, defend, draw),
         # so no need to re-sort here. This avoids O(n log n) overhead per call
         # during MCTS simulation where this is called thousands of times.

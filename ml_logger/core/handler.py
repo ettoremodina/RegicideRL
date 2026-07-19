@@ -1,3 +1,5 @@
+"""Logging handler that feeds formatted records to the live dashboard."""
+
 import logging
 from collections import deque
 from threading import Lock
@@ -11,6 +13,7 @@ class DashboardLogHandler(logging.Handler):
         self.highlighter = highlighter
 
     def emit(self, record):
+        """Format, highlight, and append one record under the queue lock."""
         try:
             msg = self.format(record)
             

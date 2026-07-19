@@ -68,6 +68,7 @@ def _write_statistics_json(
     pairwise: pd.DataFrame,
     output_dir: Path,
 ) -> None:
+    """Persist full aggregate and pairwise records for downstream consumers."""
     payload = {
         "summary": summary.to_dict(orient="records"),
         "pairwise_tests": pairwise.to_dict(orient="records"),
@@ -83,6 +84,7 @@ def _resolve_config(
     config_path: str | Path | None,
     report_config: dict[str, Any] | None,
 ) -> dict[str, Any]:
+    """Resolve explicit config data, a requested file, or the run snapshot."""
     if report_config is not None:
         return report_config
     if config_path is not None:

@@ -31,6 +31,7 @@ def plot_metrics(run_dir):
 
 
 def _read_jsonl(path):
+    """Read non-empty JSON objects from a metrics JSONL stream."""
     rows = []
     with path.open("r", encoding="utf-8") as stream:
         for line in stream:
@@ -40,6 +41,7 @@ def _read_jsonl(path):
 
 
 def _build_figure(data):
+    """Compose training curves and final-distribution histograms."""
     steps = [row.get("step", index) for index, row in enumerate(data)]
     win_rates = [row.get("win_rate", 0) * 100 for row in data]
     average_enemies = [row.get("avg_enemies_defeated", 0) for row in data]

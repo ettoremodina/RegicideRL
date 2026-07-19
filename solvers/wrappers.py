@@ -1,3 +1,5 @@
+"""Observation adapters used by neural Regicide policies."""
+
 import gymnasium as gym
 from gymnasium import spaces
 import numpy as np
@@ -33,6 +35,11 @@ class NumericObsWrapper(gym.ObservationWrapper):
         self._last_action_mask = None
         
     def observation(self, obs):
+        """Encode cards, enemy state, flags, and mask as fixed NumPy arrays.
+
+        Empty hand slots and absent suits are encoded as zero. Enemy health is
+        remaining health rather than starting health.
+        """
         hand = obs['hand']
         
         # Parse Hand

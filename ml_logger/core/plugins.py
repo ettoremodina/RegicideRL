@@ -1,3 +1,5 @@
+"""Extension hooks for optional dashboard integrations."""
+
 from typing import Any, Dict
 
 class LoggerPlugin:

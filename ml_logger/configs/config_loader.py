@@ -30,6 +30,7 @@ def load_config(config_path: str | Path | None = None, run_type=None) -> dict:
 
 
 def _select_config_path(config_path):
+    """Resolve explicit, environment, project, then packaged configuration."""
     if config_path:
         return Path(config_path)
     environment_path = os.environ.get(CONFIG_ENVIRONMENT_VARIABLE)
@@ -45,6 +46,7 @@ def _read_yaml(path):
 
 
 def _deep_merge(destination, source):
+    """Recursively copy ``source`` values over a destination mapping."""
     for key, value in source.items():
         if isinstance(value, dict) and isinstance(destination.get(key), dict):
             _deep_merge(destination[key], value)
@@ -54,6 +56,7 @@ def _deep_merge(destination, source):
 
 
 def _validate_config(config):
+    """Normalize and validate settings that affect runtime behavior."""
     logging_level = str(config["logging"]["level"]).upper()
     if logging_level not in VALID_LEVELS:
         raise ValueError(f"Unsupported logging level: {logging_level}")

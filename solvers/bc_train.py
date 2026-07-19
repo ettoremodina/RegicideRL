@@ -19,11 +19,24 @@ logger = get_logger(__name__)
 
 
 def load_config(config_path="config.yaml"):
+    """Load the YAML configuration used to initialize the PPO policy."""
     with open(config_path, "r", encoding="utf-8") as stream:
         return yaml.safe_load(stream)
 
 
 def train_bc(data_path, context: RunContext, config_path="config.yaml", epochs=10, batch_size=64):
+    """Pre-train a PPO policy by supervised imitation of teacher actions.
+
+    Args:
+        data_path: Compressed NumPy dataset produced by ``generate_bc_data``.
+        context: Run receiving metrics and the trained model.
+        config_path: Solver YAML configuration.
+        epochs: Number of complete passes over the dataset.
+        batch_size: Samples per optimizer update.
+
+    Returns:
+        Model path and one loss/accuracy record per epoch.
+    """
     logger.info("Loading behavioral-cloning data from %s", data_path)
     data = np.load(data_path)
     dataloader = _build_dataloader(data, batch_size)
@@ -51,6 +64,7 @@ def train_bc(data_path, context: RunContext, config_path="config.yaml", epochs=1
 
 
 def _build_dataloader(data, batch_size):
+    """Convert dataset arrays into shuffled PyTorch training batches."""
     tensors = (
         torch.tensor(data["hand_values"], dtype=torch.long),
         torch.tensor(data["hand_suits"], dtype=torch.long),
@@ -63,6 +77,7 @@ def _build_dataloader(data, batch_size):
 
 
 def _build_model(config):
+    """Create an untrained MaskablePPO model with the project feature extractor."""
     ppo_config = config["ppo"]
     architecture = ppo_config.get("net_arch", [256, 256])
     policy_kwargs = {
@@ -81,6 +96,7 @@ def _build_model(config):
 
 
 def _train_epoch(model, dataloader, optimizer, criterion):
+    """Run one supervised optimization epoch and aggregate loss and accuracy."""
     model.policy.train()
     total_loss = 0.0
     correct = 0
@@ -109,6 +125,7 @@ def _train_epoch(model, dataloader, optimizer, criterion):
 
 
 def main():
+    """Parse CLI arguments and execute one recorded BC training run."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--data", required=True)
     parser.add_argument("--config", default="config.yaml")

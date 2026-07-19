@@ -1,3 +1,5 @@
+"""Read legacy TensorBoard scalar series for policy-analysis plots."""
+
 import os
 import glob
 import pandas as pd

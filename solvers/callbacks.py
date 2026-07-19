@@ -1,3 +1,5 @@
+"""Stable-Baselines callback for Regicide-specific episodic metrics."""
+
 from stable_baselines3.common.callbacks import BaseCallback
 
 class EpisodeLoggerCallback(BaseCallback):
@@ -18,6 +20,7 @@ class EpisodeLoggerCallback(BaseCallback):
         self.last_bosses_defeated = 0
 
     def _on_step(self) -> bool:
+        """Update action counters and emit aggregate metrics at episode end."""
         # Access info dict from the environment
         infos = self.locals.get("infos", [])
         

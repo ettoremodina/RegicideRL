@@ -92,6 +92,7 @@ def _plot_dashboard(
     summary: pd.DataFrame,
     output_dir: Path,
 ) -> Path:
+    """Combine the four core comparisons into one publication overview."""
     figure, axes = plt.subplots(
         2,
         2,
@@ -140,6 +141,7 @@ def _draw_win_rate(
     summary: pd.DataFrame,
     compact: bool = False,
 ) -> None:
+    """Draw ordered win estimates with Wilson confidence intervals."""
     ordered = summary.sort_values(
         ["win_rate", "bosses_mean"],
         ascending=False,
@@ -173,6 +175,7 @@ def _draw_win_rate_marks(
     colors: dict[str, str],
     compact: bool,
 ) -> None:
+    """Draw one colored confidence interval and point per agent."""
     for position, row in enumerate(ordered.itertuples()):
         color = colors[str(row.agent)]
         axis.errorbar(
@@ -205,6 +208,7 @@ def _configure_win_rate_axis(
     upper_limit: float,
     compact: bool,
 ) -> None:
+    """Apply percentage scaling, labels, ordering, and shared styling."""
     axis.set_xlim(0.0, upper_limit)
     axis.set_yticks(positions, ordered["label"])
     axis.invert_yaxis()
@@ -229,6 +233,7 @@ def _draw_bosses(
     summary: pd.DataFrame,
     compact: bool = False,
 ) -> None:
+    """Draw per-game progress distributions with annotated agent means."""
     ordered = summary.sort_values("bosses_mean", ascending=False).reset_index(drop=True)
     order = ordered["label"].tolist()
     colors = _label_color_map(ordered)
@@ -250,6 +255,7 @@ def _annotate_boss_means(
     colors: dict[str, str],
     compact: bool,
 ) -> None:
+    """Overlay and label mean bosses on categorical distributions."""
     for position, row in enumerate(ordered.itertuples()):
         color = colors[str(row.label)]
         axis.scatter(
@@ -275,6 +281,7 @@ def _annotate_boss_means(
 
 
 def _configure_boss_axis(axis: plt.Axes, compact: bool) -> None:
+    """Configure the bounded 0–12 progress axis and victory marker."""
     axis.axvline(12, color=OUTLINE, linewidth=1.2, linestyle=(0, (3, 3)), zorder=0)
     axis.set_xlim(-0.25, 12.55)
     axis.set_xticks(np.arange(0, 13, 2))
@@ -305,6 +312,7 @@ def _draw_execution_time(
     summary: pd.DataFrame,
     compact: bool = False,
 ) -> None:
+    """Draw positive per-game duration distributions on a logarithmic scale."""
     ordered = summary.sort_values("duration_seconds_median").reset_index(drop=True)
     order = ordered["label"].tolist()
     colors = _label_color_map(ordered)
@@ -328,6 +336,7 @@ def _annotate_duration_medians(
     colors: dict[str, str],
     compact: bool,
 ) -> None:
+    """Overlay and format median duration for each agent."""
     for position, row in enumerate(ordered.itertuples()):
         color = colors[str(row.label)]
         axis.scatter(
@@ -374,6 +383,7 @@ def _draw_categorical_distribution(
     colors: dict[str, str],
     compact: bool,
 ) -> None:
+    """Layer jittered game observations beneath robust box summaries."""
     sns.stripplot(
         data=games,
         x=metric,
@@ -415,6 +425,7 @@ def _draw_tradeoff(
     summary: pd.DataFrame,
     compact: bool = False,
 ) -> None:
+    """Plot mean progress against computational cost and Pareto efficiency."""
     ordered = summary.sort_values("duration_seconds_mean").reset_index(drop=True)
     colors = _color_map(ordered["agent"])
     midpoint = float(
@@ -448,6 +459,7 @@ def _draw_tradeoff_point(
     midpoint: float,
     compact: bool,
 ) -> None:
+    """Draw one agent with two-dimensional uncertainty and a readable label."""
     x_error = np.array(
         [
             [max(0.0, row.duration_seconds_mean - row.duration_seconds_ci_low)],
@@ -498,6 +510,7 @@ def _draw_tradeoff_point(
 
 
 def _configure_tradeoff_axis(axis: plt.Axes, compact: bool) -> None:
+    """Configure logarithmic cost and bounded progress axes."""
     axis.set_xscale("log")
     axis.set_ylim(-0.35, 12.55)
     axis.set_yticks(np.arange(0, 13, 2))
@@ -514,6 +527,7 @@ def _configure_tradeoff_axis(axis: plt.Axes, compact: bool) -> None:
 
 
 def _configure_theme() -> None:
+    """Set the shared color, font, grid, and sizing defaults."""
     sns.set_theme(
         style="ticks",
         context="notebook",
@@ -549,6 +563,7 @@ def _style_axis(
     grid_axis: str,
     compact: bool,
 ) -> None:
+    """Apply consistent titles, subtitle, grid, spines, and ticks."""
     axis.set_facecolor(BACKGROUND)
     axis.set_title(
         title,
@@ -597,6 +612,7 @@ def _label_color_map(summary: pd.DataFrame) -> dict[str, str]:
 
 
 def _percentage_axis_limit(highs: np.ndarray) -> float:
+    """Choose a readable percentage limit while leaving annotation space."""
     observed = float(np.nanmax(highs)) if highs.size else 0.0
     padded = max(10.0, observed * 1.28)
     for limit in (10.0, 20.0, 25.0, 50.0, 75.0, 100.0):
@@ -613,6 +629,7 @@ def _annotate_interval_value(
     value: str,
     axis_limit: float,
 ) -> None:
+    """Place a value label on the side of an interval with available space."""
     if high < axis_limit * 0.82:
         x_value = high
         offset = (7, 0)
@@ -648,6 +665,7 @@ def _format_duration_axis(axis: plt.Axes) -> None:
 
 
 def _format_duration(seconds: float) -> str:
+    """Format seconds using microseconds, milliseconds, seconds, or minutes."""
     if seconds < 0.001:
         return f"{seconds * 1_000_000:.0f} µs"
     if seconds < 1.0:
@@ -658,6 +676,7 @@ def _format_duration(seconds: float) -> str:
 
 
 def _pareto_frontier(summary: pd.DataFrame) -> pd.DataFrame:
+    """Return agents that improve quality as mean cost increases."""
     efficient_rows = []
     best_quality = -np.inf
     for _, row in summary.sort_values("duration_seconds_mean").iterrows():

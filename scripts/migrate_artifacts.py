@@ -41,6 +41,7 @@ def migrate_legacy_artifacts(workspace=".", artifacts_dir="artifacts"):
 
 
 def _promote_models(workspace_path, artifacts_path):
+    """Move reusable legacy model archives into ``promoted_models``."""
     models_dir = workspace_path / "models"
     if not models_dir.exists():
         return []
@@ -63,6 +64,7 @@ def _promote_models(workspace_path, artifacts_path):
 
 
 def main():
+    """Migrate legacy artifact directories using command-line paths."""
     parser = argparse.ArgumentParser(description="Migrate legacy Regicide artifacts")
     parser.add_argument("--workspace", default=".")
     parser.add_argument("--artifacts-dir", default="artifacts")

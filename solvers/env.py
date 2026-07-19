@@ -1,3 +1,5 @@
+"""Gymnasium adapter exposing Regicide through one masked global action space."""
+
 import gymnasium as gym
 from gymnasium import spaces
 import numpy as np
@@ -60,6 +62,16 @@ class RegicideEnv(gym.Env):
         return new_env
         
     def reset(self, seed=None, options=None):
+        """Start a new game and initialize optional persistent recording.
+
+        Args:
+            seed: Random seed. A seed is generated when recording is enabled so
+                every persisted game can be reproduced.
+            options: Reserved by the Gymnasium reset contract.
+
+        Returns:
+            Initial observation and an empty info dictionary.
+        """
         if seed is None and self.recorder and self.recorder.enabled:
             seed = secrets.randbits(63)
         super().reset(seed=seed)
@@ -82,6 +94,7 @@ class RegicideEnv(gym.Env):
         return self._get_obs(), {}
         
     def _get_obs(self):
+        """Build the mixed raw observation and its legal global-action mask."""
         current = self.game.current_player
         hand = self.game.get_player_hand(current)
         
@@ -213,6 +226,7 @@ class RegicideEnv(gym.Env):
         return self._get_obs(), reward, terminated, truncated, res
 
     def _describe_action(self, action):
+        """Convert a raw action into a stable, replay-oriented description."""
         hand = self.game.get_player_hand(self.game.current_player)
         description = {
             "action_id": int(action) if isinstance(action, (int, np.integer)) else None,
@@ -235,6 +249,7 @@ class RegicideEnv(gym.Env):
         return description
 
     def _action_kind(self, indices):
+        """Classify decoded indices using the current attack or defense phase."""
         if indices == [-1]:
             return "solo_jester"
         if not indices and self.required_defense == 0:

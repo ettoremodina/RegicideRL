@@ -50,6 +50,7 @@ class UtcOffsetFormatter(logging.Formatter):
         self.utc_offset = utc_offset
 
     def formatTime(self, record, datefmt=None):
+        """Format a record timestamp in the configured fixed UTC offset."""
         timestamp = datetime.fromtimestamp(record.created, tz=self.utc_offset)
         if datefmt:
             return timestamp.strftime(datefmt)

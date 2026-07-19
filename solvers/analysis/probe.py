@@ -1,3 +1,5 @@
+"""Behavioral probing of trained PPO policies over complete solo games."""
+
 import numpy as np
 import torch
 from solvers.env import RegicideEnv
@@ -9,6 +11,17 @@ from ml_logger import get_logger
 logger = get_logger(__name__)
 
 def probe_policy(model_path, num_games=50, recorder=None):
+    """Evaluate a PPO checkpoint and collect action-level behavioral metrics.
+
+    Args:
+        model_path: Stable-Baselines model archive.
+        num_games: Number of solo games to evaluate.
+        recorder: Optional source-game recorder.
+
+    Returns:
+        Lists and counters used by the legacy policy-analysis report, or
+        ``None`` if the model cannot be loaded.
+    """
     logger.info("Probing model %s for %d games", model_path, num_games)
     
     # Initialize environment

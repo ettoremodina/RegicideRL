@@ -67,6 +67,7 @@ def _summarize_agent(
     bootstrap_samples: int,
     rng: np.random.Generator,
 ) -> dict[str, float | int | str]:
+    """Aggregate one agent with Wilson and bootstrap uncertainty intervals."""
     victories = group["victory"].astype(int).to_numpy()
     win_low, win_high = _wilson_interval(victories.sum(), len(victories), confidence_level)
     row: dict[str, float | int | str] = {
@@ -116,6 +117,7 @@ def _compare_agent_pair(
     bootstrap_samples: int,
     rng: np.random.Generator,
 ) -> dict[str, float | int | str]:
+    """Compare two agents on shared seeds using paired outcomes and progress."""
     paired = _paired_rows(games, first, second)
     win_difference = paired["victory_a"].astype(float) - paired["victory_b"].astype(float)
     boss_difference = paired["bosses_defeated_a"] - paired["bosses_defeated_b"]
@@ -172,6 +174,7 @@ def _bootstrap_interval(
     samples: int,
     rng: np.random.Generator,
 ) -> tuple[float, float]:
+    """Estimate a percentile interval by non-parametric resampling."""
     if values.size == 0:
         return 0.0, 0.0
     indices = rng.integers(0, values.size, size=(samples, values.size))
@@ -188,6 +191,7 @@ def _wilson_interval(
     trials: int,
     confidence_level: float,
 ) -> tuple[float, float]:
+    """Return a bounded Wilson score interval for a binomial proportion."""
     if trials == 0:
         return 0.0, 0.0
     z_score = NormalDist().inv_cdf(0.5 + confidence_level / 2.0)
@@ -228,6 +232,7 @@ def _wilcoxon_test(differences: np.ndarray) -> tuple[float, float]:
 
 
 def _cohen_dz(differences: np.ndarray) -> float:
+    """Return paired-sample Cohen's dz, with zero for degenerate inputs."""
     if differences.size < 2:
         return 0.0
     standard_deviation = float(np.std(differences, ddof=1))
@@ -259,6 +264,7 @@ def _safe_ratio(numerator: float, denominator: float) -> float:
 
 
 def _validate_games(games: pd.DataFrame) -> None:
+    """Reject empty datasets or schemas missing required aggregate fields."""
     required = {
         "agent",
         "label",
@@ -283,6 +289,7 @@ def _validate_games(games: pd.DataFrame) -> None:
 
 
 def _validate_paired_seeds(games: pd.DataFrame) -> None:
+    """Require one observation per agent and identical seeds across agents."""
     _validate_games(games)
     seed_sets = [
         set(group["seed"].tolist())

@@ -1,7 +1,11 @@
+"""Regex-based Rich highlighting for project log messages."""
+
 import re
 from rich.text import Text
 
 class Highlighter:
+    """Compile configured regex rules and apply their Rich styles."""
+
     def __init__(self, highlight_rules: list):
         self.highlight_rules = []
         for rule in highlight_rules:

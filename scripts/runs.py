@@ -10,6 +10,7 @@ logger = get_logger(__name__)
 
 
 def main():
+    """Inspect runs, games, and replay events through the catalog CLI."""
     parser = _build_parser()
     args = parser.parse_args()
     configure_logging()
@@ -24,6 +25,7 @@ def main():
 
 
 def _build_parser():
+    """Create subcommands for catalog and replay inspection."""
     parser = argparse.ArgumentParser(description="Inspect Regicide artifacts")
     parser.add_argument("--artifacts-dir", default="artifacts")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -39,6 +41,7 @@ def _build_parser():
 
 
 def _list_runs(catalog, limit):
+    """Log a compact table of the newest runs."""
     rows = catalog.list_runs(limit)
     if not rows:
         logger.info("No recorded runs")
@@ -62,6 +65,7 @@ def _show_run(catalog, run_id):
 
 
 def _list_games(catalog, run_id):
+    """Log recorded game summaries belonging to one run."""
     games = catalog.list_games(run_id)
     if not games:
         logger.info("No games recorded for %s", run_id)
@@ -78,6 +82,7 @@ def _list_games(catalog, run_id):
 
 
 def _replay_game(catalog, game_id):
+    """Stream a recorded action history in sequence order."""
     game = catalog.get_game(game_id)
     if not game:
         logger.error("Unknown game: %s", game_id)

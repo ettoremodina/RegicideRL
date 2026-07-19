@@ -1,3 +1,6 @@
+"""Small stateful metric transforms for dashboard extensions."""
+
+
 class ExponentialMovingAverage:
     """An extension for calculating EMA of live metrics."""
     def __init__(self, alpha: float = 0.1):
@@ -5,6 +8,7 @@ class ExponentialMovingAverage:
         self._ema = None
 
     def update(self, value: float) -> float:
+        """Add a sample and return the updated exponential moving average."""
         if self._ema is None:
             self._ema = value
         else:

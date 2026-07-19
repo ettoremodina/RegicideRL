@@ -19,6 +19,11 @@ logger = get_logger(__name__)
 
 
 def objective(trial, config, context: RunContext, recorder):
+    """Train and score one Optuna hyperparameter trial.
+
+    Failed training trials return zero so a single numerical failure does not
+    terminate the complete study.
+    """
     hyperparameters = _suggest_hyperparameters(trial, config)
     trial_dir = context.run_dir / "checkpoints" / f"trial-{trial.number}"
     trial_dir.mkdir(parents=True, exist_ok=True)
@@ -60,6 +65,7 @@ def objective(trial, config, context: RunContext, recorder):
 
 
 def _suggest_hyperparameters(trial, config):
+    """Sample the PPO search space while preserving configured layer widths."""
     return {
         "learning_rate": trial.suggest_float("learning_rate", 1e-5, 1e-3, log=True),
         "batch_size": trial.suggest_categorical("batch_size", [32, 64, 128, 256]),
@@ -78,6 +84,7 @@ def _build_model(
     trial_dir,
     tensorboard_enabled,
 ):
+    """Create a trial-specific MaskablePPO model and TensorBoard destination."""
     architecture = hyperparameters.pop("net_arch")
     policy_kwargs = {
         "features_extractor_class": RegicideFeatureExtractor,
@@ -100,6 +107,7 @@ def _build_model(
 
 
 def _score_probe(probe_results):
+    """Score progress while penalizing conspicuous resource-wasting actions."""
     if not probe_results:
         return 0.0
     bosses = probe_results.get("bosses_killed", [])
@@ -113,6 +121,7 @@ def _score_probe(probe_results):
 
 
 def run_tuner(config_path="config.yaml"):
+    """Execute the configured Optuna study and persist its best trial."""
     config = load_config(config_path)
     context = start_run("hyperparameter-tuning", config=config)
     recorder = GameRecorder(context)

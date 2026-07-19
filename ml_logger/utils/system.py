@@ -1,11 +1,15 @@
+"""Read host CPU, RAM, and NVIDIA GPU utilization for the dashboard."""
+
 import psutil
 import subprocess
 from typing import List
 
 def get_cpu_usage() -> float:
+    """Return host-wide CPU utilization as a percentage."""
     return psutil.cpu_percent()
 
 def get_ram_usage() -> float:
+    """Return host-wide virtual-memory utilization as a percentage."""
     return psutil.virtual_memory().percent
 
 def get_gpu_usage() -> List[str]:

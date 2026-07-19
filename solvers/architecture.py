@@ -1,3 +1,5 @@
+"""Neural feature extraction used by the MaskablePPO policy."""
+
 import torch
 import torch.nn as nn
 from gymnasium import spaces
@@ -46,6 +48,15 @@ class RegicideFeatureExtractor(BaseFeaturesExtractor):
         )
         
     def forward(self, observations) -> torch.Tensor:
+        """Encode structured card and enemy observations into dense features.
+
+        Args:
+            observations: Batched tensor dictionary produced by
+                ``NumericObsWrapper``.
+
+        Returns:
+            Tensor with shape ``(batch_size, features_dim)``.
+        """
         hand_values = observations['hand_values'].long() # (B, 8)
         hand_suits = observations['hand_suits'].long() # (B, 8)
         

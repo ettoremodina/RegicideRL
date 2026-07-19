@@ -1,3 +1,5 @@
+"""Train a MaskablePPO policy and save checkpoints in a canonical run."""
+
 import os
 import argparse
 from stable_baselines3.common.callbacks import CheckpointCallback, CallbackList
@@ -12,6 +14,7 @@ logger = get_logger(__name__)
 
 
 def main():
+    """Configure the environment, policy, callbacks, and PPO training lifecycle."""
     parser = argparse.ArgumentParser(description="Train MaskablePPO on Regicide")
     parser.add_argument("--config", type=str, default="config.yaml", help="Path to config.yaml")
     args = parser.parse_args()

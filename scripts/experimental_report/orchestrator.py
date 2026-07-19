@@ -71,6 +71,7 @@ def _prepare_run(
     base_seed: int | None,
     resume_run: str | Path | None,
 ):
+    """Create a fresh run or attach a resume-safe existing run."""
     if resume_run is not None:
         if requested_agents or games is not None or base_seed is not None:
             raise ValueError(
@@ -93,6 +94,7 @@ def _prepare_run(
 
 
 def _resume_existing_run(run_dir: Path):
+    """Restore saved configuration and mark an existing run as running."""
     snapshot_path = run_dir / "experimental_report_config.yaml"
     if not snapshot_path.exists():
         raise FileNotFoundError(f"Missing run configuration: {snapshot_path}")

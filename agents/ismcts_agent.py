@@ -58,6 +58,7 @@ class ISMCTSNode:
 
     @property
     def mean_reward(self):
+        """Return average backed-up reward, or zero before the first visit."""
         if self.visit_count == 0:
             return 0.0
         return self.total_reward / self.visit_count
@@ -112,6 +113,7 @@ class ISMCTSAgent(BaseAgent):
         self.ctx_turn = 1
         
     def set_context(self, game, total_games, turn):
+        """Set progress metadata shared with an optional worker status display."""
         self.ctx_game = game
         self.ctx_total_games = total_games
         self.ctx_turn = turn

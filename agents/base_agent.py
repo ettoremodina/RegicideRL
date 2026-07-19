@@ -1,24 +1,28 @@
+"""Common action-selection interface implemented by every Regicide agent."""
+
+
 class BaseAgent:
+    """Define the minimal interface shared by evaluation and solver workflows.
+
+    Args:
+        name: Human-readable identifier used in logs and reports.
     """
-    Abstract base class for all Regicide agents.
-    """
+
     def __init__(self, name="BaseAgent", **kwargs):
         self.name = name
         
     def select_action(self, obs, env=None):
-        """
-        Takes an observation dictionary from RegicideEnv and returns a chosen action_mask.
-        
+        """Choose a global action identifier for the current observation.
+
         Args:
-            obs (dict): The observation containing:
-                - 'game_state': Raw game state dict
-                - 'hand': Current player's hand (list of Card objects)
-                - 'current_player': Int
-                - 'valid_actions': List of action masks (lists of ints)
-                - 'defense_phase': Bool
-                - 'required_defense': Int
-                
+            obs: Observation dictionary returned by ``RegicideEnv``.
+            env: Live environment when an implementation needs cloning or
+                direct access to the game state.
+
         Returns:
-            list: The chosen action_mask.
+            Global action identifier, or ``None`` when no action is legal.
+
+        Raises:
+            NotImplementedError: Always; subclasses define the policy.
         """
         raise NotImplementedError("Agents must implement select_action")

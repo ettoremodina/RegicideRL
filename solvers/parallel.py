@@ -1,3 +1,5 @@
+"""Parallel solo-game evaluation with optional persistent game recording."""
+
 import multiprocessing as mp
 import time
 from ml_logger import GameRecorder, RunContext, get_logger
@@ -103,6 +105,7 @@ class ParallelSimulator:
             self.pool = mp.Pool(self.n_jobs)
         
     def close(self):
+        """Join worker processes and stop the multiprocessing manager."""
         if self.pool is not None:
             self.pool.close()
             self.pool.join()
@@ -164,6 +167,7 @@ class ParallelSimulator:
 
     @staticmethod
     def _aggregate_results(results_list, total_games, start_time):
+        """Merge worker summaries into the evaluation metric contract."""
         elapsed = time.time() - start_time
         total_victories = sum(r['victories'] for r in results_list)
         all_enemies = []

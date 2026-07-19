@@ -1,3 +1,5 @@
+"""Full-screen Pygame client for interactive Regicide games."""
+
 import pygame
 from typing import Optional
 
@@ -14,6 +16,7 @@ pygame.font.init()
 logger = get_logger(__name__)
 
 def get_font(name: str, size: int, bold=False):
+    """Load a themed system font with Pygame's default font as fallback."""
     # Fallbacks if specific fonts aren't available
     try:
         if name == "Uncial Antiqua":
@@ -28,6 +31,13 @@ def get_font(name: str, size: int, bold=False):
         return pygame.font.Font(None, size)
 
 class RegicideApp:
+    """Manage the interactive UI state, rendering, actions, and game recording.
+
+    Args:
+        run_context: Existing run used for logs and game artifacts. A UI session
+            run is created when omitted.
+    """
+
     def __init__(self, run_context: RunContext | None = None):
         self.run_context = run_context or start_run("ui-session")
         self.recorder = GameRecorder(self.run_context)
@@ -63,6 +73,7 @@ class RegicideApp:
         self._build_menu()
 
     def _build_menu(self):
+        """Create player-count controls for the opening menu."""
         self.menu_buttons = []
         # Player count buttons
         btn_w, btn_h = 160, 50
@@ -79,6 +90,7 @@ class RegicideApp:
             self.menu_buttons.append(b)
 
     def set_players_and_start(self, n: int):
+        """Start and record a new game for ``n`` players."""
         self.num_players = n
         self.game = Game(n)
         self.state = "GAME"
@@ -96,6 +108,7 @@ class RegicideApp:
         logger.info("Started %d-player UI game", n)
 
     def _build_game_ui(self):
+        """Create action controls and the enemy health bar."""
         # Action Buttons
         self.play_btn = Button(50, self.height - 100, 180, 50, "Play Selected", self.bold_font, self._on_play)
         self.yield_btn = Button(250, self.height - 100, 120, 50, "Yield", self.bold_font, self._on_yield)
@@ -105,6 +118,7 @@ class RegicideApp:
         self.enemy_hp_bar = HealthBar(self.width // 2 - 150, 280, 300, 30, self.bold_font)
 
     def log(self, text: str):
+        """Append a message to the bounded on-screen log and application logger."""
         self.action_log.append(text)
         if len(self.action_log) > 8:
             self.action_log.pop(0)
@@ -131,6 +145,7 @@ class RegicideApp:
         self._handle_result(res)
 
     def _on_jester(self):
+        """Use the solo Jester and resolve an impossible post-refill defense."""
         if self.state not in ("GAME", "DEFENSE"): return
         timing = "step1" if self.state == "GAME" else "step4"
         res = self._record_action(
@@ -148,6 +163,7 @@ class RegicideApp:
                 self._finish_recording("no_possible_defense")
 
     def _on_defend(self):
+        """Submit selected cards for defense and update terminal state."""
         if self.state != "DEFENSE": return
         indices = sorted(self.selected_indices)
         cards = [str(self.game.get_current_player_hand()[index]) for index in indices]
@@ -182,6 +198,7 @@ class RegicideApp:
             self.recorder.finish(self.game, reason=reason)
 
     def _handle_result(self, res: dict):
+        """Apply an engine result to UI state, feedback, and recording lifecycle."""
         if not res: return
         
         if res.get("cards_played"):
@@ -228,6 +245,7 @@ class RegicideApp:
 
     # --- Updates ---
     def _update_ui_state(self):
+        """Enable or disable controls from the current selection and game phase."""
         if self.state != "GAME" and self.state != "DEFENSE": return
         gstate = self.game.get_game_state()
         
@@ -252,6 +270,11 @@ class RegicideApp:
             self.defend_btn.is_disabled = total < self.defense_required
 
     def handle_events(self):
+        """Process one frame of Pygame events.
+
+        Returns:
+            ``False`` when the window should close; otherwise ``True``.
+        """
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return False
@@ -328,6 +351,7 @@ class RegicideApp:
         return True
 
     def draw(self):
+        """Render the current top-level UI state and present the frame."""
         self.screen.fill(DARK_THEME["bg"])
         
         if self.state == "MENU":
@@ -340,6 +364,7 @@ class RegicideApp:
         pygame.display.flip()
 
     def draw_menu(self):
+        """Render the title and player-count menu."""
         title = self.title_font.render("REGICIDE", True, DARK_THEME["danger"])
         title_rect = title.get_rect(center=(self.width//2, 200))
         self.screen.blit(title, title_rect)
@@ -351,6 +376,7 @@ class RegicideApp:
             b.draw(self.screen)
 
     def draw_game(self):
+        """Render the complete game table, controls, action list, and overlays."""
         gstate = self.game.get_game_state()
         self._update_ui_state()
 
@@ -527,6 +553,7 @@ class RegicideApp:
                 self.jester_btn.draw(self.screen)
 
     def draw_game_over(self):
+        """Render the terminal victory or defeat screen."""
         title = self.title_font.render(self.game_over_msg, True, DARK_THEME["danger"] if "Defeat" in self.game_over_msg else DARK_THEME["success"])
         self.screen.blit(title, title.get_rect(center=(self.width//2, 200)))
         
@@ -534,6 +561,7 @@ class RegicideApp:
         self.screen.blit(msg, msg.get_rect(center=(self.width//2, 300)))
 
     def run(self):
+        """Run the 60 FPS event loop and finalize recording on every exit path."""
         try:
             running = True
             while running:

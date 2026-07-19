@@ -1,3 +1,5 @@
+"""Legacy live dashboard backed by Rich and the canonical run storage."""
+
 import logging
 import time
 from collections import deque
@@ -23,6 +25,18 @@ from .layout import (
 from .progress import ProgressManager
 
 class DashboardLogger:
+    """Render logs, metrics, progress, and host telemetry in a live terminal.
+
+    The class is a legacy presentation facade. It configures the root logger to
+    enqueue records for the Rich layout while persisting metrics through a
+    ``RunContext``.
+
+    Args:
+        config_path: Optional logger YAML override.
+        run_context: Existing run to own dashboard artifacts. When omitted, the
+            dashboard creates and completes its own run.
+    """
+
     def __init__(
         self,
         config_path: str = None,
@@ -83,23 +97,29 @@ class DashboardLogger:
 
     # --- Progress API ---
     def start_progress(self, total_steps: int, description: str = "Training"):
+        """Show a progress task in the dashboard footer."""
         self.progress_manager.start(total_steps, description)
         self._layout["footer"].visible = True
 
     def step_progress(self, advance: int = 1, description: str = None):
+        """Advance the dashboard progress task."""
         self.progress_manager.step(advance, description)
 
     # --- Core Logging API ---
     def log(self, level, msg, *args, **kwargs):
+        """Emit a standard logging record at an explicit level."""
         self.root_logger.log(level, msg, *args, **kwargs)
         
     def info(self, msg, *args, **kwargs):
+        """Emit an informational record."""
         self.root_logger.info(msg, *args, **kwargs)
         
     def warning(self, msg, *args, **kwargs):
+        """Emit a warning record."""
         self.root_logger.warning(msg, *args, **kwargs)
         
     def error(self, msg, *args, **kwargs):
+        """Emit an error record."""
         self.root_logger.error(msg, *args, **kwargs)
 
     def update_metrics(self, category: str, name: str, value: Any):
@@ -180,6 +200,7 @@ class DashboardLogger:
 
     # --- Lifecycle ---
     def start(self):
+        """Start full-screen Rich rendering and notify registered plugins."""
         self._running = True
         self._last_telemetry_time = time.time() # Reset telemetry timer
         
@@ -190,6 +211,7 @@ class DashboardLogger:
         self._live.start()
 
     def stop(self):
+        """Stop rendering, shut down plugins, and complete an owned run."""
         self._running = False
         if self._live:
             self._live.stop()

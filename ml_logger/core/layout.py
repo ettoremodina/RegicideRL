@@ -1,3 +1,5 @@
+"""Rich renderables composing the command-center dashboard."""
+
 from rich.layout import Layout
 from rich.panel import Panel
 from rich.table import Table

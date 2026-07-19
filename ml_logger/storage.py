@@ -37,6 +37,7 @@ def _atomic_json_write(path: Path, data: dict[str, Any]) -> None:
 
 
 def _git_metadata() -> dict[str, Any]:
+    """Capture the current commit and dirty flag without requiring Git."""
     metadata: dict[str, Any] = {"commit": None, "dirty": None}
     try:
         commit = subprocess.run(
@@ -73,6 +74,7 @@ class RunCatalog:
         return connection
 
     def _initialize(self) -> None:
+        """Create idempotent run/game tables and lookup indexes."""
         with self._connect() as connection:
             connection.executescript(
                 """
@@ -105,6 +107,7 @@ class RunCatalog:
             )
 
     def upsert_run(self, manifest: dict[str, Any], path: Path) -> None:
+        """Insert a run or refresh its mutable status and manifest fields."""
         payload = json.dumps(json_safe(manifest), ensure_ascii=False)
         with self._connect() as connection:
             connection.execute(
@@ -139,6 +142,11 @@ class RunCatalog:
         path: Path,
         summary: dict[str, Any] | None = None,
     ) -> None:
+        """Insert or update one game summary in the catalog.
+
+        The initial row may represent a running game; finalization updates the
+        status, outcome, turn count, and serialized summary in place.
+        """
         summary = summary or {}
         payload = json.dumps(json_safe(summary), ensure_ascii=False) if summary else None
         with self._connect() as connection:
@@ -171,6 +179,7 @@ class RunCatalog:
             )
 
     def list_runs(self, limit: int = 50) -> list[dict[str, Any]]:
+        """Return the newest cataloged runs up to ``limit``."""
         with self._connect() as connection:
             rows = connection.execute(
                 "SELECT * FROM runs ORDER BY started_at DESC LIMIT ?",
@@ -179,6 +188,7 @@ class RunCatalog:
         return [dict(row) for row in rows]
 
     def get_run(self, run_id: str) -> dict[str, Any] | None:
+        """Return one catalog row by run identifier, if present."""
         with self._connect() as connection:
             row = connection.execute(
                 "SELECT * FROM runs WHERE run_id = ?",
@@ -187,6 +197,7 @@ class RunCatalog:
         return dict(row) if row else None
 
     def list_games(self, run_id: str) -> list[dict[str, Any]]:
+        """Return games belonging to a run in start-time order."""
         with self._connect() as connection:
             rows = connection.execute(
                 "SELECT * FROM games WHERE run_id = ? ORDER BY started_at",
@@ -195,6 +206,7 @@ class RunCatalog:
         return [dict(row) for row in rows]
 
     def get_game(self, game_id: str) -> dict[str, Any] | None:
+        """Return one catalog row by game identifier, if present."""
         with self._connect() as connection:
             row = connection.execute(
                 "SELECT * FROM games WHERE game_id = ?",
@@ -227,6 +239,19 @@ class RunContext:
         metadata: dict[str, Any] | None = None,
         settings: dict[str, Any] | None = None,
     ) -> "RunContext":
+        """Create run directories, manifest, configuration snapshot, and catalog row.
+
+        Args:
+            run_type: Stable workflow category used by configuration overrides.
+            name: Optional human-readable run name.
+            config: Effective workflow configuration to snapshot.
+            root_dir: Artifact root override.
+            metadata: Additional JSON-compatible provenance.
+            settings: Preloaded logger settings; loaded automatically if omitted.
+
+        Returns:
+            Running context ready for logs, metrics, games, and results.
+        """
         effective_settings = settings or load_config(run_type=run_type)
         started_at = utc_now()
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
@@ -286,6 +311,11 @@ class RunContext:
         run_dir: str | Path,
         root_dir: str | Path,
     ) -> "RunContext":
+        """Attach a process-local context to an existing run directory.
+
+        This is used by worker processes and does not create a new manifest or
+        run identifier.
+        """
         path = Path(run_dir)
         manifest = json.loads((path / "manifest.json").read_text(encoding="utf-8"))
         return cls(
@@ -310,6 +340,7 @@ class RunContext:
         }
 
     def log_metrics(self, step: int, metrics: dict[str, Any]) -> None:
+        """Append one timestamped metric record when metric saving is enabled."""
         if not self.saving_enabled("metrics"):
             return
         entry = {"timestamp": utc_now(), "step": step, **json_safe(metrics)}
@@ -318,6 +349,7 @@ class RunContext:
             stream.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
     def log_telemetry(self, telemetry: dict[str, Any]) -> None:
+        """Append one timestamped hardware sample when telemetry is enabled."""
         if not self.saving_enabled("telemetry"):
             return
         entry = {"timestamp": utc_now(), **json_safe(telemetry)}
@@ -331,6 +363,11 @@ class RunContext:
         result: dict[str, Any],
         category: str = "analysis",
     ) -> Path:
+        """Atomically save a JSON result below a run category directory.
+
+        Returns the intended path even when result saving is disabled, allowing
+        callers to keep a stable control flow.
+        """
         output_path = self.run_dir / category / filename
         if not self.saving_enabled("results"):
             return output_path
@@ -339,23 +376,28 @@ class RunContext:
         return output_path
 
     def saving_enabled(self, category: str) -> bool:
+        """Return whether the global and category-specific save switches are on."""
         saving = self.settings.get("saving", {})
         return bool(saving.get("enabled", True) and saving.get(category, True))
 
     @property
     def game_recording_enabled(self) -> bool:
+        """Return whether optional game artifacts are enabled for this run."""
         games = self.settings.get("games", {})
         saving_enabled = self.settings.get("saving", {}).get("enabled", True)
         return bool(saving_enabled and games.get("enabled", True))
 
     @property
     def game_recording_level(self) -> str:
+        """Return the configured ``summary``, ``actions``, or ``full`` level."""
         return self.settings.get("games", {}).get("recording_level", "actions")
 
     def complete(self, metadata: dict[str, Any] | None = None) -> None:
+        """Finalize the run successfully and merge optional result metadata."""
         self._finish("completed", metadata)
 
     def fail(self, error: BaseException | str) -> None:
+        """Finalize the run as failed with a serialized error message."""
         self._finish("failed", {"error": str(error)})
 
     def _finish(self, status: str, metadata: dict[str, Any] | None) -> None:
@@ -376,6 +418,7 @@ def _build_manifest(
     metadata: dict[str, Any] | None,
     logger_settings: dict[str, Any],
 ) -> dict[str, Any]:
+    """Assemble the versioned, JSON-safe provenance record for a new run."""
     command = " ".join(shlex.quote(argument) for argument in sys.argv)
     return {
         "schema_version": SCHEMA_VERSION,

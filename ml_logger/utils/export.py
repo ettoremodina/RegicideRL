@@ -1,3 +1,5 @@
+"""Export logger JSONL streams to flat CSV files."""
+
 import json
 import csv
 from pathlib import Path

@@ -117,6 +117,7 @@ def _evaluate_agents(
     store: EvaluationStore,
     jobs: int,
 ) -> None:
+    """Evaluate each configured agent only on seed pairs not yet checkpointed."""
     seeds = _paired_seeds(protocol)
     for agent_key, specification in agents.items():
         pending_seeds = [
@@ -150,6 +151,7 @@ def _evaluate_agent(
     store: EvaluationStore,
     jobs: int,
 ) -> None:
+    """Dispatch one agent to sequential or process-parallel evaluation."""
     if jobs == 1:
         _evaluate_agent_sequentially(
             agent_key,
@@ -176,6 +178,7 @@ def _evaluate_agent_sequentially(
     protocol,
     store,
 ) -> None:
+    """Reuse one agent instance while evaluating pending seeds in the parent."""
     agent = build_agent(specification)
     pending = [seed for seed in seeds if (agent_key, seed) not in store.completed]
     game_numbers = {seed: index + 1 for index, seed in enumerate(seeds)}
@@ -192,6 +195,7 @@ def _evaluate_agent_in_parallel(
     store,
     jobs,
 ) -> None:
+    """Evaluate pending seeds in isolated processes and checkpoint in the parent."""
     pending = [seed for seed in seeds if (agent_key, seed) not in store.completed]
     game_numbers = {seed: index + 1 for index, seed in enumerate(seeds)}
     executor = ProcessPoolExecutor(max_workers=jobs)
@@ -225,6 +229,7 @@ def _play_game_worker(agent_key, specification, seed, protocol):
 
 
 def _record_result(row, game_number, total_games, store):
+    """Persist one completed game atomically in metrics and the CSV checkpoint."""
     store.rows.append(row)
     store.context.log_metrics(len(store.rows), row)
     _save_checkpoint(store.rows, store.output_path)
@@ -241,6 +246,7 @@ def _record_result(row, game_number, total_games, store):
 
 
 def _load_checkpoint(run_dir: Path) -> list[dict[str, Any]]:
+    """Recover completed rows from CSV, falling back to the metrics journal."""
     dataset_path = run_dir / "datasets" / "games.csv"
     if dataset_path.exists() and dataset_path.stat().st_size:
         games = pd.read_csv(dataset_path)
@@ -278,6 +284,7 @@ def _play_game(
     seed: int,
     protocol: dict[str, Any],
 ) -> dict[str, Any]:
+    """Play one seeded game and return its aggregate evaluation row."""
     _seed_everything(seed)
     environment = RegicideEnv(num_players=1)
     observation, _ = environment.reset(seed=seed)
@@ -307,6 +314,7 @@ def _run_episode(
     counters: dict[str, Any],
     protocol: dict[str, Any],
 ) -> str:
+    """Advance an agent until termination, no action, or the decision limit."""
     limit = int(protocol["max_decisions_per_game"])
     for turn in range(limit):
         if hasattr(agent, "set_context"):
@@ -356,6 +364,7 @@ def _game_row(
     duration: float,
     bosses_defeated: int,
 ) -> dict[str, Any]:
+    """Convert final state, counters, and latency samples to the CSV schema."""
     decision_times = np.asarray(counters.pop("decision_times"), dtype=float)
     return {
         "agent": agent_key,
@@ -395,6 +404,7 @@ def _paired_seeds(protocol: dict[str, Any]) -> list[int]:
 
 
 def _normalize_jobs(jobs: int) -> int:
+    """Validate and normalize the requested worker count."""
     jobs = int(jobs)
     if jobs < 1:
         raise ValueError("--jobs must be at least 1")
@@ -402,6 +412,7 @@ def _normalize_jobs(jobs: int) -> int:
 
 
 def _seed_everything(seed: int) -> None:
+    """Seed Python, NumPy, and already-imported PyTorch generators."""
     random.seed(seed)
     np.random.seed(seed % (2**32 - 1))
     if "torch" in sys.modules:

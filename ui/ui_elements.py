@@ -1,8 +1,12 @@
+"""Reusable Pygame widgets and card rendering primitives."""
+
 import pygame
 from typing import Callable
 from .theme import DARK_THEME, SUIT_COLORS
 
 class Button:
+    """Clickable rectangular control with hover and disabled states."""
+
     def __init__(self, x: int, y: int, width: int, height: int, text: str, font: pygame.font.Font, on_click: Callable = None, bg_color=DARK_THEME["wood"], hover_color=DARK_THEME["wood_hover"], text_color=DARK_THEME["text"]):
         self.rect = pygame.Rect(x, y, width, height)
         self.text = text
@@ -15,6 +19,7 @@ class Button:
         self.is_disabled = False
 
     def draw(self, surface: pygame.Surface):
+        """Render the button and its centered label on ``surface``."""
         color = self.bg_color
         if self.is_disabled:
             color = (50, 50, 50)
@@ -29,6 +34,11 @@ class Button:
         surface.blit(text_surf, text_rect)
 
     def handle_event(self, event: pygame.event.Event):
+        """Update hover state and invoke the click callback when activated.
+
+        Returns:
+            Whether the event triggered the callback.
+        """
         if self.is_disabled:
             return False
 
@@ -42,6 +52,8 @@ class Button:
 
 
 class Label:
+    """Cached text surface positioned by a configurable Pygame anchor."""
+
     def __init__(self, x: int, y: int, text: str, font: pygame.font.Font, color=DARK_THEME["text"], anchor="topleft"):
         self.x = x
         self.y = y
@@ -52,6 +64,7 @@ class Label:
         self._render()
 
     def set_text(self, text: str, color=None):
+        """Replace label content and optionally its color, then rerender it."""
         self.text = text
         if color:
             self.color = color
@@ -63,10 +76,13 @@ class Label:
         setattr(self.rect, self.anchor, (self.x, self.y))
 
     def draw(self, surface: pygame.Surface):
+        """Blit the cached label surface."""
         surface.blit(self.surf, self.rect)
 
 
 class HealthBar:
+    """Bounded horizontal health meter with a numeric label."""
+
     def __init__(self, x: int, y: int, width: int, height: int, font: pygame.font.Font):
         self.rect = pygame.Rect(x, y, width, height)
         self.font = font
@@ -74,10 +90,12 @@ class HealthBar:
         self.maximum = 1
 
     def set(self, current: int, maximum: int):
+        """Update health while clamping current and maximum to safe minima."""
         self.current = max(0, current)
         self.maximum = max(1, maximum)
 
     def draw(self, surface: pygame.Surface):
+        """Render the filled health fraction and numeric value."""
         # Background
         pygame.draw.rect(surface, (59, 59, 59), self.rect, border_radius=4)
         # Foreground
@@ -93,6 +111,7 @@ class HealthBar:
 
 
 def draw_card(surface: pygame.Surface, x: int, y: int, width: int, height: int, label: str, font: pygame.font.Font, selected: bool = False):
+    """Render one stylized card with suit coloring and selection feedback."""
     rect = pygame.Rect(x, y, width, height)
     suit = label[-1] if label else "?"
     color = SUIT_COLORS.get(suit, DARK_THEME["text"])

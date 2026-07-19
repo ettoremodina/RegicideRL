@@ -1,3 +1,5 @@
+"""Progress-bar state rendered in the dashboard footer."""
+
 from rich.progress import Progress, TextColumn, BarColumn, TimeElapsedColumn, TimeRemainingColumn
 from rich.panel import Panel
 
@@ -16,10 +18,12 @@ class ProgressManager:
         self.is_active = False
 
     def start(self, total_steps: int, description: str = "Training"):
+        """Create and expose a progress task."""
         self.task_id = self.progress.add_task(f"[magenta]{description}", total=total_steps)
         self.is_active = True
 
     def step(self, advance: int = 1, description: str = None):
+        """Advance the active task and optionally replace its description."""
         if self.task_id is not None:
             kwargs = {"advance": advance}
             if description:
@@ -27,7 +31,9 @@ class ProgressManager:
             self.progress.update(self.task_id, **kwargs)
 
     def stop(self):
+        """Hide progress updates without discarding the Rich task."""
         self.is_active = False
         
     def render(self) -> Panel:
+        """Return the current progress state wrapped in a dashboard panel."""
         return Panel(self.progress, title="Progress", border_style="blue")

@@ -80,6 +80,7 @@ def snapshot_report_config(
 
 
 def _validate_protocol(protocol: dict[str, Any]) -> None:
+    """Validate sample sizes, confidence level, bootstrap count, and seed."""
     required_positive = (
         "games_per_agent",
         "max_decisions_per_game",
@@ -98,6 +99,7 @@ def _validate_protocol(protocol: dict[str, Any]) -> None:
 
 
 def _validate_agents(agents: dict[str, Any]) -> None:
+    """Validate fields required to instantiate and describe every agent."""
     if not agents:
         raise ValueError("experimental_report.agents must not be empty")
     for name, spec in agents.items():

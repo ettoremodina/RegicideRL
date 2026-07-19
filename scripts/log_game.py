@@ -9,6 +9,14 @@ logger = get_logger(__name__)
 
 
 def play_one_game_with_logs(seed=None):
+    """Play, record, and summarize one random solo game.
+
+    Args:
+        seed: Optional reproducibility seed.
+
+    Returns:
+        Victory flag and victory tier saved with the run.
+    """
     context = start_run(
         "game",
         name="random-simulation",

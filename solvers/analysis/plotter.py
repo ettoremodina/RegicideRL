@@ -1,3 +1,5 @@
+"""Render the legacy PPO policy-analysis dashboard."""
+
 import matplotlib.pyplot as plt
 import seaborn as sns
 from collections import Counter

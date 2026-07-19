@@ -1,3 +1,5 @@
+"""Rule-based baseline that scores legal Regicide actions by hand strategy."""
+
 import random
 import numpy as np
 
@@ -5,12 +7,21 @@ from game.action_space import SOLO_JESTER_ACTION_ID
 from agents.base_agent import BaseAgent
 
 class HeuristicAgent(BaseAgent):
-    """
-    A purely rule-based heuristic agent.
-    Evaluates every valid action based on a set of hardcoded strategic rules and returns the one with the highest score.
-    """
+    """Score legal actions using defense, damage, suit, and conservation rules."""
     
     def select_action(self, obs, env=None):
+        """Return the highest-scoring legal action with randomized tie-breaking.
+
+        Args:
+            obs: Observation returned by ``RegicideEnv``.
+            env: Live environment used to inspect cards and enemy state.
+
+        Returns:
+            Selected global action identifier, or ``None`` if the mask is empty.
+
+        Raises:
+            ValueError: If ``env`` is omitted.
+        """
         if env is None:
             raise ValueError("HeuristicAgent requires the env object to be passed in to access game state directly.")
             
@@ -44,6 +55,21 @@ class HeuristicAgent(BaseAgent):
         return best_action
         
     def _evaluate_action(self, action_id, hand, game, env):
+        """Assign a strategic score to one legal attack or defense action.
+
+        Exact defense and exact kills receive the strongest bonuses. The policy
+        penalizes excess defense, premature yielding, and avoidable use of face
+        cards while preferring useful suit powers against threatening enemies.
+
+        Args:
+            action_id: Global action-space identifier.
+            hand: Current player's sorted cards.
+            game: Live ``Game`` state.
+            env: Environment whose handler decodes the action.
+
+        Returns:
+            Heuristic utility; larger values are preferred.
+        """
         # Base score
         score = 0.0
         

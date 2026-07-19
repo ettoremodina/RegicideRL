@@ -40,6 +40,16 @@ class GameRecorder:
         descriptor: dict[str, str],
         recording_level: RecordingLevel | None = None,
     ) -> "GameRecorder":
+        """Attach a recorder inside a worker process using a safe descriptor.
+
+        Args:
+            descriptor: Run identifier and filesystem paths from
+                :meth:`RunContext.descriptor`.
+            recording_level: Optional override for the attached recorder.
+
+        Returns:
+            Recorder backed by an attached ``RunContext``.
+        """
         context = RunContext.attach(
             descriptor["run_id"],
             descriptor["run_dir"],
@@ -49,6 +59,7 @@ class GameRecorder:
 
     @property
     def active(self) -> bool:
+        """Return whether a game has been started and not yet finalized."""
         return self.game_id is not None
 
     def begin_game(
@@ -57,6 +68,19 @@ class GameRecorder:
         seed: int | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> str:
+        """Start a game artifact and register it in the catalog.
+
+        Starting a new game aborts any active recording. Disabled recorders are
+        no-ops and return an empty identifier.
+
+        Args:
+            game: Initial game state to serialize.
+            seed: Reproducibility seed, when known.
+            metadata: Additional JSON-compatible provenance.
+
+        Returns:
+            Generated game identifier, or an empty string when disabled.
+        """
         if not self.enabled:
             return ""
         if self.active:
@@ -94,6 +118,14 @@ class GameRecorder:
         game: Any,
         state_before: dict[str, Any] | None = None,
     ) -> None:
+        """Append one transition according to the configured recording level.
+
+        ``summary`` only increments counters, ``actions`` writes action and
+        result data, and ``full`` additionally stores states before and after.
+
+        Raises:
+            RuntimeError: If recording is enabled but no game is active.
+        """
         if not self.enabled:
             return
         if not self.active:
@@ -121,6 +153,14 @@ class GameRecorder:
         reason: str | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
+        """Finalize a completed game, persist its summary, and update the catalog.
+
+        Returns:
+            Persisted summary, or an empty dictionary when recording is disabled.
+
+        Raises:
+            RuntimeError: If recording is enabled but no game is active.
+        """
         if not self.enabled:
             return {}
         if not self.active:
@@ -149,6 +189,7 @@ class GameRecorder:
         return summary
 
     def abort(self, reason: str) -> None:
+        """Finalize an active game with ``interrupted`` status."""
         if not self.active:
             return
         summary = {
@@ -190,6 +231,7 @@ class GameRecorder:
             stream.write(json.dumps(json_safe(data), ensure_ascii=False) + "\n")
 
     def _require_game_dir(self) -> Path:
+        """Return the active game directory or reject out-of-lifecycle writes."""
         if self.game_dir is None:
             raise RuntimeError("No active game directory")
         return self.game_dir

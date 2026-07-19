@@ -65,7 +65,10 @@ class AlphaZeroAgent(BaseAgent):
             env: The live RegicideEnv instance (required).
 
         Returns:
-            list: The chosen action mask (hand-relative).
+            Selected global action identifier, or ``None`` if no action is legal.
+
+        Raises:
+            ValueError: If ``env`` is omitted.
         """
         if env is None:
             raise ValueError("AlphaZeroAgent requires the env object.")

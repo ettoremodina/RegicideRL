@@ -70,6 +70,7 @@ def configure_logging(
 
 
 def _create_console_handler(terminal_settings, highlights, utc_offset):
+    """Create either the configured Rich handler or a plain stream fallback."""
     if terminal_settings.get("colors", True):
         handler = ConfiguredRichHandler(terminal_settings, highlights)
         handler.setFormatter(logging.Formatter("%(message)s"))
@@ -149,23 +150,29 @@ class RunLogger:
         self.logger = get_logger(run_name or run_type)
 
     def log(self, message: str, *args: Any) -> None:
+        """Log an informational message through the compatibility facade."""
         self.logger.info(message, *args)
 
     def info(self, message: str, *args: Any) -> None:
+        """Log an informational message."""
         self.logger.info(message, *args)
 
     def log_metrics(self, step: int, metrics_dict: dict[str, Any]) -> None:
+        """Persist metrics for one solver step."""
         self.context.log_metrics(step, metrics_dict)
 
     def get_run_dir(self) -> str:
+        """Return the active run directory as a legacy string path."""
         return str(self.context.run_dir)
 
     @property
     def models_dir(self) -> str:
+        """Return the run-local model directory as a legacy string path."""
         return str(self.context.run_dir / "models")
 
 
 def _remove_managed_handlers(logger: logging.Logger) -> None:
+    """Close handlers installed by this package without touching third parties."""
     for handler in list(logger.handlers):
         if getattr(handler, _MANAGED_HANDLER_ATTRIBUTE, False):
             logger.removeHandler(handler)

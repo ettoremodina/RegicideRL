@@ -1,3 +1,5 @@
+"""Inspect the static global action-space layout and persist its dimensions."""
+
 from collections import Counter
 
 from ml_logger import get_logger, start_run

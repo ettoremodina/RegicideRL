@@ -1,3 +1,5 @@
+"""Benchmark rules, Gymnasium, multiprocessing, and PPO training throughput."""
+
 import time
 import random
 import argparse
@@ -14,6 +16,11 @@ logger = get_logger(__name__)
 
 
 def simulate_normal(num_games=1000, recorder=None):
+    """Benchmark direct rules-engine games driven by random local actions.
+
+    Returns:
+        Completed games per second.
+    """
     logger.info("Starting normal single-thread benchmark")
     start_time = time.time()
     
@@ -127,6 +134,7 @@ def simulate_normal(num_games=1000, recorder=None):
     return fps
 
 def simulate_parallel(num_games=1000, jobs=None, context=None):
+    """Benchmark random-agent evaluation through ``ParallelSimulator``."""
     logger.info("Starting parallel benchmark with jobs=%s", jobs or "max")
     simulator = ParallelSimulator(n_jobs=jobs, run_context=context)
     
@@ -148,6 +156,7 @@ def simulate_parallel(num_games=1000, jobs=None, context=None):
     return fps
 
 def simulate_training(device, steps=10000, recorder=None):
+    """Benchmark MaskablePPO learning throughput on one compute device."""
     logger.info("Starting training benchmark on %s", device.upper())
     import torch
     from sb3_contrib.ppo_mask import MaskablePPO
@@ -182,6 +191,7 @@ def simulate_training(device, steps=10000, recorder=None):
     return fps
 
 def simulate_env(num_games=1000, recorder=None):
+    """Benchmark complete games through the Gymnasium environment adapter."""
     logger.info("Starting environment benchmark")
     start_time = time.time()
     
@@ -219,6 +229,7 @@ def simulate_env(num_games=1000, recorder=None):
     return fps
 
 def build_parser():
+    """Create CLI options for benchmark selection and workload sizes."""
     parser = argparse.ArgumentParser(description="Regicide Benchmarking Utility")
     parser.add_argument(
         "--mode",
@@ -238,6 +249,7 @@ def build_parser():
 
 
 def main():
+    """Run selected benchmarks and save their throughput in a canonical run."""
     args = build_parser().parse_args()
     context = start_run("benchmark", config=vars(args))
     recorder = GameRecorder(context) if context.game_recording_enabled else None
@@ -253,6 +265,7 @@ def main():
 
 
 def select_modes(requested_mode):
+    """Expand ``all`` and validate explicit GPU benchmark requests."""
     if requested_mode == "all":
         modes_to_run = ["normal", "env", "parallel", "cpu"]
         import torch
@@ -273,6 +286,7 @@ def select_modes(requested_mode):
 
 
 def run_benchmarks(args, modes_to_run, recorder, context):
+    """Execute selected modes and return their labeled throughput values."""
     results = {}
     if "normal" in modes_to_run:
         results["Normal   (Games/sec)"] = simulate_normal(args.games, recorder)

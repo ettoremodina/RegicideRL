@@ -68,6 +68,7 @@ def write_tables(
 
 
 def _protocol_section(games: pd.DataFrame, protocol: dict[str, Any]) -> str:
+    """Describe pairing, limits, confidence settings, and parallel timing."""
     agents = games["agent"].nunique()
     seeds = games["seed"].nunique()
     parallel_jobs = int(protocol.get("parallel_jobs", 1))
@@ -99,6 +100,7 @@ def _algorithm_section(
     games: pd.DataFrame,
     agent_specs: dict[str, dict[str, Any]],
 ) -> str:
+    """Describe only agents represented in the completed game dataset."""
     descriptions = []
     for agent_key in games["agent"].drop_duplicates():
         specification = agent_specs[agent_key]
@@ -129,6 +131,7 @@ def _statistics_section(
     pairwise: pd.DataFrame,
     protocol: dict[str, Any],
 ) -> str:
+    """Render paired-test results and explain the inferential methods."""
     confidence = protocol["confidence_level"]
     if pairwise.empty:
         table = "Only one agent was evaluated, so paired tests do not apply."
@@ -165,6 +168,7 @@ def _interpretation_section(
     pairwise: pd.DataFrame,
     protocol: dict[str, Any],
 ) -> str:
+    """Summarize observed leaders without overstating sample rankings."""
     best_win = summary.sort_values("win_rate", ascending=False).iloc[0]
     best_progress = summary.sort_values("bosses_mean", ascending=False).iloc[0]
     fastest = summary.sort_values("duration_seconds_mean").iloc[0]
@@ -200,6 +204,7 @@ tables and plots can be regenerated without repeating the simulations."""
 
 
 def _compact_summary(summary: pd.DataFrame) -> pd.DataFrame:
+    """Select and rename publication-facing aggregate columns."""
     compact = summary[
         [
             "label",
@@ -230,6 +235,7 @@ def _compact_summary(summary: pd.DataFrame) -> pd.DataFrame:
 
 
 def _compact_pairwise(pairwise: pd.DataFrame) -> pd.DataFrame:
+    """Select and rename publication-facing paired-comparison columns."""
     if pairwise.empty:
         return pairwise
     compact = pairwise[

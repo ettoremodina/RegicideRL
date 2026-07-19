@@ -47,6 +47,7 @@ def run_analysis_pipeline(
 
 
 def main():
+    """Parse CLI arguments and run the end-to-end policy analysis."""
     parser = argparse.ArgumentParser(description="Analyze a trained Regicide policy")
     parser.add_argument("--model", required=True, help="Path to the trained .zip model")
     parser.add_argument("--games", type=int, default=50)

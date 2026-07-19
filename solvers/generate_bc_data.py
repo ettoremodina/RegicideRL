@@ -14,6 +14,19 @@ logger = get_logger(__name__)
 
 
 def generate_data(num_games, save_path, recorder=None):
+    """Generate state-action pairs by running the heuristic teacher.
+
+    Args:
+        num_games: Number of complete solo games to attempt.
+        save_path: Destination ``.npz`` path.
+        recorder: Optional recorder for source-game provenance.
+
+    Returns:
+        Dataset metadata containing game count, sample count, and path.
+
+    Raises:
+        RuntimeError: If the teacher produces no decisions.
+    """
     raw_environment = RegicideEnv(num_players=1, recorder=recorder)
     environment = NumericObsWrapper(raw_environment)
     agent = HeuristicAgent(name="teacher")
@@ -50,6 +63,7 @@ def generate_data(num_games, save_path, recorder=None):
 
 
 def _copy_observation(observation):
+    """Detach one numeric observation from mutable environment buffers."""
     return {
         "hand_values": observation["hand_values"].copy(),
         "hand_suits": observation["hand_suits"].copy(),
@@ -60,6 +74,7 @@ def _copy_observation(observation):
 
 
 def _stack_dataset(observations, actions):
+    """Stack copied observations and labels into homogeneous NumPy arrays."""
     return {
         "hand_values": np.stack([item["hand_values"] for item in observations]),
         "hand_suits": np.stack([item["hand_suits"] for item in observations]),
@@ -71,6 +86,7 @@ def _stack_dataset(observations, actions):
 
 
 def main():
+    """Parse CLI options and generate a recorded behavioral-cloning dataset."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--games", type=int, default=5000)
     parser.add_argument("--out")

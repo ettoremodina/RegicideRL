@@ -1,3 +1,5 @@
+"""Deterministic depth-first solver used to validate reachable game states."""
+
 import time
 from typing import List, Optional, Set
 from ml_logger import get_logger
@@ -6,6 +8,8 @@ from solvers.env import RegicideEnv
 logger = get_logger(__name__)
 
 class GameStateHasher:
+    """Create immutable keys for the perfect solver's transposition table."""
+
     @staticmethod
     def hash_env(env: RegicideEnv) -> tuple:
         """
@@ -52,6 +56,14 @@ class GameStateHasher:
         )
 
 class PerfectSolver:
+    """Search the deterministic game tree for a winning action sequence.
+
+    Args:
+        verbose: Emit progress and final search statistics.
+        callback: Optional callable notified every ``callback_freq`` nodes.
+        callback_freq: Number of evaluated nodes between callback updates.
+    """
+
     def __init__(self, verbose: bool = False, callback=None, callback_freq: int = 1000):
         self.visited: Set[tuple] = set()
         self.nodes_evaluated = 0
@@ -100,6 +112,7 @@ class PerfectSolver:
         return result
         
     def _dfs(self, env: RegicideEnv) -> Optional[List[int]]:
+        """Recursively explore unseen states, returning the first winning path."""
         self.nodes_evaluated += 1
         
         if self.callback and self.nodes_evaluated % self.callback_freq == 0:
@@ -145,6 +158,7 @@ class PerfectSolver:
         # Sort actions heuristically to prune the tree faster.
         # This only affects the ORDER we explore, not the final result.
         def action_heuristic(item):
+            """Order branches to find strong plays before weaker alternatives."""
             action_id, cards_played, is_yield = item
             
             if obs['defense_phase']:

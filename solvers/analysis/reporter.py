@@ -1,3 +1,5 @@
+"""Generate legacy text and JSON summaries from PPO probe results."""
+
 import json
 import numpy as np
 from collections import Counter
