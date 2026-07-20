@@ -47,7 +47,7 @@ integrations:
       level: actions  # summary, actions, or full.
 
 dashboard:
-  mode: auto          # auto, live, compact, or off.
+  mode: off          # auto, live, compact, or off.
   refresh_rate: 4
   max_log_lines: 50
   max_metrics: 16

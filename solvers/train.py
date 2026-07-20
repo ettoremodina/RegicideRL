@@ -85,7 +85,7 @@ def run_evaluation(args):
             logger.log(f"  Avg Turns: {metrics['avg_turns']:.1f}")
             logger.log(f"  Speed: {metrics['games_per_second']:.2f} games/sec")
             logger.log_metrics(step=episode, metrics_dict=metrics)
-    except Exception as error:
+    except BaseException as error:
         context.fail(error)
         raise
     finally:
@@ -167,10 +167,13 @@ def train_alphazero(args):
             run_context=context,
         ).run()
         context.complete()
-    except Exception as error:
+    except BaseException as error:
         context.fail(error)
         raise
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        raise SystemExit(130) from None

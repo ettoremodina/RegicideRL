@@ -137,6 +137,10 @@ Ordine di selezione:
 Il file scelto viene fuso ricorsivamente sopra i default. Gli override in
 `run_type_overrides.<run_type>` vengono applicati per ultimi.
 
+La configurazione viene letta una volta, all'apertura della run. Modificare
+`logger_config.yaml` mentre un processo è già attivo non riconfigura quella
+run: la modifica ha effetto dal comando successivo.
+
 Esempio completo:
 
 ```yaml

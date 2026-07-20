@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="control-token" content="__CONTROL_PANEL_TOKEN__">
+  <title>Regicide Control Panel</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">R</div>
+        <div>
+          <strong>REGICIDE</strong>
+          <span>CONTROL PLANE</span>
+        </div>
+      </div>
+
+      <nav class="primary-nav" aria-label="Primary navigation">
+        <button class="nav-item active" data-view="overview">
+          <span class="nav-icon">⌂</span><span>Overview</span>
+        </button>
+        <button class="nav-item" data-view="jobs">
+          <span class="nav-icon">▶</span><span>All jobs</span>
+        </button>
+        <button class="nav-item" data-view="jobs" data-category="Play">
+          <span class="nav-icon">♠</span><span>Play</span>
+        </button>
+        <button class="nav-item" data-view="jobs" data-category="Train">
+          <span class="nav-icon">◆</span><span>Train</span>
+        </button>
+        <button class="nav-item" data-view="jobs" data-category="Analyze">
+          <span class="nav-icon">⌁</span><span>Analyze</span>
+        </button>
+        <button class="nav-item" data-view="runs">
+          <span class="nav-icon">◉</span><span>Runs & monitor</span>
+        </button>
+        <button class="nav-item" data-view="config">
+          <span class="nav-icon">⚙</span><span>Configuration</span>
+        </button>
+        <button class="nav-item" data-view="artifacts">
+          <span class="nav-icon">▱</span><span>Files & artifacts</span>
+        </button>
+        <button class="nav-item" data-view="repository">
+          <span class="nav-icon">⌘</span><span>Repository</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="local-only"><span></span> localhost only</div>
+        <button class="ghost-button danger-text" id="shutdown-button">Stop control panel</button>
+      </div>
+    </aside>
+
+    <div class="workspace">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">REPOSITORY OPERATIONS</p>
+          <h1 id="page-title">Overview</h1>
+        </div>
+        <div class="topbar-actions">
+          <span class="connection-pill"><i></i><span id="connection-label">Connected</span></span>
+          <button class="icon-button" id="refresh-button" title="Refresh">↻</button>
+        </div>
+      </header>
+
+      <main>
+        <section class="view active" id="view-overview">
+          <div class="hero-panel">
+            <div>
+              <p class="eyebrow">ONE APP · EVERY WORKFLOW</p>
+              <h2>Command the entire Regicide workspace.</h2>
+              <p>Launch, configure, monitor, inspect, and analyze without entering shell commands.</p>
+            </div>
+            <div class="hero-actions" id="quick-actions"></div>
+          </div>
+          <div class="metric-grid" id="overview-metrics"></div>
+          <div class="dashboard-grid">
+            <article class="panel span-2">
+              <div class="panel-heading">
+                <div><p class="eyebrow">ACTIVITY</p><h3>Recent runs</h3></div>
+                <button class="text-button" data-go="runs">View all</button>
+              </div>
+              <div id="overview-runs" class="table-wrap"></div>
+            </article>
+            <article class="panel">
+              <div class="panel-heading"><div><p class="eyebrow">HOST</p><h3>Resources</h3></div></div>
+              <div id="system-resources" class="resource-stack"></div>
+            </article>
+            <article class="panel">
+              <div class="panel-heading"><div><p class="eyebrow">CHECKS</p><h3>Repository health</h3></div></div>
+              <div id="health-list" class="health-list"></div>
+            </article>
+            <article class="panel span-2">
+              <div class="panel-heading">
+                <div><p class="eyebrow">PROCESS SUPERVISOR</p><h3>Active and recent jobs</h3></div>
+                <button class="text-button" data-go="jobs">Open jobs</button>
+              </div>
+              <div id="overview-jobs"></div>
+            </article>
+          </div>
+        </section>
+
+        <section class="view" id="view-jobs">
+          <div class="section-toolbar">
+            <div class="segmented" id="job-category-filter"></div>
+            <label class="search-box"><span>⌕</span><input id="command-search" placeholder="Search workflows"></label>
+          </div>
+          <div id="command-grid" class="command-grid"></div>
+          <article class="panel jobs-panel">
+            <div class="panel-heading">
+              <div><p class="eyebrow">SUPERVISOR</p><h3>Job history</h3></div>
+              <span class="muted" id="job-count-label"></span>
+            </div>
+            <div id="jobs-table" class="table-wrap"></div>
+          </article>
+        </section>
+
+        <section class="view" id="view-runs">
+          <div class="section-toolbar">
+            <div class="run-filters">
+              <select id="run-status-filter"><option value="">All states</option><option>running</option><option>completed</option><option>failed</option></select>
+              <input id="run-type-filter" placeholder="Run type">
+              <input id="run-search" placeholder="Search ID or name">
+              <button class="secondary-button" id="run-filter-button">Filter</button>
+            </div>
+          </div>
+          <div class="runs-layout">
+            <article class="panel runs-list-panel">
+              <div class="panel-heading"><div><p class="eyebrow">LOGGER CATALOG</p><h3>Runs</h3></div></div>
+              <div id="runs-table" class="table-wrap"></div>
+            </article>
+            <article class="panel run-detail-panel" id="run-detail">
+              <div class="empty-state"><span>◉</span><h3>Select a run</h3><p>Inspect metrics, telemetry, logs, games, reports, and files.</p></div>
+            </article>
+          </div>
+        </section>
+
+        <section class="view" id="view-config">
+          <div class="config-layout">
+            <aside class="panel config-list" id="config-list"></aside>
+            <article class="panel config-editor-panel">
+              <div class="panel-heading config-heading">
+                <div><p class="eyebrow" id="config-path">CONFIGURATION</p><h3 id="config-title">Select a configuration</h3><p id="config-note" class="muted"></p></div>
+                <div class="editor-actions">
+                  <button class="secondary-button" id="config-reload-button">Reload</button>
+                  <button class="secondary-button" id="config-preview-button">Validate & diff</button>
+                  <button class="primary-button" id="config-save-button">Save</button>
+                </div>
+              </div>
+              <textarea id="config-editor" spellcheck="false" disabled></textarea>
+              <div id="config-validation" class="validation-panel"></div>
+            </article>
+          </div>
+        </section>
+
+        <section class="view" id="view-artifacts">
+          <div class="section-toolbar">
+            <div class="segmented" id="scope-filter"></div>
+            <div class="breadcrumbs" id="browser-breadcrumbs"></div>
+          </div>
+          <div class="browser-layout">
+            <article class="panel file-browser">
+              <div id="browser-list" class="file-list"></div>
+            </article>
+            <article class="panel file-preview" id="file-preview">
+              <div class="empty-state"><span>▱</span><h3>Select a file</h3><p>Text, images, PDFs, and generated reports can be inspected here.</p></div>
+            </article>
+          </div>
+        </section>
+
+        <section class="view" id="view-repository">
+          <div class="metric-grid" id="repo-metrics"></div>
+          <div class="dashboard-grid">
+            <article class="panel span-2">
+              <div class="panel-heading"><div><p class="eyebrow">DISCOVERY</p><h3>Runnable entry points</h3></div></div>
+              <div id="entrypoint-list" class="entrypoint-list"></div>
+            </article>
+            <article class="panel">
+              <div class="panel-heading"><div><p class="eyebrow">GIT</p><h3>Working tree</h3></div></div>
+              <div id="git-panel"></div>
+            </article>
+            <article class="panel">
+              <div class="panel-heading"><div><p class="eyebrow">SURFACE AREA</p><h3>Repository areas</h3></div></div>
+              <div id="area-list" class="area-list"></div>
+            </article>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <dialog id="command-dialog" class="modal">
+    <form method="dialog" class="modal-card" id="command-form">
+      <div class="modal-heading">
+        <div><p class="eyebrow" id="command-category"></p><h2 id="command-title"></h2><p id="command-description" class="muted"></p></div>
+        <button class="icon-button" value="cancel" aria-label="Close">×</button>
+      </div>
+      <div id="command-warning" class="warning-box hidden"></div>
+      <div id="command-fields" class="form-grid"></div>
+      <div class="modal-actions">
+        <button class="secondary-button" value="cancel">Cancel</button>
+        <button class="primary-button" id="command-submit" value="default">Start job</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="log-dialog" class="modal wide-modal">
+    <div class="modal-card log-modal-card">
+      <div class="modal-heading">
+        <div><p class="eyebrow">LIVE OUTPUT</p><h2 id="log-title">Job log</h2><p id="log-status" class="muted"></p></div>
+        <button class="icon-button" id="log-close-button" aria-label="Close">×</button>
+      </div>
+      <pre id="job-log"></pre>
+      <div class="modal-actions">
+        <button class="danger-button" id="stop-job-button">Stop job</button>
+        <button class="secondary-button" id="refresh-log-button">Refresh</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="confirm-dialog" class="modal small-modal">
+    <form method="dialog" class="modal-card">
+      <div class="modal-heading"><div><p class="eyebrow">CONFIRM ACTION</p><h2 id="confirm-title">Are you sure?</h2></div></div>
+      <p id="confirm-message"></p>
+      <div class="modal-actions">
+        <button class="secondary-button" value="cancel">Cancel</button>
+        <button class="danger-button" id="confirm-accept" value="default">Confirm</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast-stack" class="toast-stack" aria-live="polite"></div>
+</body>
+</html>

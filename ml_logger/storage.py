@@ -434,7 +434,10 @@ class RunContext:
 
     def fail(self, error: BaseException | str) -> None:
         """Finalize the run as failed with a serialized error message."""
-        self._finish("failed", {"error": str(error)})
+        message = str(error)
+        if not message and isinstance(error, BaseException):
+            message = type(error).__name__
+        self._finish("failed", {"error": message})
 
     def _finish(self, status: str, metadata: dict[str, Any] | None) -> None:
         """Finalize storage, publish status, and release runtime resources."""

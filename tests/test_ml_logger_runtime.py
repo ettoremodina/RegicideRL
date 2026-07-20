@@ -61,6 +61,25 @@ def test_run_scope_marks_uncaught_exception_as_failed(tmp_path):
     assert _managed_handlers() == []
 
 
+def test_run_scope_finalizes_keyboard_interrupt_with_meaningful_error(tmp_path):
+    config_path = _runtime_config(tmp_path)
+
+    with pytest.raises(KeyboardInterrupt):
+        with run_scope(
+            "interrupted-test",
+            root_dir=tmp_path / "artifacts",
+            logger_config_path=config_path,
+        ) as context:
+            raise KeyboardInterrupt
+
+    manifest = json.loads(
+        (context.run_dir / "manifest.json").read_text(encoding="utf-8")
+    )
+    assert manifest["status"] == "failed"
+    assert manifest["result"]["error"] == "KeyboardInterrupt"
+    assert _managed_handlers() == []
+
+
 def test_metric_event_reaches_storage_and_listener_once(tmp_path):
     config_path = _runtime_config(tmp_path)
     context = start_run(

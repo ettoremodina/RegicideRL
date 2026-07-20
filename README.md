@@ -27,6 +27,25 @@ To launch the graphical game client:
 python -m ui
 ```
 
+## Repository Control Panel
+
+On Windows, double-click [`control_panel.pyw`](control_panel.pyw) to open the
+local browser control panel. It provides one navigable interface for launching
+the game and allowlisted jobs, editing validated YAML configurations, monitoring
+processes and logger runs, browsing artifacts, viewing reports, and running
+analysis or quality workflows.
+
+The panel binds only to `127.0.0.1`, launches workloads as isolated subprocesses,
+and keeps its job registry, logs, config snapshots, and backups under the ignored
+`artifacts/control_panel/` directory. Closing the panel does not terminate jobs;
+they are reconciled when it is opened again.
+
+For developer startup without the double-click launcher:
+
+```bash
+python -m control_panel
+```
+
 ## Running the AI Agent
 
 To simulate a game played autonomously by the ISMCTS agent:
