@@ -36,3 +36,17 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+
+# Understand Anything & Agent modules
+.understand-anything/
+.ua/
+.agents/
+
+# Keep AgentWorkflow's portable project manifest and project-local memory in Git.
+!.agents/
+.agents/*
+!.agents/control-center.json
+!.agents/memory/
+.agents/memory/*
+!.agents/memory/local/
+!.agents/memory/local/**
