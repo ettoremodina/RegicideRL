@@ -44,6 +44,9 @@
         <button class="nav-item" data-view="artifacts">
           <span class="nav-icon">▱</span><span>Files & artifacts</span>
         </button>
+        <button class="nav-item" data-view="documentation">
+          <span class="nav-icon">≡</span><span>Documentation</span>
+        </button>
         <button class="nav-item" data-view="repository">
           <span class="nav-icon">⌘</span><span>Repository</span>
         </button>
@@ -172,6 +175,44 @@
           </div>
         </section>
 
+        <section class="view" id="view-documentation">
+          <div class="documentation-intro panel">
+            <div>
+              <p class="eyebrow">PROJECT HANDBOOK</p>
+              <h2>Read the project as a system.</h2>
+              <p>Open the navigable project report, inspect the generated Python API, or browse every source document from one place.</p>
+            </div>
+            <div class="documentation-actions">
+              <a class="primary-button" href="/documentation/site/" target="_blank" rel="noopener">Open project report</a>
+              <a class="secondary-button" href="/documentation/api/" target="_blank" rel="noopener">Open API reference</a>
+              <button class="secondary-button" id="browse-docs-button">Browse source docs</button>
+            </div>
+          </div>
+          <div class="documentation-grid">
+            <article class="panel documentation-card">
+              <span class="documentation-suit">♛</span>
+              <p class="eyebrow">START HERE</p>
+              <h3>Project report</h3>
+              <p>Rules, architecture, agents, experimental results, repository map, and future work.</p>
+              <a class="text-button" href="/documentation/site/" target="_blank" rel="noopener">Read the report →</a>
+            </article>
+            <article class="panel documentation-card">
+              <span class="documentation-suit">{ }</span>
+              <p class="eyebrow">REFERENCE</p>
+              <h3>Python API</h3>
+              <p>Generated module, class, and function documentation for the implementation.</p>
+              <a class="text-button" href="/documentation/api/" target="_blank" rel="noopener">Browse the API →</a>
+            </article>
+            <article class="panel documentation-card">
+              <span class="documentation-suit">▱</span>
+              <p class="eyebrow">SOURCE MATERIAL</p>
+              <h3>Documentation files</h3>
+              <p>Inspect guides, design notes, planning records, and generated assets inside the panel.</p>
+              <button class="text-button" id="browse-docs-card-button">Browse files →</button>
+            </article>
+          </div>
+        </section>
+
         <section class="view" id="view-repository">
           <div class="metric-grid" id="repo-metrics"></div>
           <div class="dashboard-grid">
@@ -197,12 +238,17 @@
     <form method="dialog" class="modal-card" id="command-form">
       <div class="modal-heading">
         <div><p class="eyebrow" id="command-category"></p><h2 id="command-title"></h2><p id="command-description" class="muted"></p></div>
-        <button class="icon-button" value="cancel" aria-label="Close">×</button>
+        <button class="icon-button" id="command-close-button" type="button" aria-label="Close">×</button>
       </div>
       <div id="command-warning" class="warning-box hidden"></div>
       <div id="command-fields" class="form-grid"></div>
+      <div class="command-preview" aria-live="polite">
+        <div class="command-preview-heading"><span>Command preview</span><span id="command-preview-state">VALIDATING</span></div>
+        <pre id="command-preview">Complete the form to resolve the launch command.</pre>
+        <small id="command-preview-note"></small>
+      </div>
       <div class="modal-actions">
-        <button class="secondary-button" value="cancel">Cancel</button>
+        <button class="secondary-button" id="command-cancel-button" type="button">Cancel</button>
         <button class="primary-button" id="command-submit" value="default">Start job</button>
       </div>
     </form>

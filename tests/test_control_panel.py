@@ -48,6 +48,27 @@ def test_command_registry_builds_list_argv_and_rejects_unknown_parameters(tmp_pa
         command.build_argv(Path(sys.executable), {"shell": "whoami"}, tmp_path)
 
 
+def test_report_commands_accept_only_the_release_configuration(tmp_path):
+    """Keep test-only YAML profiles out of report and regeneration jobs."""
+    commands = command_map()
+
+    with pytest.raises(ValueError, match="Configuration must be one of: config.yaml"):
+        commands["experimental-report"].build_argv(
+            Path(sys.executable),
+            {"config": "config_test.yaml"},
+            tmp_path,
+        )
+    with pytest.raises(
+        ValueError,
+        match="Optional configuration must be one of: config.yaml",
+    ):
+        commands["regenerate-report"].build_argv(
+            Path(sys.executable),
+            {"run_dir": str(tmp_path), "config": "config_test.yaml"},
+            tmp_path,
+        )
+
+
 def test_artifact_output_parameter_rejects_repository_escape(tmp_path):
     """Prevent output forms from writing outside the canonical artifact tree."""
     parameter = ParameterSpec(
@@ -146,6 +167,34 @@ def test_job_manager_captures_output_and_persists_completion(tmp_path):
     assert reloaded["status"] == "completed"
 
 
+def test_job_manager_previews_the_same_validated_list_argv(tmp_path):
+    """Show operators the resolved command without spawning a process."""
+    command = CommandSpec(
+        "probe",
+        "Probe",
+        "Quality",
+        "Preview one fixed command.",
+        ("-c", "print('panel-ready')"),
+        creates_run=False,
+    )
+    manager = JobManager(
+        tmp_path,
+        tmp_path / "artifacts" / "control_panel",
+        {"probe": command},
+        Path(sys.executable),
+    )
+
+    preview = manager.preview("probe", {})
+
+    assert preview["argv"] == [
+        str(Path(sys.executable).resolve()),
+        "-c",
+        "print('panel-ready')",
+    ]
+    assert "panel-ready" in preview["display"]
+    assert preview["working_directory"] == str(tmp_path.resolve())
+
+
 def test_http_api_requires_ephemeral_header_token(tmp_path):
     """Keep repository data and mutations inaccessible to tokenless requests."""
     application = ControlPanelApplication(
@@ -170,6 +219,35 @@ def test_http_api_requires_ephemeral_header_token(tmp_path):
 
     assert error.value.code == 403
     assert payload["project"]["name"] == "Regicide AI"
+
+
+def test_http_server_exposes_only_files_inside_documentation_tree(tmp_path):
+    """Keep navigable documentation local and contained under docs/."""
+    site = tmp_path / "docs" / "site"
+    site.mkdir(parents=True)
+    (site / "index.html").write_text("<h1>Regicide report</h1>", encoding="utf-8")
+    (tmp_path / "secret.txt").write_text("not documentation", encoding="utf-8")
+    application = ControlPanelApplication(
+        tmp_path,
+        tmp_path / "artifacts" / "control_panel",
+        Path(sys.executable),
+        token="test-token",
+    )
+    server = ControlPanelServer(("127.0.0.1", 0), application)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    origin = f"http://127.0.0.1:{server.server_address[1]}"
+    try:
+        with urlopen(f"{origin}/documentation/site/", timeout=3) as response:
+            report = response.read().decode("utf-8")
+        with pytest.raises(HTTPError) as error:
+            urlopen(f"{origin}/documentation/../secret.txt", timeout=3)
+    finally:
+        server.shutdown()
+        server.server_close()
+
+    assert "Regicide report" in report
+    assert error.value.code == 403
 
 
 def test_recorded_game_detail_reads_bounded_replay_files(tmp_path):

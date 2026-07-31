@@ -1,0 +1,118 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 400" role="img" aria-labelledby="title desc">
+  <title id="title">Mean castle progress by agent</title>
+  <desc id="desc">A twelve-cell Jack Queen King castle ladder. ISMCTS defeated 10.01 enemies on average, PIMC 9.25, Heuristic 4.37, and Random 2.97.</desc>
+  <style>
+    text { font-family: "Segoe UI", Arial, sans-serif; fill: #101A24; }
+    .utility { font-family: "Cascadia Code", Consolas, monospace; font-size: 13px; fill: #536577; }
+    .label { font-size: 16px; font-weight: 650; }
+    .value { font-size: 15px; font-weight: 700; }
+    .grid { stroke: #D7D8D2; stroke-width: 1; }
+  </style>
+  <rect width="920" height="400" rx="14" fill="#FBF9F4"/>
+  <text class="utility" x="211.5" y="42" text-anchor="middle">J</text>
+  <text class="utility" x="266.5" y="42" text-anchor="middle">J</text>
+  <text class="utility" x="321.5" y="42" text-anchor="middle">J</text>
+  <text class="utility" x="376.5" y="42" text-anchor="middle">J</text>
+  <text class="utility" x="431.5" y="42" text-anchor="middle">Q</text>
+  <text class="utility" x="486.5" y="42" text-anchor="middle">Q</text>
+  <text class="utility" x="541.5" y="42" text-anchor="middle">Q</text>
+  <text class="utility" x="596.5" y="42" text-anchor="middle">Q</text>
+  <text class="utility" x="651.5" y="42" text-anchor="middle">K</text>
+  <text class="utility" x="706.5" y="42" text-anchor="middle">K</text>
+  <text class="utility" x="761.5" y="42" text-anchor="middle">K</text>
+  <text class="utility" x="816.5" y="42" text-anchor="middle">K</text>
+  <text class="label" x="24" y="98">ISMCTS</text>
+  <rect x="187" y="70" width="49" height="38" rx="5" fill="#E7E4DC"/>
+  <rect x="187" y="70" width="49.0" height="38" rx="5" fill="#B64038"/>
+  <rect x="242" y="70" width="49" height="38" rx="5" fill="#E7E4DC"/>
+  <rect x="242" y="70" width="49.0" height="38" rx="5" fill="#B64038"/>
+  <rect x="297" y="70" width="49" height="38" rx="5" fill="#E7E4DC"/>
+  <rect x="297" y="70" width="49.0" height="38" rx="5" fill="#B64038"/>
+  <rect x="352" y="70" width="49" height="38" rx="5" fill="#E7E4DC"/>
+  <rect x="352" y="70" width="49.0" height="38" rx="5" fill="#B64038"/>
+  <rect x="407" y="70" width="49" height="38" rx="5" fill="#E7E4DC"/>
+  <rect x="407" y="70" width="49.0" height="38" rx="5" fill="#B64038"/>
+  <rect x="462" y="70" width="49" height="38" rx="5" fill="#E7E4DC"/>
+  <rect x="462" y="70" width="49.0" height="38" rx="5" fill="#B64038"/>
+  <rect x="517" y="70" width="49" height="38" rx="5" fill="#E7E4DC"/>
+  <rect x="517" y="70" width="49.0" height="38" rx="5" fill="#B64038"/>
+  <rect x="572" y="70" width="49" height="38" rx="5" fill="#E7E4DC"/>
+  <rect x="572" y="70" width="49.0" height="38" rx="5" fill="#B64038"/>
+  <rect x="627" y="70" width="49" height="38" rx="5" fill="#E7E4DC"/>
+  <rect x="627" y="70" width="49.0" height="38" rx="5" fill="#B64038"/>
+  <rect x="682" y="70" width="49" height="38" rx="5" fill="#E7E4DC"/>
+  <rect x="682" y="70" width="49.0" height="38" rx="5" fill="#B64038"/>
+  <rect x="737" y="70" width="49" height="38" rx="5" fill="#E7E4DC"/>
+  <rect x="737" y="70" width="0.5" height="38" rx="5" fill="#B64038"/>
+  <rect x="792" y="70" width="49" height="38" rx="5" fill="#E7E4DC"/>
+  <line x1="711.8" y1="119" x2="753.8" y2="119" stroke="#101A24" stroke-width="2"/>
+  <circle cx="732.5" cy="119" r="4" fill="#101A24"/>
+  <text class="value" x="880" y="98" text-anchor="end">10.01 / 12</text>
+  <text class="label" x="24" y="168">PIMC</text>
+  <rect x="187" y="140" width="49" height="38" rx="5" fill="#E7E4DC"/>
+  <rect x="187" y="140" width="49.0" height="38" rx="5" fill="#123D3A"/>
+  <rect x="242" y="140" width="49" height="38" rx="5" fill="#E7E4DC"/>
+  <rect x="242" y="140" width="49.0" height="38" rx="5" fill="#123D3A"/>
+  <rect x="297" y="140" width="49" height="38" rx="5" fill="#E7E4DC"/>
+  <rect x="297" y="140" width="49.0" height="38" rx="5" fill="#123D3A"/>
+  <rect x="352" y="140" width="49" height="38" rx="5" fill="#E7E4DC"/>
+  <rect x="352" y="140" width="49.0" height="38" rx="5" fill="#123D3A"/>
+  <rect x="407" y="140" width="49" height="38" rx="5" fill="#E7E4DC"/>
+  <rect x="407" y="140" width="49.0" height="38" rx="5" fill="#123D3A"/>
+  <rect x="462" y="140" width="49" height="38" rx="5" fill="#E7E4DC"/>
+  <rect x="462" y="140" width="49.0" height="38" rx="5" fill="#123D3A"/>
+  <rect x="517" y="140" width="49" height="38" rx="5" fill="#E7E4DC"/>
+  <rect x="517" y="140" width="49.0" height="38" rx="5" fill="#123D3A"/>
+  <rect x="572" y="140" width="49" height="38" rx="5" fill="#E7E4DC"/>
+  <rect x="572" y="140" width="49.0" height="38" rx="5" fill="#123D3A"/>
+  <rect x="627" y="140" width="49" height="38" rx="5" fill="#E7E4DC"/>
+  <rect x="627" y="140" width="49.0" height="38" rx="5" fill="#123D3A"/>
+  <rect x="682" y="140" width="49" height="38" rx="5" fill="#E7E4DC"/>
+  <rect x="682" y="140" width="12.2" height="38" rx="5" fill="#123D3A"/>
+  <rect x="737" y="140" width="49" height="38" rx="5" fill="#E7E4DC"/>
+  <rect x="792" y="140" width="49" height="38" rx="5" fill="#E7E4DC"/>
+  <line x1="670.4" y1="189" x2="712.4" y2="189" stroke="#101A24" stroke-width="2"/>
+  <circle cx="691.1" cy="189" r="4" fill="#101A24"/>
+  <text class="value" x="880" y="168" text-anchor="end">9.25 / 12</text>
+  <text class="label" x="24" y="238">Heuristic</text>
+  <rect x="187" y="210" width="49" height="38" rx="5" fill="#E7E4DC"/>
+  <rect x="187" y="210" width="49.0" height="38" rx="5" fill="#D0A84C"/>
+  <rect x="242" y="210" width="49" height="38" rx="5" fill="#E7E4DC"/>
+  <rect x="242" y="210" width="49.0" height="38" rx="5" fill="#D0A84C"/>
+  <rect x="297" y="210" width="49" height="38" rx="5" fill="#E7E4DC"/>
+  <rect x="297" y="210" width="49.0" height="38" rx="5" fill="#D0A84C"/>
+  <rect x="352" y="210" width="49" height="38" rx="5" fill="#E7E4DC"/>
+  <rect x="352" y="210" width="49.0" height="38" rx="5" fill="#D0A84C"/>
+  <rect x="407" y="210" width="49" height="38" rx="5" fill="#E7E4DC"/>
+  <rect x="407" y="210" width="18.1" height="38" rx="5" fill="#D0A84C"/>
+  <rect x="462" y="210" width="49" height="38" rx="5" fill="#E7E4DC"/>
+  <rect x="517" y="210" width="49" height="38" rx="5" fill="#E7E4DC"/>
+  <rect x="572" y="210" width="49" height="38" rx="5" fill="#E7E4DC"/>
+  <rect x="627" y="210" width="49" height="38" rx="5" fill="#E7E4DC"/>
+  <rect x="682" y="210" width="49" height="38" rx="5" fill="#E7E4DC"/>
+  <rect x="737" y="210" width="49" height="38" rx="5" fill="#E7E4DC"/>
+  <rect x="792" y="210" width="49" height="38" rx="5" fill="#E7E4DC"/>
+  <line x1="411.0" y1="259" x2="438.8" y2="259" stroke="#101A24" stroke-width="2"/>
+  <circle cx="425.2" cy="259" r="4" fill="#101A24"/>
+  <text class="value" x="880" y="238" text-anchor="end">4.37 / 12</text>
+  <text class="label" x="24" y="308">Random</text>
+  <rect x="187" y="280" width="49" height="38" rx="5" fill="#E7E4DC"/>
+  <rect x="187" y="280" width="49.0" height="38" rx="5" fill="#6B8498"/>
+  <rect x="242" y="280" width="49" height="38" rx="5" fill="#E7E4DC"/>
+  <rect x="242" y="280" width="49.0" height="38" rx="5" fill="#6B8498"/>
+  <rect x="297" y="280" width="49" height="38" rx="5" fill="#E7E4DC"/>
+  <rect x="297" y="280" width="47.5" height="38" rx="5" fill="#6B8498"/>
+  <rect x="352" y="280" width="49" height="38" rx="5" fill="#E7E4DC"/>
+  <rect x="407" y="280" width="49" height="38" rx="5" fill="#E7E4DC"/>
+  <rect x="462" y="280" width="49" height="38" rx="5" fill="#E7E4DC"/>
+  <rect x="517" y="280" width="49" height="38" rx="5" fill="#E7E4DC"/>
+  <rect x="572" y="280" width="49" height="38" rx="5" fill="#E7E4DC"/>
+  <rect x="627" y="280" width="49" height="38" rx="5" fill="#E7E4DC"/>
+  <rect x="682" y="280" width="49" height="38" rx="5" fill="#E7E4DC"/>
+  <rect x="737" y="280" width="49" height="38" rx="5" fill="#E7E4DC"/>
+  <rect x="792" y="280" width="49" height="38" rx="5" fill="#E7E4DC"/>
+  <line x1="336.9" y1="329" x2="360.9" y2="329" stroke="#101A24" stroke-width="2"/>
+  <circle cx="348.9" cy="329" r="4" fill="#101A24"/>
+  <text class="value" x="880" y="308" text-anchor="end">2.97 / 12</text>
+  <text class="utility" x="187" y="374">Mean castle progress · whisker = bootstrap 95% CI</text>
+</svg>

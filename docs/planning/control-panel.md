@@ -51,3 +51,24 @@ Traceback (most recent call last):
   File "C:\Users\modin\Desktop\programming\GAMES\Regicide\scripts\experimental_report\configuration.py", line 20, in load_report_config
     raise ValueError("Missing 'experimental_report' section in config")
 ValueError: Missing 'experimental_report' section in config
+
+---
+
+## Closure pass (2026-07-31)
+
+The publication pass closes the remaining control-panel requests without adding new
+training work:
+
+- Experimental-report and report-regeneration forms now accept only `config.yaml`;
+  `config_test.yaml` is rejected by the server-side argv schema as well as omitted
+  from the form.
+- Every command form shows a live, validated command preview before launch. The
+  actual job still executes with immutable configuration snapshots, and the final
+  resolved argv remains recorded in its output log.
+- Command-dialog Cancel and close controls are non-submit buttons, so required
+  fields can never prevent dismissal.
+- Documentation has a first-class navigation page with links to the multi-page
+  project report and generated API reference, plus direct access to the docs file
+  browser.
+- The panel remains bound to `127.0.0.1`; command execution remains shell-free,
+  allowlisted, and validated.

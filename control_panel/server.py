@@ -115,6 +115,11 @@ class ControlPanelApplication:
                 str(payload.get("command_id", "")),
                 payload.get("parameters") or {},
             )
+        if route == "/api/jobs/preview":
+            return self.jobs.preview(
+                str(payload.get("command_id", "")),
+                payload.get("parameters") or {},
+            )
         if route == "/api/jobs/stop":
             return self.jobs.stop(
                 str(payload.get("job_id", "")),
@@ -177,6 +182,11 @@ class ControlPanelHandler(BaseHTTPRequestHandler):
             return
         if parsed.path == "/view":
             self._handle_view(parsed)
+            return
+        if parsed.path == "/documentation" or parsed.path.startswith(
+            "/documentation/"
+        ):
+            self._serve_documentation(parsed.path)
             return
         if parsed.path in {"/", "/index.html"}:
             self._serve_index()
@@ -278,6 +288,28 @@ class ControlPanelHandler(BaseHTTPRequestHandler):
         if content_type.startswith("text/") or path.suffix in {".js", ".css"}:
             content_type += "; charset=utf-8"
         self._send_bytes(path.read_bytes(), content_type, cache_seconds=3600)
+
+    def _serve_documentation(self, request_path: str) -> None:
+        """Serve the curated documentation tree with working relative links."""
+        documentation_root = (
+            self.server.application.repository_root / "docs"
+        ).resolve()
+        relative_path = request_path.removeprefix("/documentation").lstrip("/")
+        path = (documentation_root / relative_path).resolve(strict=False)
+        try:
+            path.relative_to(documentation_root)
+        except ValueError:
+            self.send_error(HTTPStatus.FORBIDDEN)
+            return
+        if path.is_dir():
+            path = path / "index.html"
+        if not path.is_file():
+            self.send_error(HTTPStatus.NOT_FOUND)
+            return
+        content_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+        if content_type.startswith("text/") or path.suffix in {".js", ".css"}:
+            content_type += "; charset=utf-8"
+        self._send_bytes(path.read_bytes(), content_type, cache_seconds=0)
 
     def _require_token(self) -> None:
         """Reject API access without the page's ephemeral header token."""

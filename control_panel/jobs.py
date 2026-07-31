@@ -127,6 +127,32 @@ class JobManager:
             logger.info("Started control-panel job %s: %s", job_id, command.title)
             return self._decorate(record)
 
+    def preview(
+        self,
+        command_id: str,
+        parameters: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        """Validate a command and expose its shell-free launch preview."""
+        try:
+            command = self.commands[command_id]
+        except KeyError as error:
+            raise KeyError(f"Unknown command: {command_id}") from error
+        argv = command.build_argv(
+            self.python_executable,
+            parameters,
+            self.repository_root,
+        )
+        return {
+            "command_id": command.command_id,
+            "argv": argv,
+            "display": subprocess.list2cmdline(argv),
+            "working_directory": str(self.repository_root),
+            "note": (
+                "Configuration files are copied into the job directory at launch; "
+                "the executed argv uses that immutable snapshot."
+            ),
+        }
+
     def list_jobs(self, limit: int = 100) -> list[dict[str, Any]]:
         """Return newest jobs after reconciling their process state."""
         with self._lock:

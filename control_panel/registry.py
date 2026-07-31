@@ -7,6 +7,7 @@ from .models import CommandSpec, ParameterSpec
 AGENTS = ("random", "heuristic", "pimc", "ismcts", "ppo")
 REPORT_AGENTS = ("random", "heuristic", "pimc", "ismcts", "ppo", "alphazero")
 CONFIGS = ("config_test.yaml", "config.yaml")
+REPORT_CONFIGS = ("config.yaml",)
 
 
 def command_catalog() -> tuple[CommandSpec, ...]:
@@ -605,7 +606,7 @@ def _report_parameters(include_resume: bool) -> tuple[ParameterSpec, ...]:
             "--config",
             kind="choice",
             default="config.yaml",
-            choices=CONFIGS,
+            choices=REPORT_CONFIGS,
         ),
         ParameterSpec(
             "agents",
@@ -681,7 +682,7 @@ def _report_regeneration_command() -> CommandSpec:
                 "Optional configuration",
                 "--config",
                 kind="choice",
-                choices=CONFIGS,
+                choices=REPORT_CONFIGS,
             ),
         ),
         risk="maintenance",

@@ -16,6 +16,8 @@ const state = {
   browserPath: "",
   logJobId: null,
   refreshBusy: false,
+  commandPreviewTimer: null,
+  commandPreviewRequest: 0,
 };
 
 const pageTitles = {
@@ -24,6 +26,7 @@ const pageTitles = {
   runs: "Runs & monitor",
   config: "Configuration",
   artifacts: "Files & artifacts",
+  documentation: "Documentation",
   repository: "Repository",
 };
 
@@ -61,6 +64,10 @@ function bindStaticEvents() {
   document.getElementById("refresh-button").addEventListener("click", refreshCurrentState);
   document.getElementById("command-search").addEventListener("input", renderCommands);
   document.getElementById("command-form").addEventListener("submit", submitCommand);
+  document.getElementById("command-form").addEventListener("input", scheduleCommandPreview);
+  document.getElementById("command-form").addEventListener("change", scheduleCommandPreview);
+  document.getElementById("command-close-button").addEventListener("click", closeCommandDialog);
+  document.getElementById("command-cancel-button").addEventListener("click", closeCommandDialog);
   document.getElementById("jobs-table").addEventListener("click", handleJobAction);
   document.getElementById("overview-jobs").addEventListener("click", handleJobAction);
   document.getElementById("runs-table").addEventListener("click", handleRunSelection);
@@ -78,6 +85,8 @@ function bindStaticEvents() {
   document.getElementById("refresh-log-button").addEventListener("click", refreshJobLog);
   document.getElementById("stop-job-button").addEventListener("click", stopSelectedJob);
   document.getElementById("shutdown-button").addEventListener("click", shutdownPanel);
+  document.getElementById("browse-docs-button").addEventListener("click", browseDocumentation);
+  document.getElementById("browse-docs-card-button").addEventListener("click", browseDocumentation);
 }
 
 async function api(path, options = {}) {
@@ -103,6 +112,11 @@ function setView(view, category = null) {
   window.location.hash = category ? `${view}:${category}` : view;
   if (view === "jobs") renderCommands();
   if (view === "repository") renderRepository();
+}
+
+function browseDocumentation() {
+  setView("artifacts");
+  loadBrowser("docs", "");
 }
 
 function renderNavigationData() {
@@ -249,6 +263,12 @@ function openCommand(commandId) {
     ? command.parameters.map(commandField).join("")
     : `<div class="field full"><p class="muted">This workflow has no configurable arguments.</p></div>`;
   document.getElementById("command-dialog").showModal();
+  scheduleCommandPreview();
+}
+
+function closeCommandDialog() {
+  window.clearTimeout(state.commandPreviewTimer);
+  document.getElementById("command-dialog").close();
 }
 
 function commandField(field) {
@@ -275,10 +295,6 @@ function commandField(field) {
 
 async function submitCommand(event) {
   event.preventDefault();
-  if (event.submitter?.value === "cancel") {
-    document.getElementById("command-dialog").close();
-    return;
-  }
   const command = state.selectedCommand;
   if (!command) return;
   const form = event.currentTarget;
@@ -301,6 +317,51 @@ async function submitCommand(event) {
     openJobLog(job.job_id);
   } catch (error) {
     toast("Could not start job", error.message, "error");
+  }
+}
+
+function scheduleCommandPreview() {
+  window.clearTimeout(state.commandPreviewTimer);
+  state.commandPreviewTimer = window.setTimeout(previewCommand, 120);
+}
+
+async function previewCommand() {
+  const command = state.selectedCommand;
+  const form = document.getElementById("command-form");
+  if (!command || !document.getElementById("command-dialog").open) return;
+  const previewBox = document.querySelector(".command-preview");
+  const output = document.getElementById("command-preview");
+  const stateLabel = document.getElementById("command-preview-state");
+  const note = document.getElementById("command-preview-note");
+  if (!form.checkValidity()) {
+    previewBox.dataset.state = "invalid";
+    stateLabel.textContent = "INCOMPLETE";
+    output.textContent = "Complete the required fields to resolve the launch command.";
+    note.textContent = "";
+    return;
+  }
+  const requestId = ++state.commandPreviewRequest;
+  previewBox.dataset.state = "loading";
+  stateLabel.textContent = "VALIDATING";
+  try {
+    const preview = await api("/api/jobs/preview", {
+      method: "POST",
+      body: JSON.stringify({
+        command_id: command.id,
+        parameters: collectCommandParameters(command, form),
+      }),
+    });
+    if (requestId !== state.commandPreviewRequest) return;
+    previewBox.dataset.state = "ready";
+    stateLabel.textContent = "READY";
+    output.textContent = preview.display;
+    note.textContent = `${preview.note} Working directory: ${preview.working_directory}`;
+  } catch (error) {
+    if (requestId !== state.commandPreviewRequest) return;
+    previewBox.dataset.state = "invalid";
+    stateLabel.textContent = "INVALID";
+    output.textContent = error.message;
+    note.textContent = "The job cannot start until this command validates.";
   }
 }
 

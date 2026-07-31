@@ -8,7 +8,14 @@ from scripts.migrate_artifacts import migrate_legacy_artifacts
 from solvers.parallel import ParallelSimulator
 
 PROJECT_ROOT = Path(__file__).parents[1]
-EXCLUDED_PARTS = {".agents", "archive", "artifacts", "venv", ".git"}
+EXCLUDED_PARTS = {
+    ".agents",
+    ".git",
+    ".understand-anything",
+    "archive",
+    "artifacts",
+    "venv",
+}
 
 
 def test_application_code_does_not_use_print_or_direct_stdout():

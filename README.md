@@ -1,222 +1,97 @@
-# Regicide AI: ISMCTS Solver
+# Regicide
 
-A Python implementation of the cooperative card game **Regicide** featuring a fully-functional rules engine, graphical interface, and a highly capable AI agent based on Information Set Monte Carlo Tree Search (ISMCTS).
+Regicide is a Python implementation of the cooperative card game, built around
+an explicit rules engine and a fixed global action space. The repository includes
+a Pygame desktop client, a local browser control panel, reproducible experiment
+tracking, and several agents for solo-game evaluation.
 
-## Features
-- **Accurate Rules Engine**: Fully implements the official Regicide mechanics, including Jester rules, suit powers, enemy immunity, combinations, yielding, and defense.
-- **Solo & Multiplayer Support**: Supports 1-4 players following the official scaling mechanics.
-- **Graphical Interface**: A complete desktop GUI to play the game natively.
-- **ISMCTS AI Solver**: A powerful autonomous agent capable of solving the game in solo mode by planning moves under hidden information (the deck).
-- **Advanced Logging & Telemetry**: Integrated `ml_logger` for terminal dashboards, JSONL logging, metrics tracking, and hardware monitoring.
+The release focuses on the completed rules engine and the comparison of Random,
+Heuristic, PIMC, and Information Set Monte Carlo Tree Search (ISMCTS). PPO was
+investigated but proved expensive to train and weak in the available experiments;
+it is not part of the final comparison. AlphaZero and a lightweight,
+interpretable agent distilled from ISMCTS decisions remain future work.
 
-## Installation
+## Quick start
+
+Regicide requires Python 3.10 or newer. From the repository root:
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/Regicide.git
-cd Regicide
-
-# Install requirements
-pip install -r requirements.txt
-```
-
-## Running the Game (GUI)
-
-To launch the graphical game client:
-```bash
+python -m pip install -r requirements.txt
 python -m ui
 ```
 
-## Repository Control Panel
+The desktop client supports one to four players and records games through the
+project's local-first logging system. Press `Esc` to leave the full-screen UI.
 
-On Windows, double-click [`control_panel.pyw`](control_panel.pyw) to open the
-local browser control panel. It provides one navigable interface for launching
-the game and allowlisted jobs, editing validated YAML configurations, monitoring
-processes and logger runs, browsing artifacts, viewing reports, and running
-analysis or quality workflows.
-
-The panel binds only to `127.0.0.1`, launches workloads as isolated subprocesses,
-and keeps its job registry, logs, config snapshots, and backups under the ignored
-`artifacts/control_panel/` directory. Closing the panel does not terminate jobs;
-they are reconciled when it is opened again.
-
-For developer startup without the double-click launcher:
+On Windows, `control_panel.pyw` opens the browser control panel. It can also be
+started from a terminal on any supported platform:
 
 ```bash
 python -m control_panel
 ```
 
-## Running the AI Agent
+The panel binds to `127.0.0.1`; it is intended for local use only.
 
-To simulate a game played autonomously by the ISMCTS agent:
-```bash
-python -m scripts.log_game
-```
-This script will leverage the `ml_logger` dashboard to provide real-time updates on game state, agent actions, and memory consumption.
+## Documentation
 
-To run the quick benchmark:
-```bash
-python benchmark.py
-```
-The complete suite, including training benchmarks, is opt-in:
-```bash
-python benchmark.py --mode all
-```
+- [Project and experimental report](docs/site/index.html) — navigable overview,
+  rules, architecture, agents, results, and future work.
+- [Results entry point](docs/RESULTS.md) — provenance, dataset, and report links.
+- [Usage guide](docs/USAGE.md) — installation and verified command-line workflows.
+- [Repository structure](docs/REPOSITORY_STRUCTURE.md) — where the main components
+  and generated artifacts live.
+- [API documentation policy](docs/DOCUMENTATION.md) — docstring conventions and
+  reference-generation checks.
+- [Logging guide](ml_logger/README.md) — runs, metrics, telemetry, and artifacts.
+- [Testing guide](TESTING.md) — focused and complete validation commands.
 
-## Analyzing Results
+Build the generated API reference with:
 
-Every command creates an isolated run under `artifacts/runs/<date>/<run_id>`.
-To analyze recorded games and persist the aggregate result:
-```bash
-python -m scripts.analyze_runs
-```
-
-To inspect the catalog or replay the recorded action sequence:
-```bash
-python -m scripts.runs list
-python -m scripts.runs games <run_id>
-python -m scripts.runs replay <game_id>
-```
-
-### Experimental comparison report
-
-The reproducible comparison pipeline evaluates every enabled agent on the same
-seeds and generates CSV/Markdown/LaTeX tables, statistical tests, plots, and an
-Italian report:
-
-```bash
-python -m scripts.experimental_report.orchestrator
-```
-
-For a quick smoke run or a selected subset:
-
-```bash
-python -m scripts.experimental_report.orchestrator \
-  --agents random heuristic \
-  --games 10 \
-  --base-seed 42
-```
-
-Interrupted or failed comparisons are checkpointed after every game. Resume the
-same run without repeating completed agent/seed pairs:
-
-```bash
-python -m scripts.experimental_report.orchestrator \
-  --resume-run artifacts/runs/<date>/<experimental-report-run-id> \
-  --jobs 4
-```
-
-Parallel workers evaluate different games of one agent at a time. The parent
-process remains the only checkpoint writer, so interruption and resume are safe.
-
-Agent classes, model paths, search budgets, sample size, seed, confidence level,
-and bootstrap count are configured centrally under `experimental_report` in
-[`config.yaml`](config.yaml). PPO and AlphaZero are present but disabled until
-valid promoted-model paths are configured. See
-[`docs/experimental_report.md`](docs/experimental_report.md) for the output
-layout and analysis protocol.
-
-## Logging and artifacts
-
-`ml_logger` is the application logging and experiment-tracking entry point.
-Modules acquire a standard logger with `get_logger(__name__)`; new executable
-commands should own their lifecycle with `with run(...):`. The same event
-stream feeds SQLite storage, JSONL compatibility exports, the optional Rich
-dashboard, structured telemetry, and a portable HTML report.
-
-Regicide-specific game recording is kept outside the generic package in
-[`integrations/regicide_logging.py`](integrations/regicide_logging.py).
-See [`ml_logger/README.md`](ml_logger/README.md) for the reference guide and
-[`ml_logger/docs/ml_logger_guide.html`](ml_logger/docs/ml_logger_guide.html)
-for the visual, tabbed walkthrough of the API, features, configuration, and
-adapter pattern.
-
-Before every run, `ml_logger` reads [`logger_config.yaml`](logger_config.yaml).
-The main switches are:
-
-- `logging.enabled`, `console`, `file`, and `level`;
-- `terminal.colors`, `timezone`, visibility, and traceback rendering;
-- `saving.enabled`, `params`, `metrics`, `results`, `artifacts`, and
-  `telemetry`;
-- `metrics.include` and `exclude`;
-- `dashboard.mode` and its visible metric filters;
-- `telemetry` sampling and providers;
-- `report.enabled`, metric filters, and visualization;
-- `integrations.regicide.recording` for domain-specific game histories;
-- `run_type_overrides` for high-volume commands.
-
-`benchmark`, PPO, AlphaZero, tuning, and BC data generation disable individual
-game recording by default. To record benchmark games, change:
-
-```yaml
-run_type_overrides:
-  benchmark:
-    integrations:
-      regicide:
-        recording:
-          enabled: true
-```
-
-The Regicide recording `level` accepts `summary`, `actions`, or `full`. A different
-configuration file can be selected without editing the repository by setting
-the `ML_LOGGER_CONFIG` environment variable. A minimal manifest and catalog
-entry are always retained; `saving.enabled` controls optional logger-managed
-artifacts, not explicitly requested outputs such as trained models.
-
-Generated data is organized as follows:
-
-```text
-artifacts/
-├── catalog.sqlite
-├── runs/<date>/<run_id>/
-│   ├── manifest.json
-│   ├── logs/run.log
-│   ├── metrics/
-│   ├── games/
-│   ├── datasets/
-│   ├── models/
-│   ├── checkpoints/
-│   └── analysis/
-├── datasets/
-├── promoted_models/
-└── legacy/
-```
-
-To migrate old `runs`, `logs`, `models`, `outputs`, `experiments`, and
-`archive` directories without deleting their contents:
-
-```bash
-python -m scripts.migrate_artifacts
-```
-
-## Generating Documentation
-
-We use `pdoc` to generate the HTML documentation from docstrings automatically. To build it:
 ```bash
 python -m scripts.generate_docs
 ```
-This will place the documentation in the `docs/` folder.
 
-## Running the AI Training
+Then open `docs/api/index.html` locally.
 
-To train new RL models (e.g. AlphaZero) or test advanced solvers, use the module runner from the root directory:
+## Common workflows
+
+Run a recorded random game:
+
 ```bash
-python -m solvers.train --help
+python -m scripts.log_game
 ```
 
-## Project Structure
-- `game/`: The core mechanics engine (`regicide.py`, `action_handler.py`).
-- `agents/`: Core interfaces and heuristic bots (e.g., Random, ISMCTS, PIMC).
-- `solvers/`: Advanced RL training loops, AlphaZero networks, self-play logic, and TensorBoard logging.
-- `ui/`: Pygame-based graphical interface.
-- `ml_logger/`: Reusable local-first run, event, telemetry, dashboard, and report package.
-- `integrations/`: Project-specific adapters, including Regicide game recording.
-- `scripts/`: Diagnostic tools, game runners, and documentation generators (run them with `python -m scripts.<name>`).
-- `tests/`: Comprehensive test suite (`pytest`).
-- `rules/`: Text files containing reference rulebooks.
-- `artifacts/`: Canonical generated runs, games, models, datasets, analyses, and legacy outputs.
+Run the reproducible four-agent comparison:
 
-## Future Work
-- Implementing a multi-agent cooperative version of ISMCTS for 2-4 player scaling.
-- Adding a "hints" feature to the UI powered by the ISMCTS tree.
-- Further optimizing the tree determinization for speed.
+```bash
+python -m scripts.experimental_report.orchestrator \
+  --agents random heuristic pimc ismcts \
+  --games 100 \
+  --base-seed 20260718 \
+  --jobs 1
+```
+
+Using one worker avoids CPU contention in timing comparisons. Runs can be
+resumed from their artifact directory; see the [usage guide](docs/USAGE.md) for
+the full command.
+
+Run the test suite:
+
+```bash
+python -m pytest
+```
+
+## Architecture at a glance
+
+- `game/` owns rules, state transitions, legal-action generation, and global
+  action encoding.
+- `agents/` contains the common agent interface and the implemented policies.
+- `solvers/` contains the Gymnasium adapter and the experimental training and
+  evaluation workflows.
+- `ui/` provides the Pygame game client; `control_panel/` provides the local web
+  launcher and run browser.
+- `ml_logger/` and `integrations/` store reproducible run metadata and
+  Regicide-specific game histories under `artifacts/`.
+- `scripts/` exposes reporting, inspection, migration, and documentation tools.
+
+See [Repository structure](docs/REPOSITORY_STRUCTURE.md) for a more complete map.

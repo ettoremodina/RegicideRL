@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 425" role="img" aria-labelledby="title desc">
+  <title id="title">Castle progress versus decision latency</title>
+  <desc id="desc">Search agents reach much deeper into the castle but require several seconds per decision. Timing was collected with five parallel workers and is descriptive only.</desc>
+  <style>
+    text { font-family: "Segoe UI", Arial, sans-serif; fill: #101A24; }
+    .utility { font-family: "Cascadia Code", Consolas, monospace; font-size: 13px; fill: #536577; }
+    .label { font-size: 16px; font-weight: 650; }
+    .value { font-size: 15px; font-weight: 700; }
+    .grid { stroke: #D7D8D2; stroke-width: 1; }
+  </style>
+  <rect width="920" height="425" rx="14" fill="#FBF9F4"/>
+  <line class="grid" x1="100.0" y1="45" x2="100.0" y2="340"/>
+  <text class="utility" x="100.0" y="370" text-anchor="middle">0.01 ms</text>
+  <line class="grid" x1="225.0" y1="45" x2="225.0" y2="340"/>
+  <text class="utility" x="225.0" y="370" text-anchor="middle">0.1</text>
+  <line class="grid" x1="350.0" y1="45" x2="350.0" y2="340"/>
+  <text class="utility" x="350.0" y="370" text-anchor="middle">1</text>
+  <line class="grid" x1="475.0" y1="45" x2="475.0" y2="340"/>
+  <text class="utility" x="475.0" y="370" text-anchor="middle">10</text>
+  <line class="grid" x1="600.0" y1="45" x2="600.0" y2="340"/>
+  <text class="utility" x="600.0" y="370" text-anchor="middle">100</text>
+  <line class="grid" x1="725.0" y1="45" x2="725.0" y2="340"/>
+  <text class="utility" x="725.0" y="370" text-anchor="middle">1 s</text>
+  <line class="grid" x1="850.0" y1="45" x2="850.0" y2="340"/>
+  <text class="utility" x="850.0" y="370" text-anchor="middle">10 s</text>
+  <line class="grid" x1="100" y1="340.0" x2="850" y2="340.0"/>
+  <text class="utility" x="82" y="345.0" text-anchor="end">0</text>
+  <line class="grid" x1="100" y1="290.8" x2="850" y2="290.8"/>
+  <text class="utility" x="82" y="295.8" text-anchor="end">2</text>
+  <line class="grid" x1="100" y1="241.7" x2="850" y2="241.7"/>
+  <text class="utility" x="82" y="246.7" text-anchor="end">4</text>
+  <line class="grid" x1="100" y1="192.5" x2="850" y2="192.5"/>
+  <text class="utility" x="82" y="197.5" text-anchor="end">6</text>
+  <line class="grid" x1="100" y1="143.3" x2="850" y2="143.3"/>
+  <text class="utility" x="82" y="148.3" text-anchor="end">8</text>
+  <line class="grid" x1="100" y1="94.2" x2="850" y2="94.2"/>
+  <text class="utility" x="82" y="99.2" text-anchor="end">10</text>
+  <line class="grid" x1="100" y1="45.0" x2="850" y2="45.0"/>
+  <text class="utility" x="82" y="50.0" text-anchor="end">12</text>
+  <circle cx="828.8" cy="93.9" r="10" fill="#B64038" stroke="#FBF9F4" stroke-width="3"/>
+  <text class="label" x="840.8" y="79.9">ISMCTS</text>
+  <circle cx="816.3" cy="112.6" r="10" fill="#123D3A" stroke="#FBF9F4" stroke-width="3"/>
+  <text class="label" x="750.3" y="98.6">PIMC</text>
+  <circle cx="177.9" cy="232.6" r="10" fill="#D0A84C" stroke="#FBF9F4" stroke-width="3"/>
+  <text class="label" x="189.9" y="220.6">Heuristic</text>
+  <circle cx="147.6" cy="267.0" r="10" fill="#6B8498" stroke="#FBF9F4" stroke-width="3"/>
+  <text class="label" x="159.6" y="289.0">Random</text>
+  <text class="utility" x="475" y="400" text-anchor="middle">Mean decision latency · logarithmic scale</text>
+  <text class="utility" transform="translate(28 195) rotate(-90)" text-anchor="middle">Mean enemies defeated</text>
+</svg>

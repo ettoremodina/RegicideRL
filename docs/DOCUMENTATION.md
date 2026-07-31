@@ -70,9 +70,10 @@ Build the complete API reference from the repository root:
 python -m scripts.generate_docs
 ```
 
-The command documents `game`, `agents`, `solvers`, `ml_logger`, `scripts`,
-`ui`, and the top-level `benchmark` module. It replaces only `docs/api/`, never
-the curated Markdown files.
+The command documents `game`, `agents`, `solvers`, `ml_logger`, `integrations`,
+`scripts`, `ui`, and the top-level `benchmark` module. It replaces only
+`docs/api/`, never the curated Markdown files or the project site in
+`docs/site/`.
 
 ## Review checklist
 

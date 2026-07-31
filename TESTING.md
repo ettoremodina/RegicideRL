@@ -1,134 +1,90 @@
-## 4. Agenti e partita simulata
+# Testing
 
-Esegue una partita completa con logging:
+Run tests from the repository root with Python 3.10 or newer. Install the runtime
+and contributor dependencies first:
 
-```powershell
-python -m scripts.log_game
+```bash
+python -m pip install -r requirements.txt
+python -m pip install -e ".[dev]"
 ```
 
-Analizza i log prodotti:
+## Release gate
 
-```powershell
-python -m scripts.analyze_runs
+Run the complete automated suite:
+
+```bash
+python -m pytest
 ```
 
-Testa il solver/evaluator con un carico ridotto:
+The suite covers the rules engine, global action encoding, Gymnasium adapter,
+agents, experimental-report pipeline, logging, control panel, and documentation
+contract. AlphaZero tests protect the retained development code; passing them
+does not mean AlphaZero is part of the finished agent comparison.
 
-```powershell
-python -m solvers.train --agent random --episodes 1 --games_per_episode 200 --jobs 1
+Build the API reference after the tests:
+
+```bash
+python -m scripts.generate_docs
 ```
 
-Con `--jobs 1` il simulatore usa direttamente il processo corrente, evitando
-il costo di avvio e comunicazione del multiprocessing.
+Open `docs/api/index.html` and confirm that the package index and representative
+pages render correctly.
 
-## 5. UI Pygame
+## Focused suites
 
-Avvia l’interfaccia grafica:
+Use a focused command while changing one subsystem:
 
-```powershell
-python -m ui
+```bash
+python -m pytest tests/test_game_rules.py tests/test_solo_rules.py
+python -m pytest tests/test_action_handler.py tests/test_env.py
+python -m pytest tests/test_experimental_report.py
+python -m pytest tests/test_ml_logger.py tests/test_ml_logger_runtime.py
+python -m pytest tests/test_control_panel.py
+python -m pytest tests/test_documentation.py
 ```
 
-Durante la difesa, se nessuna combinazione è sufficiente, la partita termina
-oppure consente di usare il Solo Jester quando disponibile.
+`tests/test_documentation.py` performs both an AST docstring audit and an
+isolated pdoc build for every published package. New public modules, classes,
+functions, and methods require docstrings; non-trivial private lifecycle or
+algorithm helpers do as well. The detailed policy is in
+[`docs/DOCUMENTATION.md`](docs/DOCUMENTATION.md).
 
-## 7. Training PPO
+## Manual smoke checks
 
-Training ridotto usando la configurazione di test:
+After the automated gate passes, verify each shipped entry point:
 
-```powershell
-python -m solvers.train_rl --config config_test.yaml
-```
+1. Start `python -m ui`, begin a one-player game, select a legal card, and exit
+   with `Esc`.
+2. Start `python -m control_panel`; confirm it opens on `127.0.0.1`, launch an
+   approved short job, and inspect its logs.
+3. Run `python -m scripts.log_game`, then use `python -m scripts.runs list` to
+   confirm that the run and game were cataloged.
+4. Exercise the report pipeline with a non-publication sample:
 
-Training completo usando `config.yaml`:
+   ```bash
+   python -m scripts.experimental_report.orchestrator \
+     --agents random heuristic \
+     --games 2 \
+     --base-seed 42 \
+     --jobs 1
+   ```
 
-```powershell
-python -m solvers.train_rl --config config.yaml
-```
+5. Open `docs/site/index.html` and check navigation, charts, responsive layout,
+   and links to the API and repository guides.
 
-`invalid_action_rate` misura le azioni rifiutate dal motore. Con le maschere
-corrette deve restare a zero: gli yield illegali e le difese impossibili non
-sono più presentati alla policy.
+Do not treat the two-game report smoke check as an experimental result.
+Publication results must use the recorded protocol and a completed run.
 
-Questi comandi possono creare file in `models/` e log TensorBoard in `runs/`.
+## Reproducibility checks
 
-## 8. Behavioral Cloning
+Before publishing results, verify that:
 
-Genera un dataset minimo:
+- the effective report configuration is stored with the run;
+- every compared agent receives the same ordered seeds;
+- timing measurements use `--jobs 1` on one otherwise idle machine;
+- raw per-game data and generated analyses remain under the same run directory;
+- no PPO or AlphaZero checkpoint is silently substituted into the final
+  Random/Heuristic/PIMC/ISMCTS comparison.
 
-```powershell
-New-Item -ItemType Directory -Force outputs | Out-Null
-python -m solvers.generate_bc_data --games 2 --out outputs/bc_data_smoke.npz
-```
-
-Esegue un’epoca di pre-training:
-
-```powershell
-python -m solvers.bc_train --data outputs/bc_data_smoke.npz --epochs 1 --batch 8
-```
-
-Il modello pre-trained viene salvato in `models/ppo_bc_pretrained.zip`.
-
-## 9. Hyperparameter tuning
-
-Controllo del CLI:
-
-```powershell
-python -m solvers.tune --help
-```
-
-Tuning ridotto con `config_test.yaml`:
-
-```powershell
-python -m solvers.tune --config config_test.yaml
-```
-
-Il tuning completo può richiedere molto tempo e produce log TensorBoard e
-modelli temporanei in `runs/`.
-
-## 10. Analisi di un modello addestrato
-
-Controllo del CLI:
-
-```powershell
-python -m solvers.analysis.run_analysis --help
-```
-
-Analisi reale, da eseguire dopo aver prodotto un modello PPO:
-
-```powershell
-python -m solvers.analysis.run_analysis `
-  --model models/ppo_regicide_tuned.zip `
-  --games 2
-```
-
-Se necessario, specifica anche il log TensorBoard:
-
-```powershell
-python -m solvers.analysis.run_analysis `
-  --model models/ppo_regicide_tuned.zip `
-  --games 2 `
-  --logdir runs/rl_logs
-```
-
-## 12. AlphaZero
-
-Avvia AlphaZero tramite l’entry point unificato:
-
-```powershell
-python -m solvers.train --agent alphazero --config config.yaml
-```
-
-Smoke test:
-
-```powershell
-python -m solvers.train --agent alphazero `
-  --config config_test.yaml `
-  --az-iterations 1 `
-  --games-per-episode 1 `
-  --sims 1 `
-  --eval-games 1
-```
-
-Usa `python -m solvers.train --help` per gli override e `--resume` per
-riprendere un checkpoint.
+PPO remains a costly, weak experiment and AlphaZero remains future work; neither
+requires additional training for the release gate.

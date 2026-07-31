@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 385" role="img" aria-labelledby="title desc">
+  <title id="title">Solo win rate by agent</title>
+  <desc id="desc">ISMCTS won 42 percent, PIMC 24 percent, Heuristic and Random zero percent; horizontal lines show Wilson 95 percent confidence intervals.</desc>
+  <style>
+    text { font-family: "Segoe UI", Arial, sans-serif; fill: #101A24; }
+    .utility { font-family: "Cascadia Code", Consolas, monospace; font-size: 13px; fill: #536577; }
+    .label { font-size: 16px; font-weight: 650; }
+    .value { font-size: 15px; font-weight: 700; }
+    .grid { stroke: #D7D8D2; stroke-width: 1; }
+  </style>
+  <rect width="920" height="385" rx="14" fill="#FBF9F4"/>
+  <line class="grid" x1="185.0" y1="45" x2="185.0" y2="330"/>
+  <text class="utility" x="185.0" y="355" text-anchor="middle">0%</text>
+  <line class="grid" x1="295.8" y1="45" x2="295.8" y2="330"/>
+  <text class="utility" x="295.8" y="355" text-anchor="middle">10%</text>
+  <line class="grid" x1="406.7" y1="45" x2="406.7" y2="330"/>
+  <text class="utility" x="406.7" y="355" text-anchor="middle">20%</text>
+  <line class="grid" x1="517.5" y1="45" x2="517.5" y2="330"/>
+  <text class="utility" x="517.5" y="355" text-anchor="middle">30%</text>
+  <line class="grid" x1="628.3" y1="45" x2="628.3" y2="330"/>
+  <text class="utility" x="628.3" y="355" text-anchor="middle">40%</text>
+  <line class="grid" x1="739.2" y1="45" x2="739.2" y2="330"/>
+  <text class="utility" x="739.2" y="355" text-anchor="middle">50%</text>
+  <line class="grid" x1="850.0" y1="45" x2="850.0" y2="330"/>
+  <text class="utility" x="850.0" y="355" text-anchor="middle">60%</text>
+  <text class="label" x="24" y="87">ISMCTS</text>
+  <line x1="548.5" y1="82" x2="759.0" y2="82" stroke="#101A24" stroke-width="3"/>
+  <line x1="548.5" y1="74" x2="548.5" y2="90" stroke="#101A24" stroke-width="2"/>
+  <line x1="759.0" y1="74" x2="759.0" y2="90" stroke="#101A24" stroke-width="2"/>
+  <circle cx="650.5" cy="82" r="9" fill="#B64038" stroke="#FBF9F4" stroke-width="3"/>
+  <text class="value" x="650.5" y="65" text-anchor="middle">42%</text>
+  <text class="label" x="24" y="159">PIMC</text>
+  <line x1="370.0" y1="154" x2="553.3" y2="154" stroke="#101A24" stroke-width="3"/>
+  <line x1="370.0" y1="146" x2="370.0" y2="162" stroke="#101A24" stroke-width="2"/>
+  <line x1="553.3" y1="146" x2="553.3" y2="162" stroke="#101A24" stroke-width="2"/>
+  <circle cx="451.0" cy="154" r="9" fill="#123D3A" stroke="#FBF9F4" stroke-width="3"/>
+  <text class="value" x="451.0" y="137" text-anchor="middle">24%</text>
+  <text class="label" x="24" y="231">Heuristic</text>
+  <line x1="185.0" y1="226" x2="226.0" y2="226" stroke="#101A24" stroke-width="3"/>
+  <line x1="185.0" y1="218" x2="185.0" y2="234" stroke="#101A24" stroke-width="2"/>
+  <line x1="226.0" y1="218" x2="226.0" y2="234" stroke="#101A24" stroke-width="2"/>
+  <circle cx="185.0" cy="226" r="9" fill="#D0A84C" stroke="#FBF9F4" stroke-width="3"/>
+  <text class="value" x="185.0" y="209" text-anchor="middle">0%</text>
+  <text class="label" x="24" y="303">Random</text>
+  <line x1="185.0" y1="298" x2="226.0" y2="298" stroke="#101A24" stroke-width="3"/>
+  <line x1="185.0" y1="290" x2="185.0" y2="306" stroke="#101A24" stroke-width="2"/>
+  <line x1="226.0" y1="290" x2="226.0" y2="306" stroke="#101A24" stroke-width="2"/>
+  <circle cx="185.0" cy="298" r="9" fill="#6B8498" stroke="#FBF9F4" stroke-width="3"/>
+  <text class="value" x="185.0" y="281" text-anchor="middle">0%</text>
+</svg>
