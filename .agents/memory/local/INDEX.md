@@ -10,5 +10,6 @@ Contains durable records and subcategories for this memory scope. Open only the 
 | Directory | Purpose |
 |---|---|
 | [decisions/](decisions/INDEX.md) | Contains durable records and subcategories for Decisions. Open only the entries relevant to the current task. |
+| [findings/](findings/INDEX.md) | Contains durable records and subcategories for Findings. Open only the entries relevant to the current task. |
 
 <!-- memory-index:end -->

@@ -48,7 +48,9 @@ uses:
 - `ismcts_agent.py` for tree search across sampled information sets.
 
 `agents/determinize.py` contains hidden-state sampling shared by the search
-agents. PPO and AlphaZero adapters remain in this package to preserve the
+agents. `agents/ismcts_trace.py` records one ISMCTS decision as replayable data
+for the [decision visualizer](ISMCTS_VISUALIZER.md); it is inert unless a tracer
+is explicitly attached to the agent. PPO and AlphaZero adapters remain in this package to preserve the
 research history, but they are not required by the final release.
 
 `solvers/env.py` exposes the game through Gymnasium. The remaining `solvers/`
@@ -80,6 +82,8 @@ User-facing utilities live under `scripts/`:
 - `analyze_runs.py` aggregates game summaries;
 - `experimental_report/` runs paired agent comparisons and analyzes them;
 - `generate_docs.py` builds the pdoc reference into `docs/api/`;
+- `trace_ismcts.py` records an ISMCTS decision and renders
+  `docs/ismcts_visualizer.html` from the template in `scripts/templates/`;
 - `migrate_artifacts.py` imports outputs from the older directory layout.
 
 The `artifacts/` directory is generated state, not source code. A typical run is

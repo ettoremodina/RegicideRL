@@ -6,14 +6,14 @@
 ### Project context
 
 - **Project:** Regicide
-- **Purpose:** A Python implementation of the cooperative card game Regicide with a rules engine, desktop GUI, browser control panel, and AI solvers including ISMCTS and reinforcement-learning workflows.
-- **Technology:** Python 3.10+, Pygame, Gymnasium, Stable-Baselines3, pytest
-- **Important commands:** pip install -r requirements.txt; python -m ui; python -m control_panel; python -m scripts.log_game; python benchmark.py; pytest
-- **Important constraints:** Preserve official Regicide rules behavior, keep the control panel bound to 127.0.0.1, and retain reproducible run artifacts and experiment configuration.
+- **Purpose:** Not established yet
+- **Technology:** Not established yet
+- **Important commands:** Not established yet
+- **Important constraints:** Not established yet
 
 ### Connected capabilities
 
-- **Managed skills:** agent-workflow-bootstrap, frontend-design, memory-manager, webapp-testing
+- **Managed skills:** agent-workflow-bootstrap, code-flow-explorer, frontend-design, html-output-viewer, memory-manager, paper-summarizer-visual, parallel-worktree-tasks, pdf, teach, webapp-testing
 - **Global memory index:** .agents/memory/global/INDEX.md
 - **Local memory index:** .agents/memory/local/INDEX.md
 

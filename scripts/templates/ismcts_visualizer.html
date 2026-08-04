@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ISMCTS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Spectral:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+/* Printed-report palette, shared with the charts under docs/site.
+   Ink logic: deep green is permanent tree ink, slate is the pencil of the
+   throwaway playout, gold is the highlighter over the sampled world, and
+   brick is reserved for losing outcomes. */
+:root{
+  --desk:#E5E0D3; --surface:#FBF9F4; --surface-2:#F1EDE3; --border:#CFC9B8;
+  --rule:#DED8C7; --text:#101A24; --muted:#536577; --faint:#918C7B;
+  --primary:#123D3A; --secondary:#4A6076; --good:#2E7A5E; --warn:#6B8498;
+  --gold:#D0A84C; --accent:#B64038; --red-card:#B64038;
+  --grain:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.16'/%3E%3C/svg%3E");
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;overflow:hidden;color:var(--text);
+  background:var(--desk) var(--grain);background-blend-mode:multiply;
+  font-family:'JetBrains Mono',ui-monospace,monospace}
+.app{height:100vh;display:grid;grid-template-rows:1fr minmax(96px,21vh) 40px;gap:8px;padding:8px}
+.top{display:grid;grid-template-columns:190px 1fr;gap:8px;min-height:0}
+.rail{display:grid;grid-template-rows:auto auto auto 1fr;gap:8px;min-height:0}
+/* every pane is a sheet laid on the desk: hairline keyline, physical shadow,
+   the same paper grain as the background */
+.pane{background:var(--surface) var(--grain);background-blend-mode:multiply;
+  border:1px solid var(--border);border-radius:3px;padding:9px;min-height:0;
+  box-shadow:0 1px 0 rgba(16,26,36,.05),0 10px 18px -14px rgba(16,26,36,.55)}
+.board{display:flex;flex-direction:column;padding:5px 4px 4px;transition:opacity .25s ease;min-height:0}
+svg.tree{width:100%;flex:1;min-height:0}
+.lbl{font-family:'Spectral',Georgia,serif;font-size:.62rem;font-style:italic;letter-spacing:.06em;
+  color:var(--faint);line-height:1.05;display:block;flex:none}
+
+/* phase emphasis --------------------------------------------------------- */
+/* fixed height: the card must never reflow the panes below it */
+.phase-card{display:grid;grid-template-rows:auto 1fr;gap:6px;border-left:3px double var(--primary);
+  height:84px;overflow:hidden}
+.phase-card .n{font-family:'Spectral',Georgia,serif;font-size:.72rem;letter-spacing:.13em;
+  color:var(--primary);font-weight:600;padding-bottom:5px;border-bottom:1px solid var(--rule)}
+.phase-card .t{font-family:'Spectral',Georgia,serif;font-size:.76rem;line-height:1.34;
+  color:var(--muted);overflow:hidden}
+.pane{transition:border-color .25s,box-shadow .25s,opacity .25s,background-color .25s}
+/* highlighter, not glow: the sampled world gets marked up in gold */
+.pane.hi{border-color:var(--gold);background-color:#FBF4E2;
+  box-shadow:0 1px 0 rgba(16,26,36,.05),0 0 0 3px rgba(208,168,76,.22)}
+.app[data-phase="determinize"] .board{opacity:.5}
+.app[data-phase="backprop"] .phase-card{border-left-color:var(--good)}
+.app[data-phase="backprop"] .phase-card .n{color:var(--good)}
+.app[data-phase="rollout"] .phase-card{border-left-color:var(--warn)}
+.app[data-phase="rollout"] .phase-card .n{color:var(--warn)}
+.app[data-phase="determinize"] .phase-card{border-left-color:var(--gold)}
+.app[data-phase="determinize"] .phase-card .n{color:#9A7A22}
+
+/* left rail ------------------------------------------------------------- */
+.enemy{display:flex;align-items:center;gap:8px}
+.enemy .face{width:38px;height:52px;border-radius:3px;background:#fff;border:1px solid var(--border);
+  box-shadow:inset 0 0 0 1px #fff,0 1px 2px rgba(16,26,36,.18);
+  display:flex;align-items:center;justify-content:center;font-size:1rem;font-weight:600}
+.enemy .gauges{flex:1;display:grid;gap:5px}
+.gauge{height:5px;border-radius:2px;background:var(--rule);overflow:hidden}
+.gauge>i{display:block;height:100%}
+.gauge.hp>i{background:var(--accent)}
+.gauge.atk>i{background:var(--gold)}
+.chips{display:flex;flex-wrap:wrap;gap:3px}
+/* every chip is a little printed card: white stock, hairline keyline */
+.c{font-size:.66rem;line-height:1;padding:5px 4px;min-width:26px;text-align:center;border-radius:2px;
+  background:#fff;border:1px solid var(--border);color:var(--text);
+  box-shadow:0 1px 1px rgba(16,26,36,.10)}
+.c.red{color:var(--red-card)}
+.c.deck{background:repeating-linear-gradient(45deg,#EDE7D6,#EDE7D6 3px,#E2DAC4 3px,#E2DAC4 6px);
+  border-color:#D3CBB4;color:#A79E86}
+.c.fresh{animation:flip .4s ease both}
+.c.castle{opacity:.5;padding:4px 3px;min-width:22px;font-size:.6rem}
+@keyframes flip{from{transform:rotateY(90deg);opacity:0}to{transform:none;opacity:1}}
+.rail .pane{display:flex;flex-direction:column;gap:6px;overflow:hidden}
+.rule{height:3px;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);margin:1px 0}
+
+/* race ------------------------------------------------------------------ */
+.race-pane{display:flex;flex-direction:column;gap:4px;min-height:0}
+.race{display:flex;flex-direction:column;gap:2px;justify-content:space-between;flex:1;min-height:0}
+.row{display:grid;grid-template-columns:64px 1fr 8px;align-items:center;gap:7px;flex:1;min-height:0}
+.row .tag{font-size:.6rem;color:var(--muted);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row.lead .tag{color:var(--text)}
+.track{position:relative;height:100%;max-height:13px;min-height:4px;background:var(--surface-2);
+  border:1px solid var(--rule);border-radius:1px;overflow:hidden}
+.track i{position:absolute;top:0;bottom:0;left:0}
+.track .avail{background:#DCD5C2}
+.track .visits{background:var(--secondary)}
+.row.lead .track .visits{background:var(--primary)}
+.row.lead .tag{font-weight:600}
+.dot{width:8px;height:8px;border-radius:50%}
+
+/* controls -------------------------------------------------------------- */
+.bar{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);
+  border-radius:12px;padding:0 12px}
+button{font-family:inherit;font-size:.8rem;color:var(--muted);background:#fff;border:1px solid var(--border);
+  border-radius:2px;padding:4px 9px;cursor:pointer;line-height:1.2;
+  box-shadow:0 1px 1px rgba(16,26,36,.08)}
+button:hover{border-color:var(--primary);color:var(--primary)}
+button.on{color:var(--primary);border-color:var(--primary)}
+input[type=range]{accent-color:var(--primary);flex:1;min-width:120px;height:3px}
+select{font-family:inherit;font-size:.72rem;color:var(--muted);background:#fff;
+  border:1px solid var(--border);border-radius:2px;padding:4px 6px}
+.phases{display:flex;gap:5px}
+.phases b{width:9px;height:9px;border-radius:50%;background:transparent;display:block;
+  border:1px solid var(--border);transition:background .15s,border-color .15s}
+.phases b.act{background:var(--primary);border-color:var(--primary)}
+.hud{font-size:.68rem;color:var(--muted);white-space:nowrap;letter-spacing:.04em}
+.empty{padding:60px;text-align:center;color:var(--muted);font-size:.9rem}
+
+/* tree ------------------------------------------------------------------ */
+.edge{stroke:#BCB6A4;fill:none;stroke-width:1.1}
+.edge.on-path{stroke:var(--primary);stroke-width:2.2}
+.edge.illegal{stroke:#D8D2C1;stroke-dasharray:2 3}
+/* illegal in this world reads as "not printed": outline only, no fill */
+.nodebox.illegal{opacity:.5}
+.nodebox.illegal rect.body{fill:none;stroke:#C9C3B1;stroke-dasharray:2.5 2.5;stroke-width:1}
+.nodebox.illegal .vbar,.nodebox.illegal .abar{opacity:.35}
+.nodebox.fresh{animation:pop .38s cubic-bezier(.2,1.4,.5,1) both}
+@keyframes pop{from{transform:scale(.4);opacity:0}to{transform:scale(1);opacity:1}}
+.nodebox rect.body{fill:#fff;stroke:#C0BAA8;stroke-width:1}
+.nodebox.current rect.body{stroke:var(--primary);stroke-width:2}
+.nodebox.chosen rect.body{stroke:var(--good);stroke-width:2}
+.nodebox.candidate rect.body{stroke:var(--secondary);stroke-width:1.4}
+.nodelabel{font-family:'JetBrains Mono',monospace;font-size:8.5px;fill:var(--text)}
+.vbar{fill:var(--primary)}
+.abar{fill:#D5CEBB}
+.pip{fill:var(--secondary)}
+.pip.best{fill:var(--good)}
+.edge.walking{stroke:var(--primary);stroke-width:2.6;stroke-dasharray:300;animation:draw .45s ease-out both}
+@keyframes draw{from{stroke-dashoffset:300}to{stroke-dashoffset:0}}
+.walker{fill:var(--primary)}
+.burst{fill:none;stroke:var(--good);stroke-width:2;transform-box:fill-box;transform-origin:center;
+  animation:burst .75s ease-out both}
+@keyframes burst{from{transform:scale(.35);opacity:.95}to{transform:scale(3.4);opacity:0}}
+.pip.best{fill:var(--good)}
+.pip-ring{fill:none;stroke:var(--good);stroke-width:1.4;transform-box:fill-box;transform-origin:center;
+  animation:ring .8s ease-out infinite}
+@keyframes ring{from{transform:scale(.6);opacity:.9}to{transform:scale(2.6);opacity:0}}
+.sweep{animation:sweepUp .85s ease-out both}
+@keyframes sweepUp{0%{transform:translateY(260px);opacity:0}25%{opacity:1}100%{transform:translateY(-300px);opacity:0}}
+/* the playout is pencil: thin, grey, provisional */
+.rollout{stroke:var(--warn);stroke-width:1.4;fill:none;stroke-dasharray:3 3;animation:dash 1s linear infinite}
+@keyframes dash{to{stroke-dashoffset:-16}}
+.rollout-dot{animation:fall .6s ease both}
+@keyframes fall{from{opacity:0;transform:translateY(-16px)}to{opacity:1;transform:none}}
+.backflow{stroke:var(--good);stroke-width:2.6;fill:none;opacity:.95;stroke-linecap:round;animation:flow .7s ease both}
+@keyframes flow{from{stroke-dasharray:0 400}to{stroke-dasharray:400 0}}
+.more{fill:var(--muted)}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="top">
+    <div class="rail">
+      <div class="pane phase-card" id="card"></div>
+      <div class="pane"><span class="lbl">enemy</span><div class="enemy" id="enemy"></div></div>
+      <div class="pane"><span class="lbl">hand</span><div class="chips" id="hand"></div></div>
+      <div class="pane world" id="world">
+        <span class="lbl">deck</span>
+        <div class="chips" id="tavern"></div>
+        <div class="rule"></div>
+        <span class="lbl">remaining enemies</span>
+        <div class="chips" id="castle"></div>
+      </div>
+    </div>
+    <div class="pane board">
+      <span class="lbl">search tree</span>
+      <svg class="tree" id="tree" viewBox="0 0 980 520" preserveAspectRatio="xMidYMid meet"></svg>
+    </div>
+  </div>
+
+  <div class="pane race-pane">
+    <span class="lbl">root actions · visits inside availability</span>
+    <div class="race" id="bars"></div>
+  </div>
+
+  <div class="bar">
+    <button class="on" id="play">▶</button>
+    <button id="prevBtn">‹</button>
+    <button id="stepBtn">›</button>
+    <button id="iterBtn">»</button>
+    <button id="resetBtn">↺</button>
+    <span class="phases" id="phases"><b></b><b></b><b></b><b></b></span>
+    <input type="range" id="slider" min="0" value="0">
+    <span class="hud" id="hud"></span>
+    <select id="speed">
+      <option value="1500">0.5×</option>
+      <option value="750" selected>1×</option>
+      <option value="330">2×</option>
+      <option value="120">6×</option>
+    </select>
+  </div>
+</div>
+
+<script>
+const TRACE = /*__ISMCTS_TRACE__*/null;
+const SUIT_RED = ['♥','♦'];
+const el = id => document.getElementById(id);
+
+if(!TRACE){
+  el('app').innerHTML = '<div class="empty">no trace embedded — run scripts/trace_ismcts.py</div>';
+  throw new Error('no trace');
+}
+
+/* replay state ---------------------------------------------------------- */
+const nodes = TRACE.nodes, iterations = TRACE.iterations;
+const childrenOf = new Map();
+nodes.forEach(n => { if(n.parent !== null){ if(!childrenOf.has(n.parent)) childrenOf.set(n.parent, []); childrenOf.get(n.parent).push(n.id); }});
+const createdAt = new Array(nodes.length).fill(Infinity);
+createdAt[0] = -1;
+iterations.forEach(it => it.steps.forEach(s => { if(createdAt[s.child] === Infinity) createdAt[s.child] = it.i; }));
+
+const phasesOf = iterations.map(it => {
+  const p = [{type:'determinize'}];
+  it.steps.forEach(s => p.push({type:'select', step:s}));
+  p.push({type:'rollout'});
+  p.push({type:'backprop'});
+  return p;
+});
+const totalPhases = phasesOf.reduce((a,p)=>a+p.length, 0);
+const phaseOffset = [];
+phasesOf.reduce((acc,p,i)=>{ phaseOffset[i]=acc; return acc+p.length; }, 0);
+const PHASE_INDEX = {determinize:0, select:1, rollout:2, backprop:3};
+const PHASE_CARD = {
+  determinize: ['1 · DETERMINIZE', 'A hidden world is sampled. The tree is kept, not reset.'],
+  select:      ['2 · SELECT',      'UCB1 compares only the children legal in this world.'],
+  expand:      ['2 · EXPAND',      'An untried legal action becomes a new node.'],
+  rollout:     ['3 · ROLLOUT',     'The heuristic plays this world to the end of the game.'],
+  backprop:    ['4 · BACKPROPAGATE','The result rises back along the visited path.'],
+};
+
+const rewards = iterations.map(it => it.reward);
+const rMin = Math.min(...rewards), rMax = Math.max(...rewards);
+function heat(r){
+  const t = rMax > rMin ? (r - rMin) / (rMax - rMin) : .5;
+  // brick → gold → deep green, the three inks of the published charts
+  const stops = [[182,64,56],[208,168,76],[18,61,58]];
+  const k = t < .5 ? 0 : 1, f = t < .5 ? t*2 : (t-.5)*2;
+  const c = stops[k].map((v,i)=>Math.round(v + (stops[k+1][i]-v)*f));
+  return `rgb(${c[0]},${c[1]},${c[2]})`;
+}
+
+let stats = [];
+function resetStats(){ stats = nodes.map(()=>({v:0,a:0,r:0,live:false})); stats[0].live = true; }
+function applyPhase(it, ph){
+  if(ph.type === 'select'){
+    const s = ph.step;
+    s.available.forEach(id => stats[id].a += 1);
+    stats[s.child].live = true;
+    if(s.expanded) stats[s.child].a = 1;
+  } else if(ph.type === 'backprop'){
+    it.path.forEach(id => { stats[id].v += 1; stats[id].r += it.reward; });
+  }
+}
+let cursor = {i:0, p:0};
+function rebuild(){
+  resetStats();
+  for(let i=0;i<cursor.i;i++) phasesOf[i].forEach(ph => applyPhase(iterations[i], ph));
+  for(let p=0;p<=cursor.p;p++) applyPhase(iterations[cursor.i], phasesOf[cursor.i][p]);
+}
+
+/* layout ---------------------------------------------------------------- */
+const W = 980, H = 520, NODE_W = 62, NODE_H = 26, MAX_KIDS = 13;
+function layout(it){
+  const legalHere = new Map();
+  it.steps.forEach(s => {
+    const set = legalHere.get(s.node) || new Set();
+    s.available.forEach(id => set.add(id));
+    set.add(s.child);
+    legalHere.set(s.node, set);
+  });
+  const seen = new Set([0]);
+  const focus = [0, ...it.path.slice(1)];
+  focus.forEach(id => {
+    const kids = (childrenOf.get(id)||[]).filter(c => createdAt[c] <= it.i);
+    const legal = legalHere.get(id) || new Set();
+    kids.slice().sort((a,b) => (legal.has(b)?1:0)-(legal.has(a)?1:0) || stats[b].v-stats[a].v || a-b)
+        .slice(0, MAX_KIDS).forEach(c => seen.add(c));
+  });
+
+  const byDepth = new Map();
+  seen.forEach(id => {
+    const d = nodes[id].depth;
+    if(!byDepth.has(d)) byDepth.set(d, []);
+    byDepth.get(d).push(id);
+  });
+  const pos = new Map();
+  const maxDepth = Math.max(...byDepth.keys());
+  const rowH = maxDepth > 0 ? Math.min(130, (H - 96) / maxDepth) : 130;
+  const usable = W - 46;
+  byDepth.forEach((ids, d) => {
+    ids.sort((a,b)=>a-b);
+    const y = 32 + d * rowH;
+    if(d === 0){ pos.set(ids[0], {x:W/2, y, w:NODE_W}); return; }
+    const pitch = Math.min(NODE_W + 10, usable / ids.length);
+    const w = Math.max(20, Math.min(NODE_W, pitch - 6));
+    const span = pitch * ids.length;
+    const anchor = pos.get(nodes[ids[0]].parent);
+    const centre = d === 1 ? W/2
+      : Math.max(span/2 + 22, Math.min(W - span/2 - 22, anchor ? anchor.x : W/2));
+    ids.forEach((id, k) => pos.set(id, {x: centre - span/2 + pitch*(k + .5), y, w}));
+  });
+  return {pos, seen, focus};
+}
+
+/* render ---------------------------------------------------------------- */
+const suitClass = t => SUIT_RED.some(s => t.includes(s)) ? 'c red' : 'c';
+
+function renderStatic(){
+  const d = TRACE.decision;
+  if(d.enemy){
+    const hp = d.enemy.health - d.enemy.damage_taken;
+    el('enemy').innerHTML =
+      `<div class="face" style="color:${SUIT_RED.includes(d.enemy.suit)?'var(--red-card)':'var(--text)'}">${d.enemy.card}</div>
+       <div class="gauges">
+         <div class="gauge hp"><i style="width:${100*hp/d.enemy.health}%"></i></div>
+         <div class="gauge atk"><i style="width:${Math.min(100, 100*d.enemy.attack/20)}%"></i></div>
+       </div>`;
+  }
+  el('hand').innerHTML = d.hand.map(c=>`<span class="${suitClass(c)}">${c}</span>`).join('');
+  el('castle').innerHTML = '';
+  el('slider').max = totalPhases - 1;
+}
+
+function nodeSvg(id, p, cls){
+  const st = stats[id], n = nodes[id];
+  const w = p.w || NODE_W, x = p.x - w/2, y = p.y - NODE_H/2;
+  const room = Math.max(1, Math.floor((w - 6) / 5.3));
+  const label = n.label.length > room ? n.label.slice(0, Math.max(1, room-1))+'·' : n.label;
+  const inner = w - 10;
+  const bar = st.v > 0 ? Math.max(1.5, inner * st.v / (window._maxV||1)) : 0;
+  const abar = st.a > 0 ? Math.max(1.5, inner * st.a / (window._maxA||1)) : 0;
+  const tint = st.v ? heat(st.r/st.v) : '#D5CEBB';
+  return `<g class="nodebox ${cls}" transform="translate(${x},${y})" style="transform-box:fill-box;transform-origin:center">
+    <title>${n.label} · visits ${st.v} · availability ${st.a}${st.v?` · mean ${(st.r/st.v).toFixed(3)}`:''}</title>
+    <rect class="body" width="${w}" height="${NODE_H}" rx="6"/>
+    <rect x="0" y="${NODE_H/2-5}" width="2.6" height="10" rx="1.3" fill="${tint}"/>
+    <text class="nodelabel" x="${w/2}" y="11" text-anchor="middle">${label}</text>
+    <rect class="abar" x="5" y="16" width="${abar}" height="2.4" rx="1.2"/>
+    <rect class="vbar" x="5" y="19.6" width="${bar}" height="3.2" rx="1.6"/>
+  </g>`;
+}
+
+function render(){
+  const it = iterations[cursor.i];
+  const ph = phasesOf[cursor.i][cursor.p];
+  const {pos, seen, focus} = layout(it);
+  const done = phasesOf[cursor.i].slice(0, cursor.p+1).filter(x=>x.type==='select').map(x=>x.step);
+  const current = ph.type === 'determinize' ? 0 : (done.length ? done[done.length-1].child : 0);
+  const activeStep = ph.type === 'select' ? ph.step : null;
+  const legalNow = new Set();
+  if(activeStep){ activeStep.available.forEach(i=>legalNow.add(i)); legalNow.add(activeStep.child); }
+
+  let maxV = 1, maxA = 1;
+  seen.forEach(id => { maxV = Math.max(maxV, stats[id].v); maxA = Math.max(maxA, stats[id].a); });
+  window._maxV = maxV; window._maxA = maxA;
+
+  const parts = [];
+
+  // backpropagation: a green wash rising from the bottom of the board
+  if(ph.type === 'backprop'){
+    parts.push(`<defs><linearGradient id="sw" x1="0" x2="0" y1="1" y2="0">
+      <stop offset="0" stop-color="#2E7A5E" stop-opacity="0"/>
+      <stop offset=".45" stop-color="#2E7A5E" stop-opacity=".22"/>
+      <stop offset="1" stop-color="#2E7A5E" stop-opacity="0"/></linearGradient></defs>
+      <rect class="sweep" x="0" y="0" width="${W}" height="${H}" fill="url(#sw)"/>`);
+  }
+
+  let walkPath = null;
+  seen.forEach(id => {
+    const n = nodes[id];
+    if(n.parent === null || !pos.has(n.parent) || !stats[id].live) return;
+    const a = pos.get(n.parent), b = pos.get(id), mid = (a.y + b.y)/2;
+    const d = `M${a.x},${a.y+NODE_H/2} C${a.x},${mid} ${b.x},${mid} ${b.x},${b.y-NODE_H/2}`;
+    const onPath = it.path.includes(id) && it.path.indexOf(id) <= it.path.indexOf(current);
+    const dim = activeStep && n.parent === activeStep.node && !legalNow.has(id);
+    const walking = activeStep && id === activeStep.child;
+    if(walking) walkPath = d;
+    parts.push(`<path class="edge ${onPath?'on-path':''} ${dim?'illegal':''} ${walking?'walking':''}" d="${d}"/>`);
+  });
+
+  if(ph.type === 'rollout' || ph.type === 'backprop'){
+    const leaf = pos.get(it.path[it.path.length-1]);
+    if(leaf && it.rollout){
+      const drop = Math.min(70, H - leaf.y - 26);
+      parts.push(`<path class="rollout" d="M${leaf.x},${leaf.y+NODE_H/2} q 14,${drop/2} 3,${drop}"/>`);
+      const r = 4 + Math.min(7, (it.rollout.depth||0) / 6);
+      parts.push(`<g class="rollout-dot" style="transform-box:fill-box;transform-origin:center">
+        <circle cx="${leaf.x+3}" cy="${leaf.y+NODE_H/2+drop+r}" r="${r}" fill="${heat(it.reward)}" opacity=".9"/></g>`);
+    }
+  }
+
+  if(ph.type === 'backprop'){
+    for(let k=it.path.length-1;k>0;k--){
+      const a = pos.get(it.path[k-1]), b = pos.get(it.path[k]);
+      if(!a || !b) continue;
+      const mid = (a.y + b.y)/2;
+      parts.push(`<path class="backflow" style="animation-delay:${(it.path.length-1-k)*150}ms"
+        d="M${b.x},${b.y-NODE_H/2} C${b.x},${mid} ${a.x},${mid} ${a.x},${a.y+NODE_H/2}"/>`);
+    }
+  }
+
+  seen.forEach(id => {
+    if(!stats[id].live) return;
+    const cls = [];
+    if(id === current) cls.push('current');
+    if(activeStep && nodes[id].parent === activeStep.node){
+      if(!legalNow.has(id)) cls.push('illegal');
+      else if(id === activeStep.child) cls.push('chosen');
+      else cls.push('candidate');
+    }
+    if(activeStep && id === activeStep.child && activeStep.expanded) cls.push('fresh');
+    parts.push(nodeSvg(id, pos.get(id), cls.join(' ')));
+  });
+
+  // UCB comparison: a pip above each competing child, sized by its score
+  if(activeStep && Object.keys(activeStep.scores).length){
+    const vals = Object.values(activeStep.scores).map(Number);
+    const lo = Math.min(...vals), hi = Math.max(...vals);
+    Object.entries(activeStep.scores).forEach(([sid, score]) => {
+      const p = pos.get(Number(sid));
+      if(!p) return;
+      const t = hi > lo ? (Number(score) - lo) / (hi - lo) : 1;
+      const best = Number(sid) === activeStep.child;
+      const cy = p.y - NODE_H/2 - 6;
+      parts.push(`<circle class="pip ${best?'best':''}" cx="${p.x}" cy="${cy}" r="${1.4 + t*3.2}"/>`);
+      if(best) parts.push(`<circle class="pip-ring" cx="${p.x}" cy="${cy}" r="5"/>`);
+    });
+  }
+
+  // expansion: a ring bursting out of the node that has just been created
+  if(activeStep && activeStep.expanded && pos.has(activeStep.child)){
+    const p = pos.get(activeStep.child);
+    parts.push(`<circle class="burst" cx="${p.x}" cy="${p.y}" r="9"/>`);
+  }
+
+  // descent: a marker travelling down the edge being taken
+  if(walkPath) parts.push(`<circle class="walker" r="3.6">
+    <animateMotion dur="0.45s" fill="freeze" path="${walkPath}"/></circle>`);
+
+  focus.forEach(fid => {
+    const hidden = (childrenOf.get(fid)||[]).filter(c => createdAt[c] <= it.i && !seen.has(c)).length;
+    if(hidden && pos.has(fid)){
+      const p = pos.get(fid);
+      for(let k=0;k<3;k++)
+        parts.push(`<circle class="more" cx="${p.x + (p.w||NODE_W)/2 + 7 + k*5}" cy="${p.y}" r="1.4" opacity="${.7 - k*.18}"/>`);
+    }
+  });
+
+  el('tree').innerHTML = parts.join('');
+  renderWorld(it);
+  renderBars(it);
+
+  const kind = ph.type === 'select' && ph.step.expanded ? 'expand' : ph.type;
+  el('app').dataset.phase = ph.type;
+  el('world').classList.toggle('hi', ph.type === 'determinize');
+  el('card').innerHTML = `<span class="n">${PHASE_CARD[kind][0]}</span><span class="t">${PHASE_CARD[kind][1]}</span>`;
+  [...el('phases').children].forEach((b,i)=>b.classList.toggle('act', i === PHASE_INDEX[ph.type]));
+  el('slider').value = phaseOffset[cursor.i] + cursor.p;
+  el('hud').textContent = `${it.i+1}/${iterations.length} · C ${TRACE.meta.exploration_constant}`;
+}
+
+function renderWorld(it){
+  el('tavern').innerHTML = it.determinization.tavern_top
+    .map((c,i)=>`<span class="${suitClass(c)} fresh" style="animation-delay:${i*28}ms">${c}</span>`).join('');
+  el('castle').innerHTML = it.determinization.castle
+    .map(c=>`<span class="c castle">${c}</span>`).join('');
+}
+
+function renderBars(it){
+  const kids = (childrenOf.get(0)||[]).filter(id => createdAt[id] <= it.i && stats[id].live);
+  const maxA = Math.max(1, ...kids.map(id=>stats[id].a));
+  const lead = kids.slice().sort((a,b)=>stats[b].v-stats[a].v)[0];
+  el('bars').innerHTML = kids.map(id=>{
+    const st = stats[id], q = st.v ? st.r/st.v : 0;
+    return `<div class="row ${id===lead?'lead':''}"
+      title="${nodes[id].label} · visits ${st.v} · availability ${st.a}${st.v?` · mean ${q.toFixed(3)}`:''}">
+      <span class="tag">${nodes[id].label}</span>
+      <span class="track"><i class="avail" style="width:${100*st.a/maxA}%"></i>
+        <i class="visits" style="width:${100*st.v/maxA}%"></i></span>
+      <span class="dot" style="background:${st.v?heat(q):'#DCD5C2'}"></span>
+    </div>`;
+  }).join('');
+}
+
+/* driving --------------------------------------------------------------- */
+function gotoAbsolute(n){
+  n = Math.max(0, Math.min(totalPhases-1, n));
+  let i = 0;
+  while(i < phasesOf.length-1 && phaseOffset[i+1] <= n) i++;
+  cursor = {i, p: n - phaseOffset[i]};
+  rebuild(); render();
+}
+function advance(step){ gotoAbsolute(phaseOffset[cursor.i] + cursor.p + step); }
+
+let timer = null;
+function stop(){ clearInterval(timer); timer = null; el('play').textContent = '▶'; el('play').classList.add('on'); }
+function play(){
+  if(timer){ stop(); return; }
+  el('play').textContent = '❚❚'; el('play').classList.remove('on');
+  timer = setInterval(() => {
+    if(phaseOffset[cursor.i] + cursor.p >= totalPhases-1){ stop(); return; }
+    advance(1);
+  }, Number(el('speed').value));
+}
+el('play').onclick = play;
+el('stepBtn').onclick = () => { stop(); advance(1); };
+el('prevBtn').onclick = () => { stop(); advance(-1); };
+el('iterBtn').onclick = () => { stop(); gotoAbsolute(phaseOffset[Math.min(cursor.i+1, iterations.length-1)]); };
+el('resetBtn').onclick = () => { stop(); gotoAbsolute(0); };
+el('slider').oninput = e => { stop(); gotoAbsolute(Number(e.target.value)); };
+el('speed').onchange = () => { if(timer){ stop(); play(); } };
+document.addEventListener('keydown', e => {
+  if(e.key === ' '){ e.preventDefault(); play(); }
+  if(e.key === 'ArrowRight'){ stop(); advance(1); }
+  if(e.key === 'ArrowLeft'){ stop(); advance(-1); }
+});
+
+renderStatic();
+gotoAbsolute(0);
+</script>
+</body>
+</html>

@@ -53,6 +53,33 @@ alphazero:
   checkpoint_freq: 5
   device: "cpu"
 
+ismcts_trace:
+  # Records one real ISMCTS decision and renders it as an animated page.
+  seed: 20260803
+  # Decisions played by the heuristic agent before the traced one, so the
+  # search runs on a realistic mid-game position instead of the opening.
+  warmup_decisions: 6
+  # The traced decision must be a genuine choice, and small enough to draw.
+  min_legal_actions: 4
+  max_legal_actions: 14
+  max_warmup_scan: 60
+  search:
+    n_iterations: 500
+    # Textbook √2. The benchmarked agent uses 14.14, which at these budgets
+    # makes the exploration term dwarf the reward differences and leaves the
+    # root visit counts almost uniform; override with --exploration to see it.
+    exploration_constant: 1.414
+  record:
+    # Recording every searched iteration keeps the animation and the final
+    # visit counts consistent.
+    max_iterations: 500
+    tavern_preview: 8
+    max_depth: 5
+  output:
+    trace_json: "artifacts/traces/ismcts_trace.json"
+    page: "docs/ismcts_visualizer.html"
+    template: "scripts/templates/ismcts_visualizer.html"
+
 experimental_report:
   protocol:
     games_per_agent: 100

@@ -22,6 +22,7 @@ DOCUMENTED_MODULES = (
     "agents.determinize",
     "agents.heuristic_agent",
     "agents.ismcts_agent",
+    "agents.ismcts_trace",
     "agents.pimc_agent",
     "agents.ppo_agent",
     "agents.random_agent",

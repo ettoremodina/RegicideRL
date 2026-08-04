@@ -5,11 +5,12 @@
   "sourceRepository": "C:\\Users\\modin\\Desktop\\programming\\LIFE\\AgentWorkflow",
   "connectedAtUtc": "07/31/2026 12:36:39",
   "workflow": {
-    "version": "1.1.0",
-    "appliedAtUtc": "2026-07-31T12:42:52.3744821Z"
+    "version": "1.9.0",
+    "appliedAtUtc": "2026-08-04T13:22:47.3994919Z"
   },
   "providers": [
-    "codex"
+    "codex",
+    "claude"
   ],
   "skills": [
     {
@@ -23,8 +24,38 @@
       "scope": "shared"
     },
     {
+      "name": "code-flow-explorer",
+      "sourcePath": ".agents/skills/code-flow-explorer/SKILL.md",
+      "scope": "shared"
+    },
+    {
       "name": "frontend-design",
       "sourcePath": ".agents/skills/frontend-design/SKILL.md",
+      "scope": "shared"
+    },
+    {
+      "name": "html-output-viewer",
+      "sourcePath": ".agents/skills/html-output-viewer/SKILL.md",
+      "scope": "shared"
+    },
+    {
+      "name": "paper-summarizer-visual",
+      "sourcePath": ".agents/skills/paper-summarizer-visual/SKILL.md",
+      "scope": "shared"
+    },
+    {
+      "name": "parallel-worktree-tasks",
+      "sourcePath": ".agents/skills/parallel-worktree-tasks/SKILL.md",
+      "scope": "shared"
+    },
+    {
+      "name": "pdf",
+      "sourcePath": ".agents/skills/pdf/SKILL.md",
+      "scope": "shared"
+    },
+    {
+      "name": "teach",
+      "sourcePath": ".agents/skills/teach/SKILL.md",
       "scope": "shared"
     },
     {

@@ -118,6 +118,30 @@ Other non-training modes are `env` and `parallel`. The `cpu`, `gpu`, and `all`
 modes include PPO training throughput and are unnecessary for release
 validation.
 
+## Visualize an ISMCTS decision
+
+Record one real search and render it as an animated page:
+
+```bash
+python scripts/trace_ismcts.py
+```
+
+The script plays a seeded game with the heuristic agent up to a mid-game
+position, traces a single ISMCTS decision, then writes the raw trace to
+`artifacts/traces/ismcts_trace.json` and a self-contained page to
+`docs/ismcts_visualizer.html`, which opens directly from the file system.
+
+Everything is configured under `ismcts_trace` in `config.yaml`; the search
+budget, the exploration constant and the seed can also be overridden per run:
+
+```bash
+python scripts/trace_ismcts.py --seed 42 --iterations 800 --exploration 14.14
+```
+
+Use `--json-only` to refresh the trace without rendering the page. The viewer
+template lives in `scripts/templates/ismcts_visualizer.html`, so the page can be
+restyled and regenerated without recording the search again.
+
 ## Build the API reference
 
 ```bash

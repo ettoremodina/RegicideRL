@@ -98,9 +98,12 @@ class ISMCTSAgent(BaseAgent):
         n_iterations: Total ISMCTS iterations per decision (default 1000).
         exploration_constant: UCB exploration parameter C (default √2 ≈ 1.414).
         name: Agent name for logging.
+        tracer: Optional :class:`~agents.ismcts_trace.ISMCTSTracer` recording
+            the search for offline visualization. Search behaviour is
+            unchanged; when it is ``None`` no tracing work is performed.
     """
 
-    def __init__(self, n_iterations=200, exploration_constant=10*1.414, name="ISMCTSAgent", status_dict=None, worker_id=None):
+    def __init__(self, n_iterations=200, exploration_constant=10*1.414, name="ISMCTSAgent", status_dict=None, worker_id=None, tracer=None):
         super().__init__(name)
         self.n_iterations = n_iterations
         self.exploration_constant = exploration_constant
@@ -108,6 +111,7 @@ class ISMCTSAgent(BaseAgent):
         self.root = None
         self.status_dict = status_dict
         self.worker_id = worker_id
+        self.tracer = tracer
         self.ctx_game = 1
         self.ctx_total_games = 1
         self.ctx_turn = 1
@@ -152,6 +156,9 @@ class ISMCTSAgent(BaseAgent):
             
         root = self.root
 
+        if self.tracer is not None:
+            self.tracer.begin_decision(self, env, obs, valid_actions, root)
+
         import time
         start_time = time.time()
         last_update_time = start_time
@@ -172,6 +179,8 @@ class ISMCTSAgent(BaseAgent):
             # 1. Clone and determinize
             sim_env = env.clone()
             determinize_env(sim_env)
+            if self.tracer is not None:
+                self.tracer.begin_iteration(i, sim_env)
 
             # 2-5. Select → Expand → Rollout → Backpropagate
             self._run_iteration(root, sim_env)
@@ -181,7 +190,10 @@ class ISMCTSAgent(BaseAgent):
         # those actions illegal in the real hand, so only current legal actions
         # may participate in the final choice.
         best_action = self._best_root_action(root, valid_actions)
-        
+
+        if self.tracer is not None:
+            self.tracer.end_decision(root, best_action)
+
         # Advance the root for the next turn
         self.root = root.children.get(best_action, None)
 
@@ -223,6 +235,12 @@ class ISMCTSAgent(BaseAgent):
             if not legal_actions:
                 break
 
+            if self.tracer is not None:
+                # The label of an action depends on the hand it is applied to,
+                # so both are captured before the state moves on.
+                hand_before = sim_obs['hand']
+                defense_before = sim_obs['defense_phase']
+
             # Update availability counts for all legal actions that have nodes
             for action in legal_actions:
                 if action in node.children:
@@ -243,6 +261,12 @@ class ISMCTSAgent(BaseAgent):
                 sim_obs, step_reward, terminated, truncated, info = sim_env.step(action)
                 cumulative_tree_reward += step_reward
 
+                if self.tracer is not None:
+                    self.tracer.record_step(
+                        node, child, action, legal_actions, hand_before,
+                        defense_before, True, step_reward,
+                    )
+
                 path.append(child)
                 node = child
                 break  # Expand one node, then rollout
@@ -258,6 +282,12 @@ class ISMCTSAgent(BaseAgent):
                 sim_obs, step_reward, terminated, truncated, info = sim_env.step(action)
                 cumulative_tree_reward += step_reward
 
+                if self.tracer is not None:
+                    self.tracer.record_step(
+                        node, child, action, legal_actions, hand_before,
+                        defense_before, False, step_reward,
+                    )
+
                 path.append(child)
                 node = child
 
@@ -269,12 +299,18 @@ class ISMCTSAgent(BaseAgent):
             reward = cumulative_tree_reward + self._rollout(sim_env, sim_obs)
         else:
             # Game already ended during tree traversal (or invalid action terminated it)
-            reward = cumulative_tree_reward + self._evaluate_terminal(sim_env)
+            terminal_value = self._evaluate_terminal(sim_env)
+            if self.tracer is not None:
+                self.tracer.record_rollout(0, terminal_value)
+            reward = cumulative_tree_reward + terminal_value
 
         # --- BACKPROPAGATION: update all nodes on the path ---
         for n in path:
             n.visit_count += 1
             n.total_reward += reward
+
+        if self.tracer is not None:
+            self.tracer.record_backprop(path, reward)
 
     def _rollout(self, env, obs):
         """Play the game to completion using the heuristic agent.
@@ -291,6 +327,7 @@ class ISMCTSAgent(BaseAgent):
         """
         done = False
         cumulative_reward = 0.0
+        depth = 0
 
         while not done:
             action = self._rollout_agent.select_action(obs, env=env)
@@ -298,9 +335,13 @@ class ISMCTSAgent(BaseAgent):
                 break
             obs, reward, terminated, truncated, info = env.step(action)
             cumulative_reward += reward
+            depth += 1
             done = terminated or truncated
 
-        return cumulative_reward + self._evaluate_terminal(env)
+        total = cumulative_reward + self._evaluate_terminal(env)
+        if self.tracer is not None:
+            self.tracer.record_rollout(depth, total)
+        return total
 
     @staticmethod
     def _evaluate_terminal(env):
